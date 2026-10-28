@@ -157,6 +157,22 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Leave a role, or (owner) delete the whole institute. Then show another role.
+  Future<void> removeRole(Membership m, {bool deleteInstitute = false}) async {
+    if (deleteInstitute) {
+      await backend.deleteInstitute(m.instituteId);
+    } else {
+      await backend.leave(m);
+    }
+    memberships = await backend.myMemberships();
+    if (active?.id == m.id || (deleteInstitute && active?.instituteId == m.instituteId)) {
+      final live = memberships.where((x) => x.status != MemberStatus.rejected).toList();
+      active = live.where((x) => x.approved).firstOrNull ?? live.firstOrNull;
+      await chooseRole(active?.role);
+    }
+    notifyListeners();
+  }
+
   Future<void> saveProfile(AppUser u) async {
     await backend.saveProfile(u);
     profile = u;

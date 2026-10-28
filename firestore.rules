@@ -26,7 +26,7 @@ service cloud.firestore {
       allow list: if false;
       allow create: if signedIn() && (isStaff(request.resource.data.instituteId) || isOwner(request.resource.data.instituteId));
       allow update: if false;
-      allow delete: if signedIn() && isAdmin(resource.data.instituteId);
+      allow delete: if signedIn() && (isAdmin(resource.data.instituteId) || isOwner(resource.data.instituteId));
     }
 
     // Who belongs where. Id is "<uid>_<instituteId>".
@@ -50,13 +50,14 @@ service cloud.firestore {
             && changed().hasOnly(['status', 'studentCode', 'monthlyFee'])
             && (resource.data.role in ['student', 'parent'] || isAdmin(resource.data.instituteId)));
 
-      allow delete: if own();
+      allow delete: if own() || isAdmin(resource.data.instituteId);
     }
 
     match /institutes/{inst} {
       allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid;
       allow get: if isMember(inst) || isOwner(inst);
       allow update: if isAdmin(inst);
+      allow delete: if isOwner(inst);
 
       match /batches/{id} {
         allow read: if isMember(inst);

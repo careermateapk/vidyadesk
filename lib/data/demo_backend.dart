@@ -205,6 +205,25 @@ class DemoBackend implements Backend {
     m.monthlyFee = fee;
   }
 
+  @override
+  Future<void> leave(Membership m) async {
+    await _wait();
+    _members.remove(m.id);
+    _codes.removeWhere((k, c) => c.type == CodeType.student && c.studentUid == m.uid && c.instituteId == m.instituteId);
+  }
+
+  @override
+  Future<void> deleteInstitute(String instituteId) async {
+    await _wait();
+    _institutes.remove(instituteId);
+    _members.removeWhere((k, m) => m.instituteId == instituteId);
+    _codes.removeWhere((k, c) => c.instituteId == instituteId);
+    _batches.removeWhere((k, b) => b.instituteId == instituteId);
+    _attendance.removeWhere((k, _) => k.startsWith('${instituteId}_'));
+    _fees.removeWhere((k, _) => k.startsWith('${instituteId}_'));
+    _notices.remove(instituteId);
+  }
+
   // ---------- institute & codes ----------
 
   @override

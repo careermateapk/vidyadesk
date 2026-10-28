@@ -44,8 +44,25 @@ class SettingsPage extends StatelessWidget {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(name, style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900)),
                   Text(u?.email ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xCCFFFFFF), fontSize: 12.5)),
-                  const SizedBox(height: 6),
-                  Tag('${roleName(m.role)} · ${m.instituteName}', fg: const Color(0xFF073B3F), bg: const Color(0xFFFFD27A)),
+                  const SizedBox(height: 8),
+                  Wrap(spacing: 6, runSpacing: 6, children: [
+                    Tag(roleName(m.role), fg: const Color(0xFF073B3F), bg: const Color(0xFFFFD27A)),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 220),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                        decoration: BoxDecoration(color: const Color(0x26FFFFFF), borderRadius: BorderRadius.circular(9)),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          const Icon(Icons.apartment_rounded, size: 14, color: Colors.white),
+                          const SizedBox(width: 5),
+                          Flexible(
+                            child: Text(m.instituteName,
+                                maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w800)),
+                          ),
+                        ]),
+                      ),
+                    ),
+                  ]),
                 ]),
               ),
               if (u != null)
@@ -59,7 +76,7 @@ class SettingsPage extends StatelessWidget {
           item(const DemoBanner()),
 
           // ----- roles -----
-          item(SectionTitle(tr('my_roles'))),
+          item(SectionTitle(tr('my_roles'), trailing: Text(trf('n_roles', {'n': '${others.length}'}), style: TextStyle(color: p.muted, fontSize: 12.5, fontWeight: FontWeight.w600)))),
           for (final x in others)
             item(AppCard(
               padding: const EdgeInsets.all(12),
@@ -79,7 +96,17 @@ class SettingsPage extends StatelessWidget {
                 else if (!x.approved)
                   Tag(tr('pending'), fg: p.warn, bg: p.warnTint)
                 else
-                  Text(tr('switch'), style: TextStyle(color: p.brand, fontWeight: FontWeight.w800)),
+                  Tag(tr('switch'), fg: p.brand, bg: p.brandTint),
+                const SizedBox(width: 8),
+                Material(
+                  color: p.dangerTint,
+                  borderRadius: BorderRadius.circular(12),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () => showRemoveRoleSheet(context, x),
+                    child: SizedBox(width: 40, height: 40, child: Icon(Icons.delete_rounded, color: p.danger, size: 21, semanticLabel: tr('remove'))),
+                  ),
+                ),
               ]),
             )),
           item(SoftButton(label: tr('add_role'), icon: Icons.add_rounded, onPressed: () => _addRole(context))),
@@ -203,6 +230,171 @@ class SettingsPage extends StatelessWidget {
       applicationVersion: '1.0.0',
       applicationIcon: const AppLogo(size: 48),
       children: [Text(tr('about_text')), const SizedBox(height: 8), Text(app.isDemo ? tr('mode_demo') : tr('mode_live'))],
+    );
+  }
+}
+
+/// Asks before leaving a role, or (owner) deleting the whole institute.
+Future<void> showRemoveRoleSheet(BuildContext context, Membership x) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (_) => _RemoveRoleSheet(x: x),
+  );
+}
+
+class _RemoveRoleSheet extends StatefulWidget {
+  const _RemoveRoleSheet({required this.x});
+  final Membership x;
+  @override
+  State<_RemoveRoleSheet> createState() => _RemoveRoleSheetState();
+}
+
+class _RemoveRoleSheetState extends State<_RemoveRoleSheet> {
+  final _name = TextEditingController();
+  bool _busy = false;
+  late final bool _owner = widget.x.role == Role.admin && widget.x.approved;
+  late final Future<List<Membership>> _members = _owner ? context.appRead.backend.members(widget.x.instituteId) : Future.value(<Membership>[]);
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  bool get _nameOk => _name.text.trim().toLowerCase() == widget.x.instituteName.trim().toLowerCase();
+
+  Future<void> _go() async {
+    final app = context.appRead;
+    final nav = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _busy = true);
+    try {
+      await app.removeRole(widget.x, deleteInstitute: _owner);
+      nav.popUntil((r) => r.isFirst);
+      messenger.showSnackBar(SnackBar(content: Text(_owner ? tr('inst_deleted') : tr('role_removed'))));
+    } catch (e) {
+      if (mounted) {
+        setState(() => _busy = false);
+        toast(context, errorMessage(e));
+      }
+    }
+  }
+
+  Widget _line(String mark, String text, Color c) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(mark, style: TextStyle(color: c, fontWeight: FontWeight.w900)),
+          const SizedBox(width: 8),
+          Expanded(child: Text(text, style: TextStyle(color: c, fontWeight: FontWeight.w600, height: 1.35))),
+        ]),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pal;
+    final x = widget.x;
+    final pending = !x.approved;
+    final color = _owner ? p.danger : p.warn;
+    final tint = _owner ? p.dangerTint : p.warnTint;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 0, 20, MediaQuery.of(context).viewInsets.bottom + 24),
+      child: SingleChildScrollView(
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Center(
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: 1),
+              duration: const Duration(milliseconds: 650),
+              curve: Curves.elasticOut,
+              builder: (context, v, child) => Transform.scale(scale: v, child: child),
+              child: Container(
+                width: 76,
+                height: 76,
+                decoration: BoxDecoration(color: tint, shape: BoxShape.circle),
+                child: Icon(_owner ? Icons.warning_rounded : Icons.logout_rounded, color: color, size: 38),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            _owner ? trf('delete_inst_q', {'name': x.instituteName}) : (pending ? tr('cancel_request_q') : trf('leave_q', {'name': x.instituteName})),
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900, color: _owner ? p.danger : p.ink),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _owner ? tr('delete_inst_sub') : trf('leave_sub', {'role': roleName(x.role), 'name': x.instituteName}),
+            textAlign: TextAlign.center,
+            style: TextStyle(color: p.muted, fontSize: 14, height: 1.4),
+          ),
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: _owner ? p.dangerTint : p.cardAlt, borderRadius: BorderRadius.circular(16)),
+            child: _owner
+                ? FutureBuilder<List<Membership>>(
+                    future: _members,
+                    builder: (context, s) {
+                      final list = s.data ?? const <Membership>[];
+                      final st = list.where((m) => m.role == Role.student).length;
+                      final te = list.where((m) => m.role == Role.teacher).length;
+                      return Column(children: [
+                        _line('✕', tr('delete_inst_l1'), p.danger),
+                        _line('✕', trf('delete_inst_l2', {'s': '$st', 't': '$te'}), p.danger),
+                        _line('✕', tr('delete_inst_l3'), p.danger),
+                      ]);
+                    },
+                  )
+                : Column(children: [
+                    _line('✓', tr('leave_l1'), p.success),
+                    _line('✓', tr('leave_l2'), p.success),
+                  ]),
+          ),
+          if (_owner) ...[
+            const SizedBox(height: 14),
+            FieldLabel(tr('type_inst_name')),
+            TextField(
+              controller: _name,
+              onChanged: (_) => setState(() {}),
+              textCapitalization: TextCapitalization.words,
+              decoration: InputDecoration(
+                hintText: x.instituteName,
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: p.danger.withValues(alpha: .5), width: 1.5)),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: p.danger, width: 2)),
+              ),
+            ),
+          ],
+          const SizedBox(height: 16),
+          Row(children: [
+            Expanded(child: SoftButton(label: tr('cancel'), color: p.cardAlt, textColor: p.ink, height: 54, onPressed: _busy ? null : () => Navigator.pop(context))),
+            const SizedBox(width: 10),
+            Expanded(
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 200),
+                opacity: !_owner || _nameOk ? 1 : .45,
+                child: Material(
+                  color: color,
+                  borderRadius: BorderRadius.circular(14),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: _busy || (_owner && !_nameOk) ? null : _go,
+                    child: SizedBox(
+                      height: 54,
+                      child: Center(
+                        child: _busy
+                            ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))
+                            : Text(_owner ? tr('delete_forever') : (pending ? tr('yes_cancel') : tr('yes_leave')),
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15.5)),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ]),
+        ]),
+      ),
     );
   }
 }

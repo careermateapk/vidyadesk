@@ -196,6 +196,47 @@ class FirebaseBackend implements Backend {
     m.monthlyFee = fee;
   }
 
+  @override
+  Future<void> leave(Membership m) => _mem.doc(m.id).delete();
+
+  Future<void> _deleteAll(List<DocumentReference<Map<String, dynamic>>> refs) async {
+    for (var i = 0; i < refs.length; i += 400) {
+      final b = _db.batch();
+      for (final r in refs.skip(i).take(400)) {
+        b.delete(r);
+      }
+      await b.commit();
+    }
+  }
+
+  @override
+  Future<void> deleteInstitute(String instituteId) async {
+    final me = _auth.currentUser!.uid;
+    final inst = _inst(instituteId);
+    final instDoc = await inst.get();
+    final members = await _mem.where('instituteId', isEqualTo: instituteId).get();
+    final batches = await inst.collection('batches').get();
+    // 1. everything inside the institute
+    final inside = <DocumentReference<Map<String, dynamic>>>[];
+    for (final c in ['batches', 'attendance', 'fees', 'notices']) {
+      final q = c == 'batches' ? batches : await inst.collection(c).get();
+      inside.addAll(q.docs.map((d) => d.reference));
+    }
+    await _deleteAll(inside);
+    // 2. its join codes
+    final codes = <String>{
+      (instDoc.data()?['code'] ?? '').toString(),
+      ...batches.docs.map((d) => (d.data()['code'] ?? '').toString()),
+      ...members.docs.map((d) => (d.data()['studentCode'] ?? '').toString()),
+    }..removeWhere((c) => c.isEmpty);
+    await _deleteAll([for (final c in codes) _db.collection('codes').doc(c)]);
+    // 3. everyone's membership, mine last
+    await _deleteAll(members.docs.where((d) => d.id != '${me}_$instituteId').map((d) => d.reference).toList());
+    await _mem.doc('${me}_$instituteId').delete();
+    // 4. the institute itself
+    await inst.delete();
+  }
+
   // ---------- institute & codes ----------
 
   @override

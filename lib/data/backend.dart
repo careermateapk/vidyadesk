@@ -41,6 +41,10 @@ abstract class Backend {
   Future<List<Membership>> members(String instituteId);
   Future<void> decide(Membership m, bool approve);
   Future<void> setMonthlyFee(Membership m, int fee);
+  /// Remove one of my roles (also cancels a pending request).
+  Future<void> leave(Membership m);
+  /// Owner only: remove the whole institute with all its data.
+  Future<void> deleteInstitute(String instituteId);
 
   // ---- institute & codes ----
   Future<Membership> createInstitute({required AppUser owner, required String name, required String city, required bool teaches, required List<String> subjects});

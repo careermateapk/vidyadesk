@@ -20,6 +20,10 @@ class DemoBackend implements Backend {
   final Map<String, Submission> _subs = {};
   final Map<String, TestPaper> _tests = {};
   final Map<String, Doubt> _doubts = {};
+  final Map<String, Txn> _ledger = {};
+  final Map<String, Lead> _leads = {};
+  final Map<String, CheckIn> _checkins = {};
+  final Map<String, Syllabus> _syllabus = {};
 
   static const demoInstituteCode = 'SHRM-4821';
   static const demoBatchCode = 'ECO-TTS-5PM-38';
@@ -41,7 +45,7 @@ class DemoBackend implements Backend {
   void _seed() {
     const instId = 'demo-inst';
     const owner = 'demo-owner';
-    _institutes[instId] = const Institute(id: instId, name: 'Sharma Classes', city: 'Darbhanga', code: demoInstituteCode, ownerUid: owner, address: 'Laheriasarai Road, Darbhanga', phone: '+91 98765 43210', upiId: 'sharmaclasses@ybl', upiName: 'Sharma Classes');
+    _institutes[instId] = const Institute(id: instId, name: 'Sharma Classes', city: 'Darbhanga', code: demoInstituteCode, ownerUid: owner, address: 'Laheriasarai Road, Darbhanga', phone: '+91 98765 43210', upiId: 'sharmaclasses@ybl', upiName: 'Sharma Classes', dueDay: 10, lateFee: 100);
     _codes[demoInstituteCode] = const JoinCode(code: demoInstituteCode, type: CodeType.institute, instituteId: instId, instituteName: 'Sharma Classes');
     final now = DateTime.now().millisecondsSinceEpoch;
     _members['${owner}_$instId'] = Membership(
@@ -53,7 +57,7 @@ class DemoBackend implements Backend {
     _codes[b1.code] = JoinCode(code: b1.code, type: CodeType.batch, instituteId: instId, instituteName: 'Sharma Classes', batchId: b1.id, batchTitle: '${b1.title} · TTS · 5:00 PM', teacherName: 'Rakesh Sharma');
     _codes[b2.code] = JoinCode(code: b2.code, type: CodeType.batch, instituteId: instId, instituteName: 'Sharma Classes', batchId: b2.id, batchTitle: '${b2.title} · MWF · 7:00 AM', teacherName: 'Anil Verma');
     _members['t1_$instId'] = Membership(
-        uid: 't1', instituteId: instId, instituteName: 'Sharma Classes', role: Role.teacher, status: MemberStatus.approved, name: 'Anil Verma', phone: '+919431122558', subjects: ['Accounts'], createdAt: now);
+        uid: 't1', instituteId: instId, instituteName: 'Sharma Classes', role: Role.teacher, status: MemberStatus.approved, name: 'Anil Verma', phone: '+919431122558', subjects: ['Accounts'], createdAt: now, salary: 9000);
     final names = ['Aarav Kumar', 'Priya Jha', 'Rohit Mishra', 'Sneha Karn', 'Ankit Yadav', 'Neha Thakur', 'Vikas Sah'];
     for (var i = 0; i < names.length; i++) {
       final uid = 's$i';
@@ -67,7 +71,9 @@ class DemoBackend implements Backend {
         phone: '+91987650${1000 + i}',
         batchIds: [i.isEven ? 'b1' : 'b2'],
         studentCode: i == 0 ? demoStudentCode : 'STU-${names[i].substring(0, 2).toUpperCase()}-${5000 + i}',
-        monthlyFee: i.isEven ? 1500 : 1200,
+        monthlyFee: i == 2 ? 1200 : (i.isEven ? 1500 : 1200),
+        discount: i == 2 ? 300 : 0,
+        feeNote: i == 2 ? 'Merit scholarship' : '',
         createdAt: now,
       );
       _members[m.id] = m;
@@ -122,19 +128,55 @@ class DemoBackend implements Backend {
     // Study material, tests and a doubt
     final day = 86400000;
     for (final r in [
-      Resource(id: 'r1', kind: 'video', title: 'Demand and Supply — full chapter', batchId: 'b1', chapter: 'Ch 3 · Demand', url: 'https://www.youtube.com/watch?v=LwLh6ax0zTE', byUid: owner, byName: 'Rakesh Sharma', createdAt: now - 2 * 3600000),
+      Resource(id: 'r1', kind: 'videos', title: 'Demand and Supply — full chapter', batchId: 'b1', chapter: 'Ch 3 · Demand', url: 'https://www.youtube.com/watch?v=LwLh6ax0zTE', byUid: owner, byName: 'Rakesh Sharma', createdAt: now - 2 * 3600000),
       Resource(id: 'r2', kind: 'notes', title: 'Demand — full notes', batchId: 'b1', chapter: 'Ch 3 · Demand', url: 'https://www.africau.edu/images/default/sample.pdf', desc: '6 pages', byUid: owner, byName: 'Rakesh Sharma', createdAt: now - 3600000),
       Resource(id: 'r3', kind: 'homework', title: 'Elasticity worksheet', batchId: 'b1', chapter: 'Ch 4 · Elasticity', desc: 'Solve Q1–Q10. Show the formula and steps for every answer.', dueAt: now + day, byUid: owner, byName: 'Rakesh Sharma', createdAt: now - day),
       Resource(id: 'r4', kind: 'important', title: 'Most asked 3-mark questions', batchId: '', chapter: 'Ch 3 · Demand', desc: '1. Law of demand with schedule\n2. Why does the demand curve slope downward?\n3. Difference between change in demand and change in quantity demanded', byUid: owner, byName: 'Rakesh Sharma', createdAt: now - 3 * day),
       Resource(id: 'r5', kind: 'syllabus', title: 'Economics Class 12 — Board syllabus', batchId: 'b1', url: 'https://cbseacademic.nic.in/curriculum_2025.html', byUid: owner, byName: 'Rakesh Sharma', createdAt: now - 20 * day),
-      Resource(id: 'r6', kind: 'link', title: 'NCERT Economics books (free)', batchId: '', url: 'https://ncert.nic.in/textbook.php', byUid: owner, byName: 'Rakesh Sharma', createdAt: now - 10 * day),
-      Resource(id: 'r7', kind: 'paper', title: 'Board paper 2025 — Economics', batchId: 'b1', url: 'https://cbseacademic.nic.in/SQP_CLASSXII_2024-25.html', byUid: owner, byName: 'Rakesh Sharma', createdAt: now - 6 * day),
+      Resource(id: 'r6', kind: 'links', title: 'NCERT Economics books (free)', batchId: '', url: 'https://ncert.nic.in/textbook.php', byUid: owner, byName: 'Rakesh Sharma', createdAt: now - 10 * day),
+      Resource(id: 'r7', kind: 'papers', title: 'Board paper 2025 — Economics', batchId: 'b1', url: 'https://cbseacademic.nic.in/SQP_CLASSXII_2024-25.html', byUid: owner, byName: 'Rakesh Sharma', createdAt: now - 6 * day),
     ]) {
       _res['${instId}_${r.id}'] = r;
     }
-    _tests['${instId}_t1'] = TestPaper(id: 't1', batchId: 'b1', title: 'Unit Test 2', subject: 'Economics', maxMarks: 50, date: now - 5 * day, published: true, marks: {'s0': 42, 's2': 47, 's4': 18, 's6': 39}, byName: 'Rakesh Sharma');
-    _tests['${instId}_t0'] = TestPaper(id: 't0', batchId: 'b1', title: 'Unit Test 1', subject: 'Economics', maxMarks: 50, date: now - 26 * day, published: true, marks: {'s0': 36, 's2': 41, 's4': 22, 's6': 35}, byName: 'Rakesh Sharma');
-    _tests['${instId}_t2'] = TestPaper(id: 't2', batchId: 'b2', title: 'Monthly test', subject: 'Accounts', maxMarks: 50, date: now - 12 * day, published: true, marks: {'s1': 33, 's3': 44, 's5': 28}, byName: 'Anil Verma');
+    _tests['${instId}_t1'] = TestPaper(id: 't1', batchId: 'b1', title: 'Unit Test 2', subject: 'Economics', maxMarks: 50, date: now - 5 * day, published: true, marks: {'s0': 42, 's2': 47, 's4': 18, 's6': 39}, byName: 'Rakesh Sharma', names: {'s0': 'Aarav Kumar', 's1': 'Priya Jha', 's2': 'Rohit Mishra', 's3': 'Sneha Karn', 's4': 'Ankit Yadav', 's5': 'Neha Thakur', 's6': 'Vikas Sah'});
+    _tests['${instId}_t0'] = TestPaper(id: 't0', batchId: 'b1', title: 'Unit Test 1', subject: 'Economics', maxMarks: 50, date: now - 26 * day, published: true, marks: {'s0': 36, 's2': 41, 's4': 22, 's6': 35}, byName: 'Rakesh Sharma', names: {'s0': 'Aarav Kumar', 's1': 'Priya Jha', 's2': 'Rohit Mishra', 's3': 'Sneha Karn', 's4': 'Ankit Yadav', 's5': 'Neha Thakur', 's6': 'Vikas Sah'});
+    _tests['${instId}_t2'] = TestPaper(id: 't2', batchId: 'b2', title: 'Monthly test', subject: 'Accounts', maxMarks: 50, date: now - 12 * day, published: true, marks: {'s1': 33, 's3': 44, 's5': 28}, byName: 'Anil Verma', names: {'s0': 'Aarav Kumar', 's1': 'Priya Jha', 's2': 'Rohit Mishra', 's3': 'Sneha Karn', 's4': 'Ankit Yadav', 's5': 'Neha Thakur', 's6': 'Vikas Sah'});
+    // Money, admissions, check-ins and syllabus
+    final mk = monthKey(today);
+    for (final t in [
+      Txn(id: 'x1', isIncome: false, category: 'rent', amount: 8000, date: now - 6 * day, note: 'Hall rent', mode: 'Bank', byName: 'Rakesh Sharma'),
+      Txn(id: 'x2', isIncome: false, category: 'electricity', amount: 1350, date: now - 4 * day, mode: 'UPI', byName: 'Rakesh Sharma'),
+      Txn(id: 'x3', isIncome: false, category: 'stationery', amount: 620, date: now - 2 * day, note: 'Markers, A4 paper', mode: 'Cash', byName: 'Rakesh Sharma'),
+      Txn(id: 'x4', isIncome: true, category: 'admission', amount: 1000, date: now - 3 * day, note: 'Rahul Kumar — admission fee', mode: 'Cash', byName: 'Rakesh Sharma'),
+      Txn(id: 'x5', isIncome: true, category: 'books', amount: 450, date: now - day, note: 'Sample papers sold', mode: 'Cash', byName: 'Rakesh Sharma'),
+      Txn(id: 'pay_t1_${monthKey(DateTime(today.year, today.month - 1))}', isIncome: false, category: 'salary', amount: 9000, date: now - 25 * day, mode: 'Bank', refUid: 't1', refName: 'Anil Verma', byName: 'Rakesh Sharma'),
+    ]) {
+      _ledger['${instId}_${t.id}'] = t;
+    }
+    for (final l in [
+      Lead(id: 'l1', name: 'Kavya Singh', phone: '+919876512345', className: 'Class 12', subject: 'Economics', source: 'walkin', status: 'new', createdAt: now - 2 * 3600000, followUp: now + day),
+      Lead(id: 'l2', name: 'Aditya Raj', phone: '+919934567812', className: 'Class 11', subject: 'Accounts', source: 'friend', status: 'contacted', note: 'Father will visit on Sunday', createdAt: now - 2 * day, followUp: now + 2 * day),
+      Lead(id: 'l3', name: 'Simran Kumari', phone: '+918877665544', className: 'Class 12', subject: 'Economics', source: 'poster', status: 'demo', note: 'Attended demo class, liked it', createdAt: now - 5 * day),
+      Lead(id: 'l4', name: 'Rahul Kumar', phone: '+919812345210', className: 'Class 12', subject: 'Economics', source: 'friend', status: 'joined', createdAt: now - 9 * day),
+    ]) {
+      _leads['${instId}_${l.id}'] = l;
+    }
+    for (var d = 1; d <= 12; d++) {
+      final day0 = DateTime(today.year, today.month, today.day).subtract(Duration(days: d));
+      if (day0.weekday == 7 || monthKey(day0) != mk) continue;
+      final c = CheckIn(uid: 't1', name: 'Anil Verma', dateKey: dateKey(day0), inAt: day0.add(const Duration(hours: 6, minutes: 50)).millisecondsSinceEpoch, outAt: day0.add(const Duration(hours: 8, minutes: 40)).millisecondsSinceEpoch);
+      _checkins['${instId}_${c.id}'] = c;
+    }
+    _syllabus['${instId}_b1'] = Syllabus(batchId: 'b1', updatedAt: now - day, chapters: [
+      Chapter(name: 'Ch 1 · Introduction to Microeconomics', done: true, doneAt: now - 40 * day),
+      Chapter(name: 'Ch 2 · Consumer Behaviour', done: true, doneAt: now - 25 * day),
+      Chapter(name: 'Ch 3 · Demand', done: true, doneAt: now - 6 * day),
+      Chapter(name: 'Ch 4 · Elasticity of Demand'),
+      Chapter(name: 'Ch 5 · Production'),
+      Chapter(name: 'Ch 6 · Cost'),
+      Chapter(name: 'Ch 7 · Supply'),
+      Chapter(name: 'Ch 8 · Market Equilibrium'),
+    ]);
     _doubts['${instId}_d1'] = Doubt(
       id: 'd1',
       batchId: 'b1',
@@ -244,6 +286,27 @@ class DemoBackend implements Backend {
   }
 
   @override
+  Future<void> setFeePlan(Membership m, {required int monthlyFee, required int discount, required String note}) async {
+    await _wait();
+    for (final x in [_members[m.id], m]) {
+      x
+        ?..monthlyFee = monthlyFee
+        ..discount = discount
+        ..feeNote = note;
+    }
+  }
+
+  @override
+  Future<void> setPay(Membership m, {required int salary, required String payType}) async {
+    await _wait();
+    for (final x in [_members[m.id], m]) {
+      x
+        ?..salary = salary
+        ..payType = payType;
+    }
+  }
+
+  @override
   Future<void> setMonthlyFee(Membership m, int fee) async {
     (_members[m.id] ?? m).monthlyFee = fee;
     m.monthlyFee = fee;
@@ -316,7 +379,7 @@ class DemoBackend implements Backend {
     final code = instituteCodeFor(inst.name);
     _codes.remove(inst.code);
     _codes[code] = JoinCode(code: code, type: CodeType.institute, instituteId: inst.id, instituteName: inst.name);
-    _institutes[inst.id] = Institute(id: inst.id, name: inst.name, city: inst.city, code: code, ownerUid: inst.ownerUid);
+    _institutes[inst.id] = (_institutes[inst.id] ?? inst).copyWith(code: code);
     return code;
   }
 
@@ -532,4 +595,70 @@ class DemoBackend implements Backend {
 
   /// Demo only: lets the person approve their own pending request.
   Future<void> demoApprove(Membership m) => decide(m, true);
+
+  // ---------- money ----------
+
+  @override
+  Future<List<Txn>> ledger(String instituteId, String month) async =>
+      _ledger.entries.where((e) => e.key.startsWith('${instituteId}_') && e.value.month == month).map((e) => e.value).toList()..sort((a, b) => b.date.compareTo(a.date));
+
+  @override
+  Future<void> saveTxn(String instituteId, Txn t) async {
+    await _wait();
+    _ledger['${instituteId}_${t.id}'] = t;
+  }
+
+  @override
+  Future<void> deleteTxn(String instituteId, String id) async {
+    await _wait();
+    _ledger.remove('${instituteId}_$id');
+  }
+
+  @override
+  Future<List<Txn>> payslips(String instituteId, String uid) async =>
+      _ledger.entries.where((e) => e.key.startsWith('${instituteId}_') && e.value.refUid == uid).map((e) => e.value).toList()..sort((a, b) => b.date.compareTo(a.date));
+
+  // ---------- admissions ----------
+
+  @override
+  Future<List<Lead>> leads(String instituteId) async =>
+      _leads.entries.where((e) => e.key.startsWith('${instituteId}_')).map((e) => e.value).toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+  @override
+  Future<void> saveLead(String instituteId, Lead l) async {
+    await _wait();
+    _leads['${instituteId}_${l.id}'] = l;
+  }
+
+  @override
+  Future<void> deleteLead(String instituteId, String id) async {
+    await _wait();
+    _leads.remove('${instituteId}_$id');
+  }
+
+  // ---------- check-in ----------
+
+  @override
+  Future<List<CheckIn>> checkIns(String instituteId, String month, {String? uid}) async => _checkins.entries
+      .where((e) => e.key.startsWith('${instituteId}_') && e.value.month == month && (uid == null || e.value.uid == uid))
+      .map((e) => e.value)
+      .toList()
+    ..sort((a, b) => b.inAt.compareTo(a.inAt));
+
+  @override
+  Future<void> saveCheckIn(String instituteId, CheckIn c) async {
+    await _wait();
+    _checkins['${instituteId}_${c.id}'] = c;
+  }
+
+  // ---------- syllabus ----------
+
+  @override
+  Future<Syllabus?> syllabus(String instituteId, String batchId) async => _syllabus['${instituteId}_$batchId'];
+
+  @override
+  Future<void> saveSyllabus(String instituteId, Syllabus s) async {
+    await _wait();
+    _syllabus['${instituteId}_${s.batchId}'] = s;
+  }
 }

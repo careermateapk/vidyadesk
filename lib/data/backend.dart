@@ -43,6 +43,10 @@ abstract class Backend {
   Future<List<Membership>> members(String instituteId);
   Future<void> decide(Membership m, bool approve);
   Future<void> setMonthlyFee(Membership m, int fee);
+  /// Admin: a student's fee plan. [monthlyFee] is the final amount after [discount].
+  Future<void> setFeePlan(Membership m, {required int monthlyFee, required int discount, required String note});
+  /// Admin: a teacher's pay — fixed monthly, or per class when [payType] is "class".
+  Future<void> setPay(Membership m, {required int salary, required String payType});
   /// Remove one of my roles (also cancels a pending request).
   Future<void> leave(Membership m);
   /// Owner only: remove the whole institute with all its data.
@@ -104,6 +108,27 @@ abstract class Backend {
   /// Staff: every doubt. Student: pass [studentUid] to get only theirs.
   Future<List<Doubt>> doubts(String instituteId, {String? studentUid});
   Future<void> saveDoubt(String instituteId, Doubt d);
+
+  // ---- money (admin) ----
+  Future<List<Txn>> ledger(String instituteId, String month);
+  Future<void> saveTxn(String instituteId, Txn t);
+  Future<void> deleteTxn(String instituteId, String id);
+  /// A teacher's own salary entries.
+  Future<List<Txn>> payslips(String instituteId, String uid);
+
+  // ---- admissions ----
+  Future<List<Lead>> leads(String instituteId);
+  Future<void> saveLead(String instituteId, Lead l);
+  Future<void> deleteLead(String instituteId, String id);
+
+  // ---- teacher check-in ----
+  /// Admin: everyone's (pass [uid] for one teacher). Teacher must pass own uid.
+  Future<List<CheckIn>> checkIns(String instituteId, String month, {String? uid});
+  Future<void> saveCheckIn(String instituteId, CheckIn c);
+
+  // ---- syllabus ----
+  Future<Syllabus?> syllabus(String instituteId, String batchId);
+  Future<void> saveSyllabus(String instituteId, Syllabus s);
 
   // ---- notices ----
   Future<List<Notice>> notices(String instituteId);

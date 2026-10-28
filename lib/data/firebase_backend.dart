@@ -207,6 +207,23 @@ class FirebaseBackend implements Backend {
   }
 
   @override
+  Future<void> setFeePlan(Membership m, {required int monthlyFee, required int discount, required String note}) async {
+    await _mem.doc(m.id).update({'monthlyFee': monthlyFee, 'discount': discount, 'feeNote': note});
+    m
+      ..monthlyFee = monthlyFee
+      ..discount = discount
+      ..feeNote = note;
+  }
+
+  @override
+  Future<void> setPay(Membership m, {required int salary, required String payType}) async {
+    await _mem.doc(m.id).update({'salary': salary, 'payType': payType});
+    m
+      ..salary = salary
+      ..payType = payType;
+  }
+
+  @override
   Future<void> leave(Membership m) => _mem.doc(m.id).delete();
 
   Future<void> _deleteAll(List<DocumentReference<Map<String, dynamic>>> refs) async {
@@ -289,7 +306,7 @@ class FirebaseBackend implements Backend {
 
   @override
   Future<void> updateInstitute(Institute inst) =>
-      _inst(inst.id).update({'name': inst.name, 'city': inst.city, 'address': inst.address, 'phone': inst.phone, 'upiId': inst.upiId, 'upiName': inst.upiName});
+      _inst(inst.id).update({'name': inst.name, 'city': inst.city, 'address': inst.address, 'phone': inst.phone, 'upiId': inst.upiId, 'upiName': inst.upiName, 'dueDay': inst.dueDay, 'lateFee': inst.lateFee});
 
   @override
   Future<String> newInstituteCode(Institute inst) async {
@@ -548,4 +565,63 @@ class FirebaseBackend implements Backend {
 
   @override
   Future<void> postNotice(String instituteId, Notice n) => _inst(instituteId).collection('notices').doc(n.id).set(n.toMap());
+
+  // ---------- money ----------
+
+  @override
+  Future<List<Txn>> ledger(String instituteId, String month) async {
+    final q = await _inst(instituteId).collection('ledger').where('month', isEqualTo: month).get();
+    return q.docs.map((d) => Txn.fromMap(d.data())).toList()..sort((a, b) => b.date.compareTo(a.date));
+  }
+
+  @override
+  Future<void> saveTxn(String instituteId, Txn t) => _inst(instituteId).collection('ledger').doc(t.id).set(t.toMap());
+
+  @override
+  Future<void> deleteTxn(String instituteId, String id) => _inst(instituteId).collection('ledger').doc(id).delete();
+
+  @override
+  Future<List<Txn>> payslips(String instituteId, String uid) async {
+    final q = await _inst(instituteId).collection('ledger').where('refUid', isEqualTo: uid).get();
+    return q.docs.map((d) => Txn.fromMap(d.data())).toList()..sort((a, b) => b.date.compareTo(a.date));
+  }
+
+  // ---------- admissions ----------
+
+  @override
+  Future<List<Lead>> leads(String instituteId) async {
+    final q = await _inst(instituteId).collection('leads').get();
+    return q.docs.map((d) => Lead.fromMap(d.data())).toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  }
+
+  @override
+  Future<void> saveLead(String instituteId, Lead l) => _inst(instituteId).collection('leads').doc(l.id).set(l.toMap());
+
+  @override
+  Future<void> deleteLead(String instituteId, String id) => _inst(instituteId).collection('leads').doc(id).delete();
+
+  // ---------- check-in ----------
+
+  @override
+  Future<List<CheckIn>> checkIns(String instituteId, String month, {String? uid}) async {
+    Query<Map<String, dynamic>> q = _inst(instituteId).collection('checkins').where('month', isEqualTo: month);
+    if (uid != null) q = q.where('uid', isEqualTo: uid);
+    final r = await q.get();
+    return r.docs.map((d) => CheckIn.fromMap(d.data())).toList()..sort((a, b) => b.inAt.compareTo(a.inAt));
+  }
+
+  @override
+  Future<void> saveCheckIn(String instituteId, CheckIn c) => _inst(instituteId).collection('checkins').doc(c.id).set(c.toMap());
+
+  // ---------- syllabus ----------
+
+  @override
+  Future<Syllabus?> syllabus(String instituteId, String batchId) async {
+    final d = await _inst(instituteId).collection('syllabus').doc(batchId).get();
+    if (!d.exists || d.data() == null) return null;
+    return Syllabus.fromMap(d.data()!);
+  }
+
+  @override
+  Future<void> saveSyllabus(String instituteId, Syllabus s) => _inst(instituteId).collection('syllabus').doc(s.batchId).set(s.toMap());
 }

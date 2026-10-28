@@ -120,6 +120,8 @@ class _PaySheetState extends State<_PaySheet> {
       claimByUid: app.signedIn?.uid ?? widget.m.uid,
       claimVia: via,
       claimAt: DateTime.now().millisecondsSinceEpoch,
+      lateFee: e?.lateFee ?? 0,
+      parts: e?.parts,
     );
     await app.backend.claimFee(widget.m.instituteId, f);
     if (!mounted) return;
@@ -267,8 +269,10 @@ class _ConfirmPaymentsScreenState extends State<ConfirmPaymentsScreen> {
               utr: f.claimUtr,
               paidBy: f.claimBy,
               claimed: false,
+              lateFee: f.lateFee,
+              parts: f.parts,
             )
-          : FeeRecord(studentUid: f.studentUid, studentName: f.studentName, month: f.month, amount: f.amount);
+          : FeeRecord(studentUid: f.studentUid, studentName: f.studentName, month: f.month, amount: f.amount, lateFee: f.lateFee, parts: f.parts);
       await context.appRead.backend.saveFee(widget.m.instituteId, rec);
       HapticFeedback.mediumImpact();
       setState(() => _done[f.id] = ok);
@@ -383,6 +387,8 @@ class _InstituteSettingsScreenState extends State<InstituteSettingsScreen> {
   Institute? _inst;
   final _name = TextEditingController(), _city = TextEditingController(), _addr = TextEditingController();
   final _phone = TextEditingController(), _upi = TextEditingController(), _upiName = TextEditingController();
+  final _late = TextEditingController();
+  int _dueDay = 10;
   bool _busy = false;
   String? _upiErr;
 
@@ -399,13 +405,15 @@ class _InstituteSettingsScreenState extends State<InstituteSettingsScreen> {
         _phone.text = i.phone;
         _upi.text = i.upiId;
         _upiName.text = i.upiName;
+        _dueDay = i.dueDay;
+        _late.text = i.lateFee == 0 ? '' : '${i.lateFee}';
       });
     });
   }
 
   @override
   void dispose() {
-    for (final c in [_name, _city, _addr, _phone, _upi, _upiName]) {
+    for (final c in [_name, _city, _addr, _phone, _upi, _upiName, _late]) {
       c.dispose();
     }
     super.dispose();
@@ -429,6 +437,8 @@ class _InstituteSettingsScreenState extends State<InstituteSettingsScreen> {
         phone: _phone.text.trim(),
         upiId: upi,
         upiName: _upiName.text.trim(),
+        dueDay: _dueDay,
+        lateFee: int.tryParse(_late.text.trim()) ?? 0,
       );
       await context.appRead.backend.updateInstitute(i);
       if (!mounted) return;
@@ -479,6 +489,30 @@ class _InstituteSettingsScreenState extends State<InstituteSettingsScreen> {
                     const SizedBox(width: 8),
                     Expanded(child: Text(tr('upi_business_tip'), style: TextStyle(color: p.warn, fontWeight: FontWeight.w700, fontSize: 12.5, height: 1.4))),
                   ]),
+                ),
+                const SizedBox(height: 20),
+                SectionTitle(tr('fee_rules')),
+                const SizedBox(height: 4),
+                Text(tr('fee_rules_sub'), style: TextStyle(color: p.muted, fontSize: 12.5, fontWeight: FontWeight.w600, height: 1.4)),
+                const SizedBox(height: 12),
+                FieldLabel(tr('due_day')),
+                AppCard(
+                  padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
+                  child: Row(children: [
+                    Icon(Icons.event_rounded, color: p.brand),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(trf('due_day_n', {'n': '$_dueDay'}), style: const TextStyle(fontWeight: FontWeight.w800))),
+                    IconButton(onPressed: _dueDay <= 1 ? null : () => setState(() => _dueDay--), icon: const Icon(Icons.remove_circle_outline_rounded)),
+                    IconButton(onPressed: _dueDay >= 28 ? null : () => setState(() => _dueDay++), icon: const Icon(Icons.add_circle_outline_rounded)),
+                  ]),
+                ),
+                const SizedBox(height: 14),
+                FieldLabel(tr('late_fee')),
+                TextField(
+                  controller: _late,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: InputDecoration(prefixText: '₹ ', hintText: '0', helperText: tr('late_fee_help')),
                 ),
               ],
             ),

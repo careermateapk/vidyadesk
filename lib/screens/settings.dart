@@ -11,8 +11,14 @@ import 'help.dart';
 import 'payments.dart';
 import 'photo.dart';
 import 'learner_home.dart';
+import 'admissions.dart';
+import 'checkin.dart';
+import 'insights.dart';
+import 'money.dart';
+import 'syllabus.dart';
 import 'onboarding.dart';
 import 'people.dart';
+import 'reports.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key, required this.m});
@@ -139,7 +145,17 @@ class SettingsPage extends StatelessWidget {
                   _Tile(icon: Icons.storefront_outlined, color: p.brand, label: tr('institute_details'), onTap: () => push(context, InstituteSettingsScreen(m: m))),
                   _Tile(icon: Icons.qr_code_2_rounded, color: p.success, label: tr('institute_code'), onTap: () => push(context, InstituteCodeScreen(m: m))),
                   _Tile(icon: Icons.currency_rupee_rounded, color: p.warn, label: tr('payments_confirm'), onTap: () => push(context, ConfirmPaymentsScreen(m: m))),
+                  _Tile(icon: Icons.savings_outlined, color: p.success, label: tr('income_expenses'), onTap: () => push(context, AccountsScreen(m: m))),
+                  _Tile(icon: Icons.payments_outlined, color: p.indigo, label: tr('payroll'), onTap: () => push(context, PayrollScreen(m: m))),
+                  _Tile(icon: Icons.bar_chart_rounded, color: p.brand, label: tr('reports'), onTap: () => push(context, ReportsScreen(m: m))),
                 ],
+                if (m.role == Role.admin) _Tile(icon: Icons.how_to_reg_outlined, color: p.success, label: tr('teacher_checkins'), onTap: () => push(context, CheckInsScreen(m: m))),
+                _Tile(icon: Icons.person_search_rounded, color: p.warn, label: tr('admissions'), onTap: () => push(context, AdmissionsScreen(m: m))),
+                _Tile(icon: Icons.warning_amber_rounded, color: p.danger, label: tr('risk_alert'), onTap: () => push(context, RiskScreen(m: m))),
+                _Tile(icon: Icons.leaderboard_rounded, color: p.warn, label: tr('leaderboard'), onTap: () => push(context, LeaderboardScreen(m: m))),
+                _Tile(icon: Icons.description_outlined, color: p.indigo, label: tr('report_cards'), onTap: () => pickReportCard(context, m)),
+                _Tile(icon: Icons.checklist_rounded, color: p.success, label: tr('syllabus_tracker'), onTap: () => push(context, SyllabusScreen(m: m))),
+                if (m.role == Role.teacher) _Tile(icon: Icons.payments_outlined, color: p.success, label: tr('my_salary'), onTap: () => push(context, MySalaryScreen(m: m))),
                 _Tile(icon: Icons.how_to_reg_rounded, color: p.danger, label: tr('requests'), onTap: () => push(context, RequestsScreen(m: m))),
                 _Tile(
                   icon: Icons.groups_rounded,

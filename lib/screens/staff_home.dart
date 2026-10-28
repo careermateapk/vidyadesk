@@ -6,6 +6,8 @@ import '../core/theme.dart';
 import '../data/models.dart';
 import '../ui/widgets.dart';
 import 'attendance.dart';
+import 'checkin.dart';
+import 'insights.dart';
 import 'common.dart';
 import 'home_shell.dart';
 import 'notices.dart';
@@ -100,13 +102,10 @@ class _StaffHomeState extends State<StaffHome> {
       final f = feeByUid[s.uid];
       final amt = f?.amount ?? s.monthlyFee;
       due += amt;
-      if (f?.paid == true) {
-        got += amt;
-      } else if (amt > 0) {
-        dueCount++;
-      }
+      got += f?.paidSoFar ?? 0;
+      if (f?.paid != true && amt > 0) dueCount++;
     }
-    final lastGot = d.lastFees.where((f) => f.paid).fold<int>(0, (a, f) => a + f.amount);
+    final lastGot = d.lastFees.fold<int>(0, (a, f) => a + f.paidSoFar);
     final change = lastGot == 0 ? null : ((got - lastGot) * 100 / lastGot).round();
     final freshNotice = d.notices.any((n) => n.createdAt > app.lastSeenNotif) || pending.isNotEmpty;
     final nowMin = now.hour * 60 + now.minute;
@@ -198,8 +197,11 @@ class _StaffHomeState extends State<StaffHome> {
           Expanded(child: StatTile(icon: Icons.fact_check_outlined, value: pct(present, marked), suffix: '%', label: tr('today_present'), fg: p.success, bg: p.successTint, empty: marked == 0)),
         ])),
         const SizedBox(height: 12),
+        if (m.role == Role.teacher) ...[item(CheckInCard(m: m)), const SizedBox(height: 12)],
         item(ToolsRow(m: m, onBack: reload)),
+        if (admin) ...[const SizedBox(height: 10), item(AdminToolsRow(m: m, onBack: reload))],
         const SizedBox(height: 12),
+        RiskCard(m: m),
         const DemoBanner(),
         if (pending.isNotEmpty)
           item(Padding(

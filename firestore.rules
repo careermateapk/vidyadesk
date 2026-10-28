@@ -48,7 +48,9 @@ service cloud.firestore {
       allow update: if (own() && changed().hasOnly(['batchIds', 'childUids', 'childNames', 'photo']))
         || (isStaff(resource.data.instituteId)
             && changed().hasOnly(['status', 'studentCode', 'monthlyFee'])
-            && (resource.data.role in ['student', 'parent'] || isAdmin(resource.data.instituteId)));
+            && (resource.data.role in ['student', 'parent'] || isAdmin(resource.data.instituteId)))
+        || (isAdmin(resource.data.instituteId)
+            && changed().hasOnly(['monthlyFee', 'discount', 'feeNote', 'salary', 'payType']));
 
       allow delete: if own() || isAdmin(resource.data.instituteId);
     }
@@ -85,6 +87,23 @@ service cloud.firestore {
         allow read: if isStaff(inst) || (isMember(inst) && (resource.data.studentUid == request.auth.uid || resource.data.studentUid in mem(inst).childUids));
         allow create, update: if isStaff(inst)
           || (isMember(inst) && request.resource.data.studentUid == request.auth.uid && request.resource.data.checked == false);
+      }
+      // Money: only the admin. A teacher can read their own salary entries.
+      match /ledger/{id} {
+        allow read: if isAdmin(inst) || (isMember(inst) && resource.data.refUid == request.auth.uid);
+        allow write: if isAdmin(inst);
+      }
+      match /leads/{id} {
+        allow read, write: if isStaff(inst);
+      }
+      match /checkins/{id} {
+        allow read: if isAdmin(inst) || (isStaff(inst) && resource.data.uid == request.auth.uid);
+        allow create, update: if isStaff(inst) && request.resource.data.uid == request.auth.uid && id == request.auth.uid + '_' + request.resource.data.dateKey;
+        allow delete: if isAdmin(inst);
+      }
+      match /syllabus/{id} {
+        allow read: if isMember(inst);
+        allow write: if isStaff(inst);
       }
       match /doubts/{id} {
         allow read: if isStaff(inst) || (isMember(inst) && (resource.data.studentUid == request.auth.uid || resource.data.studentUid in mem(inst).childUids));

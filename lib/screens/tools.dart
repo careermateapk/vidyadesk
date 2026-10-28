@@ -5,12 +5,60 @@ import '../core/theme.dart';
 import '../data/models.dart';
 import '../ui/widgets.dart';
 import 'attendance.dart';
+import 'admissions.dart';
 import 'common.dart';
 import 'doubts.dart';
+import 'money.dart';
 import 'notices.dart';
+import 'reports.dart';
 import 'resources.dart';
 import 'schedule.dart';
 import 'tests.dart';
+
+/// Admin-only money shortcuts.
+class AdminToolsRow extends StatelessWidget {
+  const AdminToolsRow({super.key, required this.m, this.onBack});
+  final Membership m;
+  final VoidCallback? onBack;
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pal;
+    Future<void> go(Widget page) async {
+      await push(context, page);
+      onBack?.call();
+    }
+
+    return _tiles([
+      (Icons.savings_rounded, tr('accounts'), p.success, () => go(AccountsScreen(m: m))),
+      (Icons.payments_rounded, tr('payroll'), p.indigo, () => go(PayrollScreen(m: m))),
+      (Icons.bar_chart_rounded, tr('reports'), p.brand, () => go(ReportsScreen(m: m))),
+      (Icons.person_search_rounded, tr('admissions'), p.warn, () => go(AdmissionsScreen(m: m))),
+    ]);
+  }
+}
+
+Widget _tiles(List<(IconData, String, Color, VoidCallback)> items) => Row(children: [
+      for (var i = 0; i < items.length; i++) ...[
+        if (i > 0) const SizedBox(width: 10),
+        Expanded(
+          child: AppCard(
+            onTap: items[i].$4,
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+            radius: 18,
+            child: Column(children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(color: items[i].$3.withValues(alpha: .13), borderRadius: BorderRadius.circular(14)),
+                child: Icon(items[i].$1, color: items[i].$3, size: 22),
+              ),
+              const SizedBox(height: 7),
+              Text(items[i].$2, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800)),
+            ]),
+          ),
+        ),
+      ],
+    ]);
 
 /// Row of four shortcut tiles on the home screens.
 class ToolsRow extends StatelessWidget {
@@ -43,27 +91,6 @@ class ToolsRow extends StatelessWidget {
         (Icons.campaign_rounded, tr('nav_notices'), p.danger, () => go(NoticesPage(m: m, back: true))),
       ],
     ];
-    return Row(children: [
-      for (var i = 0; i < items.length; i++) ...[
-        if (i > 0) const SizedBox(width: 10),
-        Expanded(
-          child: AppCard(
-            onTap: items[i].$4,
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-            radius: 18,
-            child: Column(children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(color: items[i].$3.withValues(alpha: .13), borderRadius: BorderRadius.circular(14)),
-                child: Icon(items[i].$1, color: items[i].$3, size: 22),
-              ),
-              const SizedBox(height: 7),
-              Text(items[i].$2, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800)),
-            ]),
-          ),
-        ),
-      ],
-    ]);
+    return _tiles(items);
   }
 }

@@ -9,6 +9,7 @@ import '../data/backend.dart';
 import '../data/models.dart';
 import '../ui/widgets.dart';
 import 'common.dart';
+import 'insights.dart' show shareReportCard;
 import 'resources.dart' show learnerUid, learnerName;
 
 String fmtMarks(double v) => v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(1);
@@ -324,6 +325,9 @@ class _MarksEntryScreenState extends State<MarksEntryScreen> {
       t.marks
         ..clear()
         ..addAll(marks);
+      t.names
+        ..clear()
+        ..addAll({for (final x in _students ?? <Membership>[]) if (marks.containsKey(x.uid)) x.uid: x.name});
       if (publish != null) t.published = publish;
       await context.appRead.backend.saveTest(widget.m.instituteId, t);
       if (!mounted) return;
@@ -555,6 +559,12 @@ class _Results extends StatelessWidget {
                   ),
                 ),
               const SizedBox(height: 6),
+              SoftButton(
+                label: tr('report_card_pdf'),
+                icon: Icons.description_outlined,
+                onPressed: () => shareReportCard(context, m, uid, name),
+              ),
+              const SizedBox(height: 8),
               SoftButton(
                 label: tr('share_results'),
                 icon: Icons.share_rounded,

@@ -9,6 +9,7 @@ import '../data/models.dart';
 import '../ui/widgets.dart';
 import 'common.dart';
 import 'notices.dart' show ago;
+import 'syllabus.dart';
 import 'viewers.dart';
 
 // ---------------------------------------------------------------------------
@@ -135,6 +136,25 @@ class _ResourcesPageState extends State<ResourcesPage> {
                 )),
               ],
               const SizedBox(height: 12),
+              if (q.isEmpty)
+                item(Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: AppCard(
+                    onTap: () => push(context, SyllabusScreen(m: m)),
+                    padding: const EdgeInsets.all(14),
+                    child: Row(children: [
+                      IconBox(Icons.checklist_rounded, fg: const Color(0xFF0EA5B7), bg: const Color(0xFF0EA5B7).withValues(alpha: .13)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text(tr('syllabus_tracker'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+                          Text(tr('syllabus_tracker_sub'), style: TextStyle(color: p.muted, fontSize: 12.5, fontWeight: FontWeight.w600)),
+                        ]),
+                      ),
+                      Icon(Icons.chevron_right_rounded, color: p.muted),
+                    ]),
+                  ),
+                )),
               if (q.isNotEmpty) ...[
                 if (found.isEmpty) EmptyState(icon: Icons.search_off_rounded, text: tr('nothing_found')),
                 for (final r in found) Padding(padding: const EdgeInsets.only(bottom: 10), child: ResourceTile(m: m, r: r, batch: batches[r.batchId], batches: d.$2, onChanged: reload)),

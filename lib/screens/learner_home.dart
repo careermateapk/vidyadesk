@@ -10,6 +10,7 @@ import '../ui/widgets.dart';
 import 'common.dart';
 import 'home_shell.dart';
 import 'attendance.dart';
+import 'insights.dart';
 import 'notices.dart';
 import 'notifications.dart';
 import 'tools.dart';
@@ -339,6 +340,7 @@ class _LearnerBody extends StatelessWidget {
               const SizedBox(height: 12),
               item(ToolsRow(m: m, studentUid: studentUid, studentName: name)),
               const SizedBox(height: 12),
+              BadgesCard(m: m),
               const DemoBanner(),
               const SizedBox(height: 16),
               item(SectionTitle(isParent ? tr('child_timetable') : tr('my_timetable'))),

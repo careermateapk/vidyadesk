@@ -67,11 +67,15 @@ class Institute {
     this.phone = '',
     this.upiId = '',
     this.upiName = '',
+    this.dueDay = 10,
+    this.lateFee = 0,
   });
   final String id, name, city, code, ownerUid;
   final String address, phone, upiId, upiName;
+  /// Fees are due by this day of the month; after it [lateFee] is added.
+  final int dueDay, lateFee;
 
-  Institute copyWith({String? name, String? city, String? code, String? address, String? phone, String? upiId, String? upiName}) => Institute(
+  Institute copyWith({String? name, String? city, String? code, String? address, String? phone, String? upiId, String? upiName, int? dueDay, int? lateFee}) => Institute(
         id: id,
         ownerUid: ownerUid,
         name: name ?? this.name,
@@ -81,10 +85,12 @@ class Institute {
         phone: phone ?? this.phone,
         upiId: upiId ?? this.upiId,
         upiName: upiName ?? this.upiName,
+        dueDay: dueDay ?? this.dueDay,
+        lateFee: lateFee ?? this.lateFee,
       );
 
   Map<String, dynamic> toMap() =>
-      {'id': id, 'name': name, 'city': city, 'code': code, 'ownerUid': ownerUid, 'address': address, 'phone': phone, 'upiId': upiId, 'upiName': upiName};
+      {'id': id, 'name': name, 'city': city, 'code': code, 'ownerUid': ownerUid, 'address': address, 'phone': phone, 'upiId': upiId, 'upiName': upiName, 'dueDay': dueDay, 'lateFee': lateFee};
   factory Institute.fromMap(Map<String, dynamic> m) => Institute(
         id: _s(m['id']),
         name: _s(m['name']),
@@ -95,6 +101,8 @@ class Institute {
         phone: _s(m['phone']),
         upiId: _s(m['upiId']),
         upiName: _s(m['upiName']),
+        dueDay: _i(m['dueDay']) == 0 ? 10 : _i(m['dueDay']).clamp(1, 28),
+        lateFee: _i(m['lateFee']),
       );
 }
 
@@ -124,9 +132,20 @@ class Membership {
     this.joinedVia = '',
     this.createdAt = 0,
     this.photo = '',
+    this.discount = 0,
+    this.feeNote = '',
+    this.salary = 0,
+    this.payType = 'fixed',
   });
 
   final String uid, instituteId, instituteName;
+  /// Fee plan (students): ₹ off every month and a note like "Merit scholarship".
+  /// [monthlyFee] is always the final amount after the discount.
+  int discount;
+  String feeNote;
+  /// Pay (teachers): fixed monthly salary, or ₹ per class when [payType] is "class".
+  int salary;
+  String payType;
   String photo;
   final Role role;
   MemberStatus status;
@@ -167,6 +186,10 @@ class Membership {
         'joinedVia': joinedVia,
         'createdAt': createdAt,
         'photo': photo,
+        'discount': discount,
+        'feeNote': feeNote,
+        'salary': salary,
+        'payType': payType,
       };
 
   factory Membership.fromMap(Map<String, dynamic> m) => Membership(
@@ -190,6 +213,10 @@ class Membership {
         joinedVia: _s(m['joinedVia']),
         createdAt: _i(m['createdAt']),
         photo: _s(m['photo']),
+        discount: _i(m['discount']),
+        feeNote: _s(m['feeNote']),
+        salary: _i(m['salary']),
+        payType: _s(m['payType']).isEmpty ? 'fixed' : _s(m['payType']),
       );
 }
 
@@ -323,10 +350,19 @@ class FeeRecord {
     this.claimByUid = '',
     this.claimVia = '',
     this.claimAt = 0,
-  });
+    this.lateFee = 0,
+    List<FeePart>? parts,
+  }) : parts = parts ?? [];
 
   final String studentUid, studentName, month;
   final int amount;
+  /// Late fee included in [amount].
+  int lateFee;
+  /// Part payments (instalments) received before the whole fee is paid.
+  final List<FeePart> parts;
+  int get paidSoFar => paid ? amount : parts.fold<int>(0, (a, p) => a + p.amount);
+  int get balance => paid ? 0 : (amount - paidSoFar).clamp(0, amount);
+  bool get partly => !paid && parts.isNotEmpty;
   bool paid;
   int paidOn;
   String mode, receiptNo;
@@ -357,6 +393,8 @@ class FeeRecord {
         'claimByUid': claimByUid,
         'claimVia': claimVia,
         'claimAt': claimAt,
+        'lateFee': lateFee,
+        'parts': parts.map((p) => p.toMap()).toList(),
       };
 
   factory FeeRecord.fromMap(Map<String, dynamic> m) => FeeRecord(
@@ -376,6 +414,8 @@ class FeeRecord {
         claimByUid: _s(m['claimByUid']),
         claimVia: _s(m['claimVia']),
         claimAt: _i(m['claimAt']),
+        lateFee: _i(m['lateFee']),
+        parts: _lm(m['parts']).map(FeePart.fromMap).toList(),
       );
 }
 
@@ -467,7 +507,7 @@ class Resource {
       };
   factory Resource.fromMap(Map<String, dynamic> m) => Resource(
         id: _s(m['id']),
-        kind: _s(m['kind']).isEmpty ? 'notes' : _s(m['kind']),
+        kind: switch (_s(m['kind'])) { '' => 'notes', 'video' => 'videos', 'link' => 'links', 'paper' => 'papers', final k => k },
         title: _s(m['title']),
         desc: _s(m['desc']),
         batchId: _s(m['batchId']),
@@ -536,12 +576,15 @@ class TestPaper {
     this.published = false,
     Map<String, double>? marks,
     this.byName = '',
-  }) : marks = marks ?? {};
+    Map<String, String>? names,
+  })  : marks = marks ?? {},
+        names = names ?? {};
   final String id, batchId, title, subject, byName;
   final int maxMarks;
   final int date; // ms
   bool published;
   final Map<String, double> marks; // studentUid -> marks
+  final Map<String, String> names; // studentUid -> name (so students can see a leaderboard)
 
   double? get average => marks.isEmpty ? null : marks.values.reduce((a, b) => a + b) / marks.length;
   double? get highest => marks.isEmpty ? null : marks.values.reduce((a, b) => a > b ? a : b);
@@ -561,6 +604,7 @@ class TestPaper {
         'published': published,
         'marks': marks,
         'byName': byName,
+        'names': names,
       };
   factory TestPaper.fromMap(Map<String, dynamic> m) => TestPaper(
         id: _s(m['id']),
@@ -572,6 +616,7 @@ class TestPaper {
         published: _b(m['published']),
         marks: m['marks'] is Map ? (m['marks'] as Map).map((k, v) => MapEntry(k.toString(), v is num ? v.toDouble() : double.tryParse('$v') ?? 0)) : {},
         byName: _s(m['byName']),
+        names: m['names'] is Map ? (m['names'] as Map).map((k, v) => MapEntry(k.toString(), v.toString())) : {},
       );
 }
 
@@ -631,4 +676,144 @@ class Doubt {
         replies: _lm(m['replies']).map(DoubtReply.fromMap).toList(),
         solved: _b(m['solved']),
       );
+}
+
+/// One instalment of a month's fee.
+class FeePart {
+  const FeePart({required this.amount, required this.at, this.mode = '', this.receiptNo = '', this.utr = '', this.by = ''});
+  final int amount, at;
+  final String mode, receiptNo, utr, by;
+  Map<String, dynamic> toMap() => {'amount': amount, 'at': at, 'mode': mode, 'receiptNo': receiptNo, 'utr': utr, 'by': by};
+  factory FeePart.fromMap(Map<String, dynamic> m) =>
+      FeePart(amount: _i(m['amount']), at: _i(m['at']), mode: _s(m['mode']), receiptNo: _s(m['receiptNo']), utr: _s(m['utr']), by: _s(m['by']));
+}
+
+/// Money in or out of the institute (besides monthly fees). Salaries are
+/// "out" entries with [refUid] = the teacher and [refId] "pay_<uid>_<month>".
+class Txn {
+  Txn({
+    required this.id,
+    required this.isIncome,
+    required this.category,
+    required this.amount,
+    required this.date,
+    this.note = '',
+    this.mode = '',
+    this.refUid = '',
+    this.refName = '',
+    this.byName = '',
+  });
+  final String id, category, note, mode, refUid, refName, byName;
+  final bool isIncome;
+  final int amount, date;
+  String get month => monthKey(DateTime.fromMillisecondsSinceEpoch(date));
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'isIncome': isIncome,
+        'category': category,
+        'amount': amount,
+        'date': date,
+        'month': month,
+        'note': note,
+        'mode': mode,
+        'refUid': refUid,
+        'refName': refName,
+        'byName': byName,
+      };
+  factory Txn.fromMap(Map<String, dynamic> m) => Txn(
+        id: _s(m['id']),
+        isIncome: _b(m['isIncome']),
+        category: _s(m['category']),
+        amount: _i(m['amount']),
+        date: _i(m['date']),
+        note: _s(m['note']),
+        mode: _s(m['mode']),
+        refUid: _s(m['refUid']),
+        refName: _s(m['refName']),
+        byName: _s(m['byName']),
+      );
+}
+
+/// Admission enquiry (CRM). status: new | contacted | demo | joined | lost
+class Lead {
+  Lead({
+    required this.id,
+    required this.name,
+    this.phone = '',
+    this.className = '',
+    this.subject = '',
+    this.source = '',
+    this.status = 'new',
+    this.note = '',
+    this.followUp = 0,
+    required this.createdAt,
+    this.byName = '',
+  });
+  final String id;
+  String name, phone, className, subject, source, status, note, byName;
+  int followUp;
+  final int createdAt;
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'name': name,
+        'phone': phone,
+        'className': className,
+        'subject': subject,
+        'source': source,
+        'status': status,
+        'note': note,
+        'followUp': followUp,
+        'createdAt': createdAt,
+        'byName': byName,
+      };
+  factory Lead.fromMap(Map<String, dynamic> m) => Lead(
+        id: _s(m['id']),
+        name: _s(m['name']),
+        phone: _s(m['phone']),
+        className: _s(m['className']),
+        subject: _s(m['subject']),
+        source: _s(m['source']),
+        status: _s(m['status']).isEmpty ? 'new' : _s(m['status']),
+        note: _s(m['note']),
+        followUp: _i(m['followUp']),
+        createdAt: _i(m['createdAt']),
+        byName: _s(m['byName']),
+      );
+}
+
+/// Teacher arrived / left. Id "<uid>_<dateKey>".
+class CheckIn {
+  CheckIn({required this.uid, required this.name, required this.dateKey, required this.inAt, this.outAt = 0});
+  final String uid, name, dateKey;
+  final int inAt;
+  int outAt;
+  String get id => '${uid}_$dateKey';
+  String get month => '${dateKey.substring(0, 4)}-${dateKey.substring(4, 6)}';
+  Map<String, dynamic> toMap() => {'uid': uid, 'name': name, 'dateKey': dateKey, 'month': month, 'inAt': inAt, 'outAt': outAt};
+  factory CheckIn.fromMap(Map<String, dynamic> m) =>
+      CheckIn(uid: _s(m['uid']), name: _s(m['name']), dateKey: _s(m['dateKey']), inAt: _i(m['inAt']), outAt: _i(m['outAt']));
+}
+
+class Chapter {
+  Chapter({required this.name, this.done = false, this.doneAt = 0});
+  String name;
+  bool done;
+  int doneAt;
+  Map<String, dynamic> toMap() => {'name': name, 'done': done, 'doneAt': doneAt};
+  factory Chapter.fromMap(Map<String, dynamic> m) => Chapter(name: _s(m['name']), done: _b(m['done']), doneAt: _i(m['doneAt']));
+}
+
+/// Chapters of one batch and which are finished. Id = batchId.
+class Syllabus {
+  Syllabus({required this.batchId, List<Chapter>? chapters, this.updatedAt = 0}) : chapters = chapters ?? [];
+  final String batchId;
+  final List<Chapter> chapters;
+  int updatedAt;
+  int get done => chapters.where((c) => c.done).length;
+  double get progress => chapters.isEmpty ? 0 : done / chapters.length;
+  Map<String, dynamic> toMap() => {'batchId': batchId, 'chapters': chapters.map((c) => c.toMap()).toList(), 'updatedAt': updatedAt};
+  factory Syllabus.fromMap(Map<String, dynamic> m) =>
+      Syllabus(batchId: _s(m['batchId']), chapters: _lm(m['chapters']).map(Chapter.fromMap).toList(), updatedAt: _i(m['updatedAt']));
 }

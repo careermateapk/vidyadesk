@@ -51,19 +51,19 @@ class _FeesPageState extends State<FeesPage> {
     final p = context.pal;
     final isThis = monthKey(_month) == monthKey(DateTime.now());
     return Scaffold(
-      appBar: InnerBar(title: tr('nav_fees'), showBack: false),
+      appBar: InnerBar(title: tr('nav_fees'), subtitle: tr('collection'), showBack: false),
       body: Column(children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          padding: const EdgeInsets.fromLTRB(18, 4, 18, 8),
           child: Row(children: [
-            IconButton.filledTonal(onPressed: () => _shift(-1), icon: const Icon(Icons.chevron_left_rounded)),
+            IconBtn(icon: Icons.chevron_left_rounded, box: 40, onTap: () => _shift(-1)),
             Expanded(
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 250),
-                child: Text(monthLabel(monthKey(_month)), key: ValueKey(_month), textAlign: TextAlign.center, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                child: Text(monthLabel(monthKey(_month)), key: ValueKey(_month), textAlign: TextAlign.center, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
               ),
             ),
-            IconButton.filledTonal(onPressed: isThis ? null : () => _shift(1), icon: const Icon(Icons.chevron_right_rounded)),
+            Opacity(opacity: isThis ? .35 : 1, child: IconBtn(icon: Icons.chevron_right_rounded, box: 40, onTap: isThis ? null : () => _shift(1))),
           ]),
         ),
         Expanded(
@@ -82,24 +82,31 @@ class _FeesPageState extends State<FeesPage> {
                 children: [
                   FadeIn(
                     child: AppCard(
-                      gradient: p.hero,
                       child: Row(children: [
                         Ring(
                           value: got + due == 0 ? 0 : got / (got + due),
-                          size: 96,
-                          stroke: 11,
-                          color: const Color(0xFFF5A524),
-                          track: const Color(0x33FFFFFF),
-                          center: Text('${pct(got, got + due)}%', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 20)),
+                          size: 104,
+                          stroke: 12,
+                          color: p.success,
+                          track: got + due == 0 ? p.cardAlt : p.dangerTint,
+                          center: Column(mainAxisSize: MainAxisSize.min, children: [
+                            Text('${pct(got, got + due)}%', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20)),
+                            Text(tr('collected').toLowerCase(), style: TextStyle(color: p.muted, fontSize: 10.5, fontWeight: FontWeight.w700)),
+                          ]),
                         ),
-                        const SizedBox(width: 16),
+                        const SizedBox(width: 18),
                         Expanded(
                           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text(tr('collected'), style: const TextStyle(color: Color(0xCCFFFFFF), fontWeight: FontWeight.w700, fontSize: 12.5)),
-                            CountUp(got, prefix: '₹', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 26)),
-                            const SizedBox(height: 6),
-                            Text('${tr('pending')}: ${rupees(due)}', style: const TextStyle(color: Color(0xFFFFD27A), fontWeight: FontWeight.w800)),
-                            Text('${paid.length} ${tr('paid_of')} ${rows.length}', style: const TextStyle(color: Color(0xCCFFFFFF), fontSize: 12.5)),
+                            LegendDot(p.success, tr('collected')),
+                            Padding(
+                              padding: const EdgeInsets.only(left: 15, top: 2, bottom: 10),
+                              child: CountUp(got, prefix: '₹', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 22, letterSpacing: -.5)),
+                            ),
+                            LegendDot(p.danger, tr('pending')),
+                            Padding(
+                              padding: const EdgeInsets.only(left: 15, top: 2),
+                              child: Text(rupees(due), style: TextStyle(fontWeight: FontWeight.w800, fontSize: 22, letterSpacing: -.5, color: p.danger)),
+                            ),
                           ]),
                         ),
                       ]),

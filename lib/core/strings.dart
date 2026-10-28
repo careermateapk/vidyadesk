@@ -530,4 +530,6 @@ const Map<String, List<String>> _t = {
   'this_week': ['This week', 'इस हफ़्ते', 'Is hafte'],
   'n_active_batches': ['{n} active batches', '{n} बैच चालू', '{n} active batch'],
   'nothing_here_filter': ['Nothing matches this filter', 'इस फ़िल्टर में कुछ नहीं', 'Is filter mein kuch nahi'],
+  'collection': ['Collection', 'वसूली', 'Collection'],
+  'calendar': ['Calendar', 'कैलेंडर', 'Calendar'],
 };

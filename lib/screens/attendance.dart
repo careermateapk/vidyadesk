@@ -309,7 +309,7 @@ class MyAttendancePage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 14),
-              FadeIn(delay: stagger(1), child: SectionTitle(tr('last_30_days'))),
+              FadeIn(delay: stagger(1), child: SectionTitle(tr('calendar'))),
               const SizedBox(height: 8),
               FadeIn(delay: stagger(2), child: AppCard(child: _Calendar(uid: studentUid, days: days))),
               const SizedBox(height: 14),
@@ -356,61 +356,95 @@ class MyAttendancePage extends StatelessWidget {
 }
 
 /// 30 small squares, one per day: green present, red absent, grey no class.
-class _Calendar extends StatelessWidget {
+class _Calendar extends StatefulWidget {
   const _Calendar({required this.uid, required this.days});
   final String uid;
   final List<AttendanceDay> days;
   @override
+  State<_Calendar> createState() => _CalendarState();
+}
+
+class _CalendarState extends State<_Calendar> {
+  late DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
+
+  @override
   Widget build(BuildContext context) {
     final p = context.pal;
     final byDate = <String, bool>{};
-    for (final d in days) {
-      if (!d.marked.contains(uid)) continue;
-      final was = byDate[d.dateKey];
-      byDate[d.dateKey] = (was ?? false) || d.present.contains(uid);
+    for (final d in widget.days) {
+      if (!d.marked.contains(widget.uid)) continue;
+      byDate[d.dateKey] = (byDate[d.dateKey] ?? false) || d.present.contains(widget.uid);
     }
-    final today = DateTime.now();
-    final list = List.generate(30, (i) => today.subtract(Duration(days: 29 - i)));
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final first = _month;
+    final daysIn = DateTime(first.year, first.month + 1, 0).day;
+    final lead = first.weekday - 1;
+    final isThis = first.year == now.year && first.month == now.month;
     return Column(children: [
-      GridView.count(
-        crossAxisCount: 10,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        mainAxisSpacing: 5,
-        crossAxisSpacing: 5,
-        children: [
-          for (var i = 0; i < list.length; i++)
-            Builder(builder: (context) {
-              final st = byDate[dateKey(list[i])];
-              final c = st == null ? p.cardAlt : (st ? p.success : p.danger);
-              return TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0, end: 1),
-                duration: Duration(milliseconds: 300 + i * 25),
-                curve: Curves.easeOutBack,
-                builder: (context, v, child) => Transform.scale(scale: v, child: child),
-                child: Container(
-                  decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(6)),
-                  alignment: Alignment.center,
-                  child: Text('${list[i].day}', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: st == null ? p.muted : Colors.white)),
-                ),
-              );
-            }),
-        ],
+      Row(children: [
+        Expanded(child: Text(monthLabel(monthKey(first)), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16))),
+        IconButton(visualDensity: VisualDensity.compact, onPressed: () => setState(() => _month = DateTime(first.year, first.month - 1)), icon: Icon(Icons.chevron_left_rounded, color: p.muted)),
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          onPressed: isThis ? null : () => setState(() => _month = DateTime(first.year, first.month + 1)),
+          icon: Icon(Icons.chevron_right_rounded, color: isThis ? p.border : p.muted),
+        ),
+      ]),
+      const SizedBox(height: 8),
+      Row(children: [
+        for (var k = 1; k <= 7; k++)
+          Expanded(child: Center(child: Text(dayShort(k).substring(0, 1), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: p.muted)))),
+      ]),
+      const SizedBox(height: 6),
+      AnimatedSwitcher(
+        duration: const Duration(milliseconds: 250),
+        child: GridView.count(
+          key: ValueKey(first),
+          crossAxisCount: 7,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 6,
+          crossAxisSpacing: 6,
+          children: [
+            for (var i = 0; i < lead; i++) const SizedBox.shrink(),
+            for (var d = 1; d <= daysIn; d++)
+              Builder(builder: (context) {
+                final date = DateTime(first.year, first.month, d);
+                final st = byDate[dateKey(date)];
+                final isToday = date == today;
+                return TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0, end: 1),
+                  duration: Duration(milliseconds: 250 + d * 15),
+                  curve: Curves.easeOutBack,
+                  builder: (context, v, child) => Transform.scale(scale: v, child: child),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: st == null ? Colors.transparent : (st ? p.successTint : p.danger),
+                      borderRadius: BorderRadius.circular(11),
+                      border: isToday ? Border.all(color: p.brand, width: 2) : null,
+                    ),
+                    alignment: Alignment.center,
+                    child: Text('$d',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: st == null ? (date.isAfter(today) ? p.border : p.muted) : (st ? p.success : Colors.white),
+                        )),
+                  ),
+                );
+              }),
+          ],
+        ),
       ),
-      const SizedBox(height: 10),
+      const SizedBox(height: 12),
       Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-        _legend(p.success, tr('present'), p),
+        LegendDot(p.success, tr('present')),
         const SizedBox(width: 14),
-        _legend(p.danger, tr('absent'), p),
+        LegendDot(p.danger, tr('absent')),
         const SizedBox(width: 14),
-        _legend(p.cardAlt, tr('no_class'), p),
+        LegendDot(p.border, tr('no_class')),
       ]),
     ]);
   }
-
-  Widget _legend(Color c, String t, Palette p) => Row(children: [
-        Container(width: 10, height: 10, decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(3))),
-        const SizedBox(width: 4),
-        Text(t, style: TextStyle(fontSize: 11.5, color: p.muted, fontWeight: FontWeight.w600)),
-      ]);
 }

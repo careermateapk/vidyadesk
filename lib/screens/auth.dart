@@ -11,6 +11,7 @@ import '../data/places.dart';
 import '../ui/widgets.dart';
 import '../ui/mascot.dart';
 import 'common.dart';
+import 'help.dart';
 import 'onboarding.dart';
 
 String errorText(Object e) {
@@ -40,6 +41,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _gBusy = false;
   String? _error;
   int _shake = 0;
+  bool _agree = false;
 
   @override
   void dispose() {
@@ -58,6 +60,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _google({required bool login}) async {
     final app = context.appRead;
+    if (!login && !_agree) {
+      _fail(tr('err_agree'));
+      return;
+    }
     setState(() {
       _gBusy = true;
       _error = null;
@@ -165,7 +171,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   Text(_tab == 0 ? tr('login_sub') : tr('signup_sub'), style: TextStyle(color: p.muted, fontSize: 14.5, height: 1.35, fontWeight: FontWeight.w500)),
                 ]),
               ),
-              const Floaty(child: Mascot(size: 92, book: false, wave: true)),
+              const Floaty(child: BlinkingMascot(size: 92, book: false, wave: true)),
             ]),
             const SizedBox(height: 16),
             const DemoBanner(),
@@ -184,6 +190,8 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 18),
               _SampleAccounts(onPick: _busy ? null : _sample),
             ],
+            const SizedBox(height: 20),
+            const LegalFooter(),
           ],
         ),
       ),
@@ -240,10 +248,46 @@ class _LoginScreenState extends State<LoginScreen> {
       _orLine(p, tr('or')),
       PrimaryButton(
         label: tr('email_signup'),
-        icon: Icons.mail_rounded,
-        onPressed: () => push(context, const ProfileFormScreen(withEmail: true)),
+        icon: Icons.mail_outline_rounded,
+        onPressed: () {
+          if (!_agree) {
+            _fail(tr('err_agree'));
+            return;
+          }
+          push(context, const ProfileFormScreen(withEmail: true));
+        },
       ),
-      const SizedBox(height: 12),
+      const SizedBox(height: 14),
+      GestureDetector(
+        onTap: () => setState(() {
+          _agree = !_agree;
+          if (_agree) _error = null;
+        }),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(16), border: Border.all(color: _agree ? p.brand : p.border)),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              width: 22,
+              height: 22,
+              margin: const EdgeInsets.only(top: 1),
+              decoration: BoxDecoration(color: _agree ? p.brand : Colors.transparent, borderRadius: BorderRadius.circular(7), border: Border.all(color: _agree ? p.brand : p.muted, width: 2)),
+              child: _agree ? const Icon(Icons.check_rounded, size: 15, color: Colors.white) : null,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Wrap(spacing: 4, runSpacing: 2, children: [
+                Text(tr('i_agree'), style: TextStyle(fontSize: 13, color: p.ink2, fontWeight: FontWeight.w600)),
+                GestureDetector(onTap: () => push(context, const LegalScreen()), child: Text(tr('terms'), style: TextStyle(fontSize: 13, color: p.brand, fontWeight: FontWeight.w800, decoration: TextDecoration.underline))),
+                Text(tr('and'), style: TextStyle(fontSize: 13, color: p.ink2, fontWeight: FontWeight.w600)),
+                GestureDetector(onTap: () => push(context, const LegalScreen(privacy: true)), child: Text(tr('privacy'), style: TextStyle(fontSize: 13, color: p.brand, fontWeight: FontWeight.w800, decoration: TextDecoration.underline))),
+              ]),
+            ),
+          ]),
+        ),
+      ),
+      const SizedBox(height: 8),
       Center(child: TextButton(onPressed: () => setState(() => _tab = 0), child: Text(tr('have_account_login')))),
     ]);
   }

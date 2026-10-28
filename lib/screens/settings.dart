@@ -7,6 +7,7 @@ import '../data/models.dart';
 import '../ui/widgets.dart';
 import 'auth.dart';
 import 'common.dart';
+import 'help.dart';
 import 'learner_home.dart';
 import 'onboarding.dart';
 import 'people.dart';
@@ -164,6 +165,16 @@ class SettingsPage extends StatelessWidget {
           item(AppCard(
             padding: const EdgeInsets.symmetric(vertical: 4),
             child: _Tile(icon: Icons.translate_rounded, color: p.indigo, label: tr('language'), value: langName, onTap: () => push(context, const LanguageScreen())),
+          )),
+          item(SectionTitle(tr('help_legal'))),
+          item(AppCard(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Column(children: [
+              _Tile(icon: Icons.help_outline_rounded, color: p.brand, label: tr('help_faq'), onTap: () => push(context, const FaqScreen())),
+              _Tile(icon: Icons.description_outlined, color: p.indigo, label: tr('terms'), onTap: () => push(context, const LegalScreen())),
+              _Tile(icon: Icons.verified_user_outlined, color: p.success, label: tr('privacy'), onTap: () => push(context, const LegalScreen(privacy: true))),
+              _Tile(icon: Icons.mail_outline_rounded, color: p.warn, label: tr('contact_us'), onTap: () => contactSupport(context)),
+            ]),
           )),
           item(AppCard(
             padding: const EdgeInsets.symmetric(vertical: 4),

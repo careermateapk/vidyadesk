@@ -68,7 +68,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               AnimatedBuilder(
                 animation: owl,
                 builder: (context, child) => Transform.scale(scale: .4 + .6 * owl.value, child: Opacity(opacity: _owl.value.clamp(0, 1), child: child)),
-                child: const Floaty(amount: 8, child: Mascot(size: 250)),
+                child: const Floaty(amount: 8, child: BlinkingMascot(size: 250)),
               ),
               const Spacer(),
               FadeIn(

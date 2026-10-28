@@ -95,18 +95,60 @@ class ParentHome extends StatelessWidget {
           d: d,
           notices: d.notices,
           isParent: true,
-          childSwitcher: m.childUids.length > 1
-              ? Wrap(spacing: 8, runSpacing: 8, children: [
-                  for (var k = 0; k < m.childUids.length; k++)
-                    ChoiceChip(
-                      label: Text(m.childNames.length > k ? firstName(m.childNames[k]) : '—'),
-                      selected: k == i,
-                      onSelected: (_) => onChild(k),
-                    ),
-                ])
-              : null,
+          childSwitcher: _KidsRow(m: m, selected: i, onPick: onChild),
         );
       },
+    );
+  }
+}
+
+/// Round photos of each child + "Add kid" — tap to switch.
+class _KidsRow extends StatelessWidget {
+  const _KidsRow({required this.m, required this.selected, required this.onPick});
+  final Membership m;
+  final int selected;
+  final ValueChanged<int> onPick;
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pal;
+    Widget kid(Widget circle, String label, bool on, VoidCallback onTap) => GestureDetector(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Column(children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: on ? p.brand : Colors.transparent, width: 2.5)),
+                child: circle,
+              ),
+              const SizedBox(height: 5),
+              Text(label, style: TextStyle(fontSize: 12, fontWeight: on ? FontWeight.w800 : FontWeight.w700, color: on ? p.brand : p.ink2)),
+            ]),
+          ),
+        );
+    return SizedBox(
+      height: 92,
+      child: ListView(scrollDirection: Axis.horizontal, children: [
+        kid(
+          Container(
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(shape: BoxShape.circle, color: p.brand, boxShadow: p.glow(p.brand)),
+            child: const Icon(Icons.add_rounded, color: Colors.white, size: 28),
+          ),
+          tr('add_kid'),
+          false,
+          () => context.appRead.startNewJoin(Role.parent),
+        ),
+        for (var k = 0; k < m.childUids.length; k++)
+          kid(
+            ClipOval(child: Avatar(m.childNames.length > k ? m.childNames[k] : '?', size: 58, index: k)),
+            m.childNames.length > k ? firstName(m.childNames[k]) : '—',
+            k == selected,
+            () => onPick(k),
+          ),
+      ]),
     );
   }
 }

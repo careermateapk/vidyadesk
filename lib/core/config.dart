@@ -7,3 +7,7 @@ const String fbSender = String.fromEnvironment('FB_SENDER');
 const String googleClientId = String.fromEnvironment('GOOGLE_CLIENT_ID');
 
 bool get firebaseConfigured => fbProject.isNotEmpty && fbApiKey.isNotEmpty && fbAppId.isNotEmpty;
+
+/// Where "Contact Us" emails go. Change this when the real support email is ready.
+const String supportEmail = String.fromEnvironment('SUPPORT_EMAIL', defaultValue: 'support@vidyadesk.in');
+const String appVersion = '1.0';

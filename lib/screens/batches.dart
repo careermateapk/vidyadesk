@@ -366,7 +366,7 @@ class _StudentAttRow extends StatelessWidget {
       onTap: onTap,
       padding: const EdgeInsets.all(10),
       child: Row(children: [
-        Avatar(s.name, size: 40, index: index),
+        Avatar(s.name, size: 40, index: index, photo: s.photo),
         const SizedBox(width: 10),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

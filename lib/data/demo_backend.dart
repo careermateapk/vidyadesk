@@ -37,7 +37,7 @@ class DemoBackend implements Backend {
   void _seed() {
     const instId = 'demo-inst';
     const owner = 'demo-owner';
-    _institutes[instId] = const Institute(id: instId, name: 'Sharma Classes', city: 'Darbhanga', code: demoInstituteCode, ownerUid: owner);
+    _institutes[instId] = const Institute(id: instId, name: 'Sharma Classes', city: 'Darbhanga', code: demoInstituteCode, ownerUid: owner, address: 'Laheriasarai Road, Darbhanga', phone: '+91 98765 43210', upiId: 'sharmaclasses@ybl', upiName: 'Sharma Classes');
     _codes[demoInstituteCode] = const JoinCode(code: demoInstituteCode, type: CodeType.institute, instituteId: instId, instituteName: 'Sharma Classes');
     final now = DateTime.now().millisecondsSinceEpoch;
     _members['${owner}_$instId'] = Membership(
@@ -172,6 +172,18 @@ class DemoBackend implements Backend {
     _users[user.uid] = user;
   }
 
+  @override
+  Future<void> setPhoto(String photo) async {
+    await _wait();
+    final me = _current?.uid;
+    if (me == null) return;
+    final u = _users[me];
+    if (u != null) _users[me] = u.withPhoto(photo);
+    for (final m in _members.values.where((m) => m.uid == me)) {
+      m.photo = photo;
+    }
+  }
+
   // ---------- memberships ----------
 
   @override
@@ -246,6 +258,7 @@ class DemoBackend implements Backend {
       teaches: teaches,
       subjects: subjects,
       createdAt: DateTime.now().millisecondsSinceEpoch,
+      photo: owner.photo,
     );
     _members[m.id] = m;
     _notices[id] = [];
@@ -254,6 +267,16 @@ class DemoBackend implements Backend {
 
   @override
   Future<Institute?> institute(String id) async => _institutes[id];
+
+  @override
+  Future<void> updateInstitute(Institute inst) async {
+    await _wait();
+    _institutes[inst.id] = inst;
+    for (final m in _members.values.where((m) => m.instituteId == inst.id)) {
+      // keep the name shown on memberships in step
+      if (m.instituteName != inst.name) _members[m.id] = Membership.fromMap({...m.toMap(), 'instituteName': inst.name});
+    }
+  }
 
   @override
   Future<String> newInstituteCode(Institute inst) async {
@@ -299,6 +322,7 @@ class DemoBackend implements Backend {
       joinedVia: code.code,
       monthlyFee: role == Role.student ? 1500 : 0,
       createdAt: DateTime.now().millisecondsSinceEpoch,
+      photo: user.photo,
     );
     _members[id] = m;
     return m;
@@ -384,6 +408,17 @@ class DemoBackend implements Backend {
     await _wait();
     _fees['${instituteId}_${fee.id}'] = fee;
   }
+
+  @override
+  Future<void> claimFee(String instituteId, FeeRecord fee) async {
+    await _wait();
+    _fees['${instituteId}_${fee.id}'] = fee;
+  }
+
+  @override
+  Future<List<FeeRecord>> feeClaims(String instituteId) async =>
+      _fees.entries.where((e) => e.key.startsWith('${instituteId}_') && e.value.waiting).map((e) => e.value).toList()
+        ..sort((a, b) => b.claimAt.compareTo(a.claimAt));
 
   // ---------- notices ----------
 

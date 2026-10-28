@@ -524,7 +524,7 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
       } else {
         final s = app.signedIn!;
         final old = widget.existing;
-        final u = AppUser(uid: s.uid, name: _name.text.trim(), email: old?.email ?? s.email, countryCode: _cc, phone: _phone.text.trim(), address: address, viaGoogle: old?.viaGoogle ?? s.viaGoogle);
+        final u = AppUser(uid: s.uid, name: _name.text.trim(), email: old?.email ?? s.email, countryCode: _cc, phone: _phone.text.trim(), address: address, viaGoogle: old?.viaGoogle ?? s.viaGoogle, photo: old?.photo ?? context.appRead.profile?.photo ?? '');
         await app.saveProfile(u);
         if (mounted && widget.existing != null) {
           toast(context, tr('saved'));

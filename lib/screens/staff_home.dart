@@ -119,7 +119,7 @@ class _StaffHomeState extends State<StaffHome> {
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
         item(Row(children: [
-          GestureDetector(onTap: () => shell?.goToNamed('profile'), child: Avatar(app.profile?.name ?? m.name, size: 46)),
+          GestureDetector(onTap: () => shell?.goToNamed('profile'), child: Avatar(app.profile?.name ?? m.name, size: 46, photo: app.profile?.photo ?? '')),
           const SizedBox(width: 12),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -214,7 +214,7 @@ class _StaffHomeState extends State<StaffHome> {
                     height: 32,
                     child: Stack(children: [
                       for (var k = 0; k < pending.take(3).length; k++)
-                        Positioned(left: k * 22.0, child: Container(decoration: BoxDecoration(border: Border.all(color: p.warnTint, width: 2), borderRadius: BorderRadius.circular(12)), child: Avatar(pending[k].name, size: 30, index: k + 2))),
+                        Positioned(left: k * 22.0, child: Container(decoration: BoxDecoration(border: Border.all(color: p.warnTint, width: 2), borderRadius: BorderRadius.circular(12)), child: Avatar(pending[k].name, size: 30, index: k + 2, photo: pending[k].photo))),
                     ]),
                   ),
                   const SizedBox(width: 10),

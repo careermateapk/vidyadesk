@@ -142,6 +142,16 @@ class FirebaseBackend implements Backend {
   @override
   Future<void> saveProfile(AppUser user) => _db.collection('users').doc(user.uid).set(user.toMap());
 
+  @override
+  Future<void> setPhoto(String photo) async {
+    final me = _auth.currentUser!.uid;
+    await _db.collection('users').doc(me).set({'photo': photo}, SetOptions(merge: true));
+    final q = await _mem.where('uid', isEqualTo: me).get();
+    for (final d in q.docs) {
+      await d.reference.update({'photo': photo});
+    }
+  }
+
   // ---------- memberships ----------
 
   CollectionReference<Map<String, dynamic>> get _mem => _db.collection('memberships');
@@ -263,6 +273,7 @@ class FirebaseBackend implements Backend {
       teaches: teaches,
       subjects: subjects,
       createdAt: DateTime.now().millisecondsSinceEpoch,
+      photo: owner.photo,
     );
     await _mem.doc(m.id).set(m.toMap());
     await _db.collection('codes').doc(code).set(JoinCode(code: code, type: CodeType.institute, instituteId: inst.id, instituteName: name, createdBy: owner.uid).toMap());
@@ -275,6 +286,10 @@ class FirebaseBackend implements Backend {
     if (!d.exists || d.data() == null) return null;
     return Institute.fromMap(d.data()!);
   }
+
+  @override
+  Future<void> updateInstitute(Institute inst) =>
+      _inst(inst.id).update({'name': inst.name, 'city': inst.city, 'address': inst.address, 'phone': inst.phone, 'upiId': inst.upiId, 'upiName': inst.upiName});
 
   @override
   Future<String> newInstituteCode(Institute inst) async {
@@ -330,6 +345,7 @@ class FirebaseBackend implements Backend {
       relation: relation,
       joinedVia: code.code,
       createdAt: DateTime.now().millisecondsSinceEpoch,
+      photo: user.photo,
     );
     await _mem.doc(id).set(m.toMap());
     return m;
@@ -432,6 +448,17 @@ class FirebaseBackend implements Backend {
     final q = await _inst(instituteId).collection('fees').where('studentUid', isEqualTo: studentUid).get();
     final list = q.docs.map((d) => FeeRecord.fromMap(d.data())).toList();
     list.sort((a, b) => b.month.compareTo(a.month));
+    return list;
+  }
+
+  @override
+  Future<void> claimFee(String instituteId, FeeRecord fee) => _inst(instituteId).collection('fees').doc(fee.id).set(fee.toMap());
+
+  @override
+  Future<List<FeeRecord>> feeClaims(String instituteId) async {
+    final q = await _inst(instituteId).collection('fees').where('claimed', isEqualTo: true).get();
+    final list = q.docs.map((d) => FeeRecord.fromMap(d.data())).where((f) => f.waiting).toList();
+    list.sort((a, b) => b.claimAt.compareTo(a.claimAt));
     return list;
   }
 

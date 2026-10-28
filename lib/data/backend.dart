@@ -35,6 +35,8 @@ abstract class Backend {
   // ---- profile ----
   Future<AppUser?> profile(String uid);
   Future<void> saveProfile(AppUser user);
+  /// Set the signed-in person's photo on their profile and every membership.
+  Future<void> setPhoto(String photo);
 
   // ---- memberships ----
   Future<List<Membership>> myMemberships();
@@ -49,6 +51,7 @@ abstract class Backend {
   // ---- institute & codes ----
   Future<Membership> createInstitute({required AppUser owner, required String name, required String city, required bool teaches, required List<String> subjects});
   Future<Institute?> institute(String id);
+  Future<void> updateInstitute(Institute inst);
   Future<String> newInstituteCode(Institute inst);
   Future<JoinCode?> lookupCode(String code);
   Future<Membership> requestJoin({required AppUser user, required JoinCode code, String relation = '', List<String> subjects = const []});
@@ -78,6 +81,10 @@ abstract class Backend {
   Future<List<FeeRecord>> feesForMonth(String instituteId, String month);
   Future<List<FeeRecord>> feesForStudent(String instituteId, String studentUid);
   Future<void> saveFee(String instituteId, FeeRecord fee);
+  /// Student/parent says "I paid by UPI" (waits for the institute to confirm).
+  Future<void> claimFee(String instituteId, FeeRecord fee);
+  /// UPI payments waiting for confirmation.
+  Future<List<FeeRecord>> feeClaims(String instituteId);
 
   // ---- notices ----
   Future<List<Notice>> notices(String instituteId);

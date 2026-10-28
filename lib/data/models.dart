@@ -22,8 +22,10 @@ class Address {
 }
 
 class AppUser {
-  const AppUser({required this.uid, required this.name, required this.email, required this.countryCode, required this.phone, required this.address, this.viaGoogle = false});
+  const AppUser({required this.uid, required this.name, required this.email, required this.countryCode, required this.phone, required this.address, this.viaGoogle = false, this.photo = ''});
   final String uid, name, email, countryCode, phone;
+  /// Small round profile photo as base64 PNG ('' = none).
+  final String photo;
   final Address address;
   final bool viaGoogle;
 
@@ -37,7 +39,10 @@ class AppUser {
         'phone': phone,
         'address': address.toMap(),
         'viaGoogle': viaGoogle,
+        'photo': photo,
       };
+
+  AppUser withPhoto(String p) => AppUser(uid: uid, name: name, email: email, countryCode: countryCode, phone: phone, address: address, viaGoogle: viaGoogle, photo: p);
 
   factory AppUser.fromMap(Map<String, dynamic> m) => AppUser(
         uid: _s(m['uid']),
@@ -47,16 +52,50 @@ class AppUser {
         phone: _s(m['phone']),
         address: Address.fromMap(m['address'] is Map ? Map<String, dynamic>.from(m['address'] as Map) : null),
         viaGoogle: _b(m['viaGoogle']),
+        photo: _s(m['photo']),
       );
 }
 
 class Institute {
-  const Institute({required this.id, required this.name, required this.city, required this.code, required this.ownerUid});
+  const Institute({
+    required this.id,
+    required this.name,
+    required this.city,
+    required this.code,
+    required this.ownerUid,
+    this.address = '',
+    this.phone = '',
+    this.upiId = '',
+    this.upiName = '',
+  });
   final String id, name, city, code, ownerUid;
+  final String address, phone, upiId, upiName;
 
-  Map<String, dynamic> toMap() => {'id': id, 'name': name, 'city': city, 'code': code, 'ownerUid': ownerUid};
-  factory Institute.fromMap(Map<String, dynamic> m) =>
-      Institute(id: _s(m['id']), name: _s(m['name']), city: _s(m['city']), code: _s(m['code']), ownerUid: _s(m['ownerUid']));
+  Institute copyWith({String? name, String? city, String? code, String? address, String? phone, String? upiId, String? upiName}) => Institute(
+        id: id,
+        ownerUid: ownerUid,
+        name: name ?? this.name,
+        city: city ?? this.city,
+        code: code ?? this.code,
+        address: address ?? this.address,
+        phone: phone ?? this.phone,
+        upiId: upiId ?? this.upiId,
+        upiName: upiName ?? this.upiName,
+      );
+
+  Map<String, dynamic> toMap() =>
+      {'id': id, 'name': name, 'city': city, 'code': code, 'ownerUid': ownerUid, 'address': address, 'phone': phone, 'upiId': upiId, 'upiName': upiName};
+  factory Institute.fromMap(Map<String, dynamic> m) => Institute(
+        id: _s(m['id']),
+        name: _s(m['name']),
+        city: _s(m['city']),
+        code: _s(m['code']),
+        ownerUid: _s(m['ownerUid']),
+        address: _s(m['address']),
+        phone: _s(m['phone']),
+        upiId: _s(m['upiId']),
+        upiName: _s(m['upiName']),
+      );
 }
 
 enum MemberStatus { pending, approved, rejected }
@@ -84,9 +123,11 @@ class Membership {
     this.monthlyFee = 0,
     this.joinedVia = '',
     this.createdAt = 0,
+    this.photo = '',
   });
 
   final String uid, instituteId, instituteName;
+  String photo;
   final Role role;
   MemberStatus status;
   final String name, phone, email, city;
@@ -125,6 +166,7 @@ class Membership {
         'monthlyFee': monthlyFee,
         'joinedVia': joinedVia,
         'createdAt': createdAt,
+        'photo': photo,
       };
 
   factory Membership.fromMap(Map<String, dynamic> m) => Membership(
@@ -147,6 +189,7 @@ class Membership {
         monthlyFee: _i(m['monthlyFee']),
         joinedVia: _s(m['joinedVia']),
         createdAt: _i(m['createdAt']),
+        photo: _s(m['photo']),
       );
 }
 
@@ -272,6 +315,14 @@ class FeeRecord {
     this.paidOn = 0,
     this.mode = '',
     this.receiptNo = '',
+    this.utr = '',
+    this.paidBy = '',
+    this.claimed = false,
+    this.claimUtr = '',
+    this.claimBy = '',
+    this.claimByUid = '',
+    this.claimVia = '',
+    this.claimAt = 0,
   });
 
   final String studentUid, studentName, month;
@@ -279,8 +330,15 @@ class FeeRecord {
   bool paid;
   int paidOn;
   String mode, receiptNo;
+  /// UTR of a confirmed UPI payment, and who paid (name).
+  String utr, paidBy;
+  /// A student/parent says they paid by UPI; waiting for the institute to confirm.
+  bool claimed;
+  String claimUtr, claimBy, claimByUid, claimVia;
+  int claimAt;
 
   String get id => '${studentUid}_$month';
+  bool get waiting => claimed && !paid;
 
   Map<String, dynamic> toMap() => {
         'studentUid': studentUid,
@@ -291,6 +349,14 @@ class FeeRecord {
         'paidOn': paidOn,
         'mode': mode,
         'receiptNo': receiptNo,
+        'utr': utr,
+        'paidBy': paidBy,
+        'claimed': claimed,
+        'claimUtr': claimUtr,
+        'claimBy': claimBy,
+        'claimByUid': claimByUid,
+        'claimVia': claimVia,
+        'claimAt': claimAt,
       };
 
   factory FeeRecord.fromMap(Map<String, dynamic> m) => FeeRecord(
@@ -302,6 +368,14 @@ class FeeRecord {
         paidOn: _i(m['paidOn']),
         mode: _s(m['mode']),
         receiptNo: _s(m['receiptNo']),
+        utr: _s(m['utr']),
+        paidBy: _s(m['paidBy']),
+        claimed: _b(m['claimed']),
+        claimUtr: _s(m['claimUtr']),
+        claimBy: _s(m['claimBy']),
+        claimByUid: _s(m['claimByUid']),
+        claimVia: _s(m['claimVia']),
+        claimAt: _i(m['claimAt']),
       );
 }
 

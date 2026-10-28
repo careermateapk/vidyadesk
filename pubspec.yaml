@@ -25,6 +25,9 @@ dependencies:
   # QR code on the student ID card
   qr_flutter: ^4.1.0
   flutter_svg: ^2.0.10
+  pdf: ^3.11.1
+  path_provider: ^2.1.4
+  image_picker: ^1.1.2
 
 dev_dependencies:
   flutter_test:

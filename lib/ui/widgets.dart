@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -470,10 +472,27 @@ class Tag extends StatelessWidget {
 }
 
 class Avatar extends StatelessWidget {
-  const Avatar(this.name, {super.key, this.size = 44, this.index = 0});
+  const Avatar(this.name, {super.key, this.size = 44, this.index = 0, this.photo = ''});
   final String name;
   final double size;
   final int index;
+  /// base64 PNG; when set the photo is shown in a circle.
+  final String photo;
+
+  static final Map<int, Uint8List> _cache = {};
+  static Uint8List? bytesOf(String b64) {
+    if (b64.isEmpty) return null;
+    final k = b64.hashCode;
+    final hit = _cache[k];
+    if (hit != null) return hit;
+    try {
+      final b = base64Decode(b64);
+      if (_cache.length > 200) _cache.clear();
+      return _cache[k] = b;
+    } catch (_) {
+      return null;
+    }
+  }
 
   static const _grads = [
     [Color(0xFFA79BFF), Color(0xFF6C5CE7)],
@@ -487,6 +506,10 @@ class Avatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final img = bytesOf(photo);
+    if (img != null) {
+      return ClipOval(child: Image.memory(img, width: size, height: size, fit: BoxFit.cover, gaplessPlayback: true));
+    }
     final g = _grads[(index.abs() + name.codeUnits.fold<int>(0, (a, b) => a + b)) % _grads.length];
     return Container(
       width: size,

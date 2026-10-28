@@ -173,6 +173,16 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> setPhoto(String photo) async {
+    await backend.setPhoto(photo);
+    profile = profile?.withPhoto(photo);
+    for (final m in memberships) {
+      m.photo = photo;
+    }
+    active?.photo = photo;
+    notifyListeners();
+  }
+
   Future<void> saveProfile(AppUser u) async {
     await backend.saveProfile(u);
     profile = u;

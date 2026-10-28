@@ -45,7 +45,7 @@ service cloud.firestore {
           || (request.resource.data.status == 'approved' && request.resource.data.role == 'admin' && isOwner(request.resource.data.instituteId))
         );
 
-      allow update: if (own() && changed().hasOnly(['batchIds', 'childUids', 'childNames']))
+      allow update: if (own() && changed().hasOnly(['batchIds', 'childUids', 'childNames', 'photo']))
         || (isStaff(resource.data.instituteId)
             && changed().hasOnly(['status', 'studentCode', 'monthlyFee'])
             && (resource.data.role in ['student', 'parent'] || isAdmin(resource.data.instituteId)));
@@ -75,6 +75,16 @@ service cloud.firestore {
         allow read: if isStaff(inst)
           || (isMember(inst) && (resource.data.studentUid == request.auth.uid || resource.data.studentUid in mem(inst).childUids));
         allow write: if isAdmin(inst);
+        // a student or parent reports a UPI payment; the admin confirms it later
+        function claimOk() {
+          return request.resource.data.paid == false
+            && request.resource.data.claimed == true
+            && request.resource.data.claimByUid == request.auth.uid
+            && (request.resource.data.studentUid == request.auth.uid || request.resource.data.studentUid in mem(inst).childUids);
+        }
+        allow create: if isMember(inst) && claimOk();
+        allow update: if isMember(inst) && claimOk() && resource.data.paid == false
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['claimed', 'claimUtr', 'claimBy', 'claimByUid', 'claimVia', 'claimAt']);
       }
     }
   }

@@ -8,6 +8,8 @@ import '../ui/widgets.dart';
 import 'auth.dart';
 import 'common.dart';
 import 'help.dart';
+import 'payments.dart';
+import 'photo.dart';
 import 'learner_home.dart';
 import 'onboarding.dart';
 import 'people.dart';
@@ -35,10 +37,25 @@ class SettingsPage extends StatelessWidget {
           item(AppCard(
             gradient: p.hero,
             child: Row(children: [
-              Container(
-                padding: const EdgeInsets.all(2),
-                decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color(0x66FFFFFF), width: 2)),
-                child: ClipOval(child: Avatar(name, size: 58)),
+              GestureDetector(
+                onTap: () => changeProfilePhoto(context),
+                child: Stack(clipBehavior: Clip.none, children: [
+                  Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color(0x66FFFFFF), width: 2)),
+                    child: ClipOval(child: Avatar(name, size: 60, photo: u?.photo ?? '')),
+                  ),
+                  Positioned(
+                    right: -2,
+                    bottom: -2,
+                    child: Container(
+                      width: 26,
+                      height: 26,
+                      decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: p.shadow),
+                      child: Icon(Icons.photo_camera_rounded, size: 15, color: p.brandDeep),
+                    ),
+                  ),
+                ]),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -47,7 +64,7 @@ class SettingsPage extends StatelessWidget {
                   Text(u?.email ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xCCFFFFFF), fontSize: 12.5)),
                   const SizedBox(height: 8),
                   Wrap(spacing: 6, runSpacing: 6, children: [
-                    Tag(roleName(m.role), fg: const Color(0xFF073B3F), bg: const Color(0xFFFFD27A)),
+                    Tag(roleName(m.role), fg: const Color(0xFF4B3FC4), bg: Colors.white),
                     ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 220),
                       child: Container(
@@ -118,8 +135,11 @@ class SettingsPage extends StatelessWidget {
             item(AppCard(
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: Column(children: [
-                if (m.role == Role.admin)
+                if (m.role == Role.admin) ...[
+                  _Tile(icon: Icons.storefront_outlined, color: p.brand, label: tr('institute_details'), onTap: () => push(context, InstituteSettingsScreen(m: m))),
                   _Tile(icon: Icons.qr_code_2_rounded, color: p.success, label: tr('institute_code'), onTap: () => push(context, InstituteCodeScreen(m: m))),
+                  _Tile(icon: Icons.currency_rupee_rounded, color: p.warn, label: tr('payments_confirm'), onTap: () => push(context, ConfirmPaymentsScreen(m: m))),
+                ],
                 _Tile(icon: Icons.how_to_reg_rounded, color: p.danger, label: tr('requests'), onTap: () => push(context, RequestsScreen(m: m))),
                 _Tile(
                   icon: Icons.groups_rounded,

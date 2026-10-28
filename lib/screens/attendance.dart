@@ -203,7 +203,7 @@ class _MarkRow extends StatelessWidget {
         border: Border.all(color: present ? p.border : p.danger.withValues(alpha: .35)),
       ),
       child: Row(children: [
-        Avatar(s.name, size: 40, index: index),
+        Avatar(s.name, size: 40, index: index, photo: s.photo),
         const SizedBox(width: 10),
         Expanded(child: Text(s.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15))),
         _PA(label: 'P', on: present, color: p.success, onTap: () => onChanged(true)),

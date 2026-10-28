@@ -223,7 +223,7 @@ class _LearnerBody extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 18),
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               item(Row(children: [
-                GestureDetector(onTap: () => shell?.goToNamed('profile'), child: Avatar(app.profile?.name ?? m.name, size: 46)),
+                GestureDetector(onTap: () => shell?.goToNamed('profile'), child: Avatar(app.profile?.name ?? m.name, size: 46, photo: app.profile?.photo ?? '')),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -479,7 +479,7 @@ class IdCardScreen extends StatelessWidget {
                           child: Container(
                             padding: const EdgeInsets.all(4),
                             decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(28)),
-                            child: Avatar(name, size: 76),
+                            child: Avatar(name, size: 76, photo: app.profile?.photo ?? ''),
                           ),
                         ),
                         Transform.translate(

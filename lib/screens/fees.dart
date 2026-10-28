@@ -8,6 +8,7 @@ import '../core/theme.dart';
 import '../data/models.dart';
 import '../ui/widgets.dart';
 import 'common.dart';
+import 'payments.dart';
 
 class _FeeRow {
   _FeeRow(this.s, this.f);
@@ -80,6 +81,41 @@ class _FeesPageState extends State<FeesPage> {
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 30),
                 children: [
+                  FutureBuilder<List<FeeRecord>>(
+                    future: context.appRead.backend.feeClaims(widget.m.instituteId),
+                    builder: (context, snap) {
+                      final n = snap.data?.length ?? 0;
+                      if (n == 0) return const SizedBox.shrink();
+                      return FadeIn(
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: GestureDetector(
+                            onTap: () async {
+                              await push(context, ConfirmPaymentsScreen(m: widget.m));
+                              setState(() => _v++);
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(color: p.successTint, borderRadius: BorderRadius.circular(Gap.rCard)),
+                              child: Row(children: [
+                                IconBox(Icons.currency_rupee_rounded, fg: Colors.white, bg: p.success),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                    Text(trf('n_to_confirm', {'n': '$n'}), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+                                    Text(tr('tap_check_utr'), style: TextStyle(color: p.muted, fontSize: 12.5, fontWeight: FontWeight.w600)),
+                                  ]),
+                                ),
+                                PulseDot(color: p.success),
+                                const SizedBox(width: 6),
+                                Icon(Icons.chevron_right_rounded, color: p.success),
+                              ]),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                   FadeIn(
                     child: AppCard(
                       child: Row(children: [
@@ -184,7 +220,7 @@ class _FeeTile extends StatelessWidget {
       onTap: onTap,
       padding: const EdgeInsets.all(10),
       child: Row(children: [
-        Avatar(r.s.name, size: 42, index: index),
+        Avatar(r.s.name, size: 42, index: index, photo: r.s.photo),
         const SizedBox(width: 10),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -199,6 +235,8 @@ class _FeeTile extends StatelessWidget {
         ),
         if (paid)
           Tag(rupees(r.f.amount), fg: p.success, bg: p.successTint, leading: Icon(Icons.check_circle_rounded, size: 14, color: p.success))
+        else if (r.f.waiting)
+          Tag(tr('confirm_q'), fg: p.warn, bg: p.warnTint, leading: Icon(Icons.hourglass_top_rounded, size: 13, color: p.warn))
         else ...[
           IconButton(onPressed: onRemind, tooltip: tr('remind'), icon: Icon(Icons.chat_rounded, color: p.success)),
           Tag(tr('due'), fg: p.danger, bg: p.dangerTint),
@@ -220,7 +258,7 @@ class _FeeSheet extends StatefulWidget {
 class _FeeSheetState extends State<_FeeSheet> {
   late final _amt = TextEditingController(text: '${widget.r.f.amount}');
   late final _monthly = TextEditingController(text: '${widget.r.s.monthlyFee}');
-  String _mode = 'Cash';
+  late String _mode = widget.r.f.waiting ? 'UPI' : 'Cash';
   bool _busy = false;
 
   @override
@@ -244,6 +282,8 @@ class _FeeSheetState extends State<_FeeSheet> {
         paidOn: paid ? DateTime.now().millisecondsSinceEpoch : 0,
         mode: paid ? _mode : '',
         receiptNo: paid ? _receiptNo() : '',
+        paidBy: paid ? (f.claimBy.isNotEmpty ? f.claimBy : f.studentName) : '',
+        utr: paid && _mode == 'UPI' ? f.claimUtr : '',
       );
       await context.appRead.backend.saveFee(widget.m.instituteId, rec);
       if (!mounted) return;
@@ -282,7 +322,7 @@ class _FeeSheetState extends State<_FeeSheet> {
       child: SingleChildScrollView(
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Row(children: [
-            Avatar(r.s.name, size: 48),
+            Avatar(r.s.name, size: 48, photo: r.s.photo),
             const SizedBox(width: 12),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -304,8 +344,16 @@ class _FeeSheetState extends State<_FeeSheet> {
             ),
             const SizedBox(height: 12),
             SoftButton(
+              label: tr('receipt_pdf'),
+              icon: Icons.picture_as_pdf_outlined,
+              onPressed: () => shareFeeReceipt(context, widget.m.instituteId, r.f, studentCode: r.s.studentCode),
+            ),
+            const SizedBox(height: 8),
+            SoftButton(
               label: tr('send_receipt'),
-              icon: Icons.receipt_long_rounded,
+              color: p.successTint,
+              textColor: p.success,
+              icon: Icons.chat_outlined,
               onPressed: () => openWhatsApp(
                   context,
                   r.s.phone,
@@ -321,6 +369,20 @@ class _FeeSheetState extends State<_FeeSheet> {
             const SizedBox(height: 8),
             TextButton(onPressed: _busy ? null : () => _markPaid(false), child: Text(tr('mark_unpaid'), style: TextStyle(color: p.danger))),
           ] else ...[
+            if (r.f.waiting)
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: p.warnTint, borderRadius: BorderRadius.circular(14)),
+                child: Row(children: [
+                  Icon(Icons.hourglass_top_rounded, color: p.warn, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(trf('claim_info', {'by': r.f.claimBy, 'utr': r.f.claimUtr.isEmpty ? '—' : r.f.claimUtr}),
+                        style: TextStyle(color: p.warn, fontWeight: FontWeight.w700, fontSize: 12.5, height: 1.35)),
+                  ),
+                ]),
+              ),
             FieldLabel(tr('amount')),
             TextField(
               controller: _amt,
@@ -369,51 +431,114 @@ class _FeeSheetState extends State<_FeeSheet> {
 }
 
 // ---------------------------------------------------------------------------
-// Student / parent: own fees
+// Student / parent: own fees (either can pay)
 // ---------------------------------------------------------------------------
 
-class MyFeesPage extends StatelessWidget {
+class MyFeesPage extends StatefulWidget {
   const MyFeesPage({super.key, required this.m, required this.studentUid, required this.studentName});
   final Membership m;
   final String studentUid, studentName;
+  @override
+  State<MyFeesPage> createState() => _MyFeesPageState();
+}
+
+class _MyFeesPageState extends State<MyFeesPage> {
+  int _v = 0;
+
+  Future<(List<FeeRecord>, Institute?)> _load() async {
+    final b = context.appRead.backend;
+    return (await b.feesForStudent(widget.m.instituteId, widget.studentUid), await b.institute(widget.m.instituteId));
+  }
 
   @override
   Widget build(BuildContext context) {
     final p = context.pal;
+    final m = widget.m;
     return Scaffold(
-      appBar: InnerBar(title: m.role == Role.parent ? '${tr('nav_fees')} · ${firstName(studentName)}' : tr('my_fees'), showBack: false),
-      body: Loader<List<FeeRecord>>(
-        load: () => context.appRead.backend.feesForStudent(m.instituteId, studentUid),
-        builder: (context, fees, reload) {
+      appBar: InnerBar(title: m.role == Role.parent ? '${tr('nav_fees')} · ${firstName(widget.studentName)}' : tr('my_fees'), subtitle: m.instituteName, showBack: false),
+      body: Loader<(List<FeeRecord>, Institute?)>(
+        key: ValueKey(_v),
+        load: _load,
+        builder: (context, d, reload) {
+          final fees = d.$1;
+          final inst = d.$2;
           final cur = monthKey(DateTime.now());
           final thisOne = fees.where((f) => f.month == cur).firstOrNull;
-          final monthly = m.role == Role.student ? m.monthlyFee : (thisOne?.amount ?? 0);
+          final monthly = m.role == Role.student ? m.monthlyFee : (thisOne?.amount ?? (fees.isEmpty ? 0 : fees.first.amount));
+          final amount = thisOne?.amount ?? monthly;
           final paidThis = thisOne?.paid == true;
+          final waiting = thisOne?.waiting == true;
+          final canPay = !paidThis && !waiting && amount > 0 && (inst?.upiId ?? '').isNotEmpty;
           final total = fees.where((f) => f.paid).fold<int>(0, (a, f) => a + f.amount);
+          Future<void> pay() async {
+            final done = await showPayFee(context,
+                m: m,
+                inst: inst!,
+                studentUid: widget.studentUid,
+                studentName: widget.studentName,
+                month: cur,
+                amount: amount,
+                existing: thisOne);
+            if (done == true) setState(() => _v++);
+          }
+
           return ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(16, 6, 16, 30),
+            padding: const EdgeInsets.fromLTRB(18, 6, 18, 30),
             children: [
               FadeIn(
-                child: AppCard(
-                  gradient: paidThis ? LinearGradient(colors: [p.success, p.success.withValues(alpha: .75)]) : p.hero,
+                child: FeatureCard(
+                  gradient: paidThis ? LinearGradient(colors: [p.success, const Color(0xFF0E9F76)], begin: Alignment.topLeft, end: Alignment.bottomRight) : null,
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Row(children: [
-                      Text(monthLabel(cur), style: const TextStyle(color: Color(0xCCFFFFFF), fontWeight: FontWeight.w700)),
-                      const Spacer(),
-                      Tag(paidThis ? tr('paid') : tr('due'), fg: paidThis ? p.success : const Color(0xFF7A4A00), bg: paidThis ? Colors.white : const Color(0xFFFFD27A)),
+                      Expanded(child: Text(monthLabel(cur).toUpperCase(), style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w800, fontSize: 12, letterSpacing: .5))),
+                      if (paidThis)
+                        const GlassChip('Paid', icon: Icons.check_rounded, solid: true)
+                      else if (waiting)
+                        GlassChip(tr('waiting_confirm'), icon: Icons.hourglass_top_rounded)
+                      else
+                        GlassChip(tr('due')),
                     ]),
-                    const SizedBox(height: 8),
-                    Text(rupees(thisOne?.amount ?? monthly), style: const TextStyle(color: Colors.white, fontSize: 34, fontWeight: FontWeight.w800, letterSpacing: -.5)),
+                    const SizedBox(height: 6),
+                    Text(amount == 0 ? '—' : rupees(amount), style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w800, letterSpacing: -1)),
                     const SizedBox(height: 4),
-                    Text(
-                      paidThis ? '${tr('paid_on')} ${prettyDate(DateTime.fromMillisecondsSinceEpoch(thisOne!.paidOn))} · ${thisOne.mode}' : tr('pay_at_institute'),
-                      style: const TextStyle(color: Color(0xDDFFFFFF), fontWeight: FontWeight.w600),
-                    ),
+                    if (paidThis)
+                      Text('${tr('paid_on')} ${prettyDate(DateTime.fromMillisecondsSinceEpoch(thisOne!.paidOn))} · ${thisOne.mode}${thisOne.paidBy.isEmpty ? '' : ' · ${thisOne.paidBy}'}',
+                          style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w600))
+                    else if (waiting)
+                      Text(trf('waiting_sub', {'utr': thisOne!.claimUtr.isEmpty ? '—' : thisOne.claimUtr}), style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, height: 1.35))
+                    else if (!canPay)
+                      Text(tr('pay_at_institute'), style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w600)),
+                    if (canPay) ...[
+                      const SizedBox(height: 12),
+                      GestureDetector(
+                        onTap: pay,
+                        child: Pressable(
+                          child: Container(
+                            height: 50,
+                            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15)),
+                            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                              Icon(Icons.bolt_rounded, color: p.brandDeep),
+                              const SizedBox(width: 6),
+                              Text(tr('pay_now_upi'), style: TextStyle(color: p.brandDeep, fontWeight: FontWeight.w800, fontSize: 15.5)),
+                            ]),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(m.role == Role.parent ? tr('either_pays_parent') : tr('either_pays_student'), style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600, height: 1.35)),
+                    ],
+                    if (paidThis) ...[
+                      const SizedBox(height: 12),
+                      GestureDetector(
+                        onTap: () => shareFeeReceipt(context, m.instituteId, thisOne!, inst: inst, studentCode: m.role == Role.student ? m.studentCode : ''),
+                        child: const GlassChip('Receipt PDF', icon: Icons.picture_as_pdf_outlined, solid: true),
+                      ),
+                    ],
                   ]),
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
               FadeIn(
                 delay: stagger(1),
                 child: Row(children: [
@@ -422,10 +547,10 @@ class MyFeesPage extends StatelessWidget {
                   Expanded(child: _mini(p, tr('monthly_fee'), monthly == 0 ? '—' : rupees(monthly), p.brand)),
                 ]),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
               SectionTitle(tr('history')),
               const SizedBox(height: 8),
-              if (fees.isEmpty) EmptyState(icon: Icons.receipt_long_rounded, text: tr('no_fee_records')),
+              if (fees.isEmpty) EmptyState(icon: Icons.receipt_long_outlined, text: tr('no_fee_records')),
               for (var i = 0; i < fees.length; i++)
                 FadeIn(
                   delay: stagger(i + 2, stepMs: 40),
@@ -433,20 +558,31 @@ class MyFeesPage extends StatelessWidget {
                     padding: const EdgeInsets.only(bottom: 8),
                     child: AppCard(
                       padding: const EdgeInsets.all(12),
+                      onTap: fees[i].paid ? () => shareFeeReceipt(context, m.instituteId, fees[i], inst: inst, studentCode: m.role == Role.student ? m.studentCode : '') : null,
                       child: Row(children: [
-                        IconBox(fees[i].paid ? Icons.check_circle_rounded : Icons.hourglass_bottom_rounded,
-                            fg: fees[i].paid ? p.success : p.danger, bg: fees[i].paid ? p.successTint : p.dangerTint),
+                        IconBox(
+                          fees[i].paid ? Icons.check_rounded : (fees[i].waiting ? Icons.hourglass_top_rounded : Icons.schedule_rounded),
+                          fg: fees[i].paid ? p.success : (fees[i].waiting ? p.warn : p.danger),
+                          bg: fees[i].paid ? p.successTint : (fees[i].waiting ? p.warnTint : p.dangerTint),
+                        ),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                             Text(monthLabel(fees[i].month), style: const TextStyle(fontWeight: FontWeight.w800)),
                             Text(
-                              fees[i].paid ? '${fees[i].mode} · ${fees[i].receiptNo}' : tr('due'),
-                              style: TextStyle(color: p.muted, fontSize: 12.5),
+                              fees[i].paid
+                                  ? [fees[i].mode, if (fees[i].paidBy.isNotEmpty) '${tr('by')} ${fees[i].paidBy}', fees[i].receiptNo].where((e) => e.isNotEmpty).join(' · ')
+                                  : (fees[i].waiting ? tr('waiting_confirm') : tr('due')),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(color: p.muted, fontSize: 12.5, fontWeight: FontWeight.w600),
                             ),
                           ]),
                         ),
-                        Text(rupees(fees[i].amount), style: TextStyle(fontWeight: FontWeight.w800, color: fees[i].paid ? p.success : p.danger)),
+                        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                          Text(rupees(fees[i].amount), style: TextStyle(fontWeight: FontWeight.w800, color: fees[i].paid ? p.success : (fees[i].waiting ? p.warn : p.danger))),
+                          if (fees[i].paid) Text('PDF ↓', style: TextStyle(color: p.brand, fontWeight: FontWeight.w800, fontSize: 11.5)),
+                        ]),
                       ]),
                     ),
                   ),

@@ -99,7 +99,7 @@ class _RequestCardState extends State<_RequestCard> {
         border: _result == null ? null : (_result! ? p.success : p.danger),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            Avatar(r.name, size: 46, index: widget.index),
+            Avatar(r.name, size: 46, index: widget.index, photo: r.photo),
             const SizedBox(width: 12),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -202,7 +202,7 @@ class _PeoplePageState extends State<PeoplePage> {
                       reload();
                     },
                     child: Row(children: [
-                      Avatar(shown[i].name, size: 42, index: i),
+                      Avatar(shown[i].name, size: 42, index: i, photo: shown[i].photo),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -265,7 +265,7 @@ class PersonScreen extends StatelessWidget {
               FadeIn(
                 child: AppCard(
                   child: Column(children: [
-                    Avatar(x.name, size: 76),
+                    Avatar(x.name, size: 76, photo: x.photo),
                     const SizedBox(height: 10),
                     Text(x.name, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800)),
                     const SizedBox(height: 4),

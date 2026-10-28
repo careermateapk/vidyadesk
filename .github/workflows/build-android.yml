@@ -1,0 +1,100 @@
+name: Build Android app
+
+# Runs on every change pushed to main, and can be started by hand
+# from the Actions tab ("Run workflow").
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "firestore.rules"
+  workflow_dispatch:
+
+permissions:
+  contents: write   # needed to publish the APK as a release
+
+concurrency:
+  group: android-build
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v5
+
+      - name: Install Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Create the Android project files
+        run: |
+          flutter --version
+          ci/run_and_report.sh flutter create . --platforms android --org com.vidyadesk --project-name vidyadesk
+          rm -f test/widget_test.dart
+          sed -i 's/android:label="vidyadesk"/android:label="VidyaDesk"/' android/app/src/main/AndroidManifest.xml
+          sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <application#' android/app/src/main/AndroidManifest.xml
+          python3 ci/patch_signing.py
+          sed -i 's/applicationId = "com.vidyadesk.vidyadesk"/applicationId = "com.vidyadesk.app"/' android/app/build.gradle.kts
+          # Firebase needs Android 7 (API 24) or newer
+          sed -i 's/minSdk = flutter.minSdkVersion/minSdk = maxOf(24, flutter.minSdkVersion)/' android/app/build.gradle.kts || true
+          grep -n "namespace\|applicationId\|minSdk" android/app/build.gradle.kts
+          # VidyaDesk app icon
+          cp -r ci/icon/res/. android/app/src/main/res/
+
+      - name: Firebase settings
+        run: |
+          python3 - <<'PY' >> "$GITHUB_ENV"
+          import json
+          c = json.load(open('firebase-app.json'))
+          for k, env in [('projectId','FB_PROJECT'),('apiKey','FB_API_KEY'),('appId','FB_APP_ID'),('senderId','FB_SENDER'),('webClientId','GOOGLE_CLIENT_ID')]:
+              print(env + '=' + (c.get(k) or '').strip())
+          PY
+          if grep -q '"projectId": ""' firebase-app.json; then echo "::warning::Firebase is not connected yet - this APK runs in DEMO mode."; fi
+
+      - name: Get packages
+        run: ci/run_and_report.sh flutter pub get
+
+      - name: Check code problems
+        run: ci/run_and_report.sh flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Run tests
+        run: ci/run_and_report.sh flutter test --timeout=180s
+
+      - name: Accept Android SDK licenses
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          yes | flutter doctor --android-licenses > /dev/null || true
+
+      - name: Build APK
+        run: |
+          DEFS="--dart-define=FB_PROJECT=${{ env.FB_PROJECT }} --dart-define=FB_API_KEY=${{ env.FB_API_KEY }} --dart-define=FB_APP_ID=${{ env.FB_APP_ID }} --dart-define=FB_SENDER=${{ env.FB_SENDER }} --dart-define=GOOGLE_CLIENT_ID=${{ env.GOOGLE_CLIENT_ID }}"
+          ci/run_and_report.sh flutter build apk --release $DEFS
+          mkdir -p dist && cp build/app/outputs/flutter-apk/app-release.apk dist/VidyaDesk-all-phones.apk
+          ci/run_and_report.sh flutter build apk --release --split-per-abi $DEFS
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk dist/VidyaDesk-most-phones.apk
+          ls -la dist
+
+      - name: Publish APK for download
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: VidyaDesk build ${{ github.run_number }}
+          body: |
+            Download VidyaDesk-most-phones.apk (smallest, works on most phones).
+            If it does not install, use VidyaDesk-all-phones.apk.
+            Built from: ${{ github.event.head_commit.message || 'manual run' }}
+          prerelease: true
+          files: |
+            dist/VidyaDesk-most-phones.apk
+            dist/VidyaDesk-all-phones.apk

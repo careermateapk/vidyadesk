@@ -1,0 +1,59 @@
+name: vidyadesk
+description: VidyaDesk — coaching and tuition management for Admin, Teacher, Student and Parent.
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Settings saved on the phone (language, theme, demo data)
+  shared_preferences: ^2.5.6
+  # Login and online data (Firebase free plan)
+  firebase_core: any
+  firebase_auth: any
+  cloud_firestore: any
+  google_sign_in: ^7.2.0
+  # Pincode -> State / City lookup
+  http: any
+  # Share codes and notices to WhatsApp and other apps
+  share_plus: any
+  url_launcher: any
+  # QR code on the student ID card
+  qr_flutter: ^4.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  fonts:
+    - family: Hanken
+      fonts:
+        - asset: assets/fonts/HankenGrotesk-400.ttf
+          weight: 400
+        - asset: assets/fonts/HankenGrotesk-500.ttf
+          weight: 500
+        - asset: assets/fonts/HankenGrotesk-600.ttf
+          weight: 600
+        - asset: assets/fonts/HankenGrotesk-700.ttf
+          weight: 700
+        - asset: assets/fonts/HankenGrotesk-800.ttf
+          weight: 800
+    - family: NotoDeva
+      fonts:
+        - asset: assets/fonts/NotoSansDevanagari-400.ttf
+          weight: 400
+        - asset: assets/fonts/NotoSansDevanagari-600.ttf
+          weight: 600
+        - asset: assets/fonts/NotoSansDevanagari-700.ttf
+          weight: 700
+
+# 2.5.0 (Pigeon JNI) crashes at start in release builds: NoSuchMethodError on getAll.
+dependency_overrides:
+  shared_preferences_android: 2.4.28

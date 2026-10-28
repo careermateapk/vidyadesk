@@ -100,7 +100,7 @@ String errorMessage(Object e) {
 Future<T?> push<T>(BuildContext context, Widget page) => Navigator.of(context).push<T>(PageRouteBuilder<T>(
       transitionDuration: const Duration(milliseconds: 380),
       reverseTransitionDuration: const Duration(milliseconds: 300),
-      pageBuilder: (_, _, _) => page,
+      pageBuilder: (_, _, _) => Backdrop(child: page),
       transitionsBuilder: (_, a, _, child) {
         final c = CurvedAnimation(parent: a, curve: Curves.easeOutCubic);
         return FadeTransition(opacity: c, child: SlideTransition(position: Tween(begin: const Offset(.08, 0), end: Offset.zero).animate(c), child: child));

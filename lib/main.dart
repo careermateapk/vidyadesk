@@ -95,7 +95,7 @@ class Gate extends StatelessWidget {
         opacity: a,
         child: SlideTransition(position: Tween(begin: const Offset(0, .04), end: Offset.zero).animate(a), child: child),
       ),
-      child: KeyedSubtree(key: ValueKey(key), child: page),
+      child: KeyedSubtree(key: ValueKey(key), child: Backdrop(child: page)),
     );
   }
 }

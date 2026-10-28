@@ -6,7 +6,9 @@ import '../core/app_state.dart';
 import '../core/strings.dart';
 import '../core/theme.dart';
 import '../data/models.dart';
+import '../ui/mascot.dart';
 import '../ui/widgets.dart';
+import 'common.dart';
 
 // ---------------------------------------------------------------------------
 // Splash
@@ -18,97 +20,91 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMixin {
-  late final AnimationController _logo = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100))..forward();
-  late final AnimationController _bar = AnimationController(vsync: this, duration: const Duration(milliseconds: 2000))..forward();
+class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+  late final AnimationController _owl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100))..forward();
   Timer? _t;
 
   @override
   void initState() {
     super.initState();
-    _t = Timer(const Duration(milliseconds: 2300), () {
-      if (mounted) context.appRead.finishSplash();
-    });
+    _t = Timer(const Duration(milliseconds: 2600), _go);
+  }
+
+  void _go() {
+    _t?.cancel();
+    if (mounted) context.appRead.finishSplash();
   }
 
   @override
   void dispose() {
     _t?.cancel();
-    _logo.dispose();
-    _bar.dispose();
+    _owl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final logo = CurvedAnimation(parent: _logo, curve: Curves.elasticOut);
+    final p = context.pal;
+    final owl = CurvedAnimation(parent: _owl, curve: Curves.elasticOut);
     return Scaffold(
+      backgroundColor: p.bg,
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(colors: [Color(0xFF0E6A70), Color(0xFF073B3F), Color(0xFF041F22)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-        ),
-        child: Stack(children: [
-          const Positioned(top: -120, right: -120, child: _Glow(size: 360, color: Color(0x66F5A524))),
-          const Positioned(bottom: -140, left: -120, child: _Glow(size: 380, color: Color(0x5514B8A6))),
-          Center(
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
+        decoration: BoxDecoration(gradient: RadialGradient(center: const Alignment(0, -.55), radius: 1.1, colors: [p.top, p.bg])),
+        child: SafeArea(
+          child: Stack(children: [
+            Positioned(top: 90, left: 30, child: _Dot(16, p.brand2.withValues(alpha: .35))),
+            Positioned(top: 170, right: 40, child: _Dot(26, p.brand2.withValues(alpha: .18))),
+            Positioned(top: 430, left: 54, child: _Dot(10, p.accent.withValues(alpha: .6))),
+            Column(children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+                child: Row(children: [
+                  const AppLogo(size: 34),
+                  const SizedBox(width: 9),
+                  Text('VidyaDesk', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: p.ink, letterSpacing: -.3)),
+                ]),
+              ),
+              const Spacer(flex: 2),
               AnimatedBuilder(
-                animation: logo,
-                builder: (context, child) => Transform.scale(scale: logo.value, child: Transform.rotate(angle: (1 - logo.value) * -.6, child: child)),
-                child: const Floaty(child: AppLogo(size: 108)),
+                animation: owl,
+                builder: (context, child) => Transform.scale(scale: .4 + .6 * owl.value, child: Opacity(opacity: _owl.value.clamp(0, 1), child: child)),
+                child: const Floaty(amount: 8, child: Mascot(size: 250)),
+              ),
+              const Spacer(),
+              FadeIn(
+                delay: const Duration(milliseconds: 450),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 36),
+                  child: Column(children: [
+                    Text(tr('splash_title1'), textAlign: TextAlign.center, style: const TextStyle(fontSize: 31, fontWeight: FontWeight.w800, letterSpacing: -1, height: 1.1)),
+                    Text(tr('splash_title2'), textAlign: TextAlign.center, style: TextStyle(fontSize: 31, fontWeight: FontWeight.w800, letterSpacing: -1, height: 1.15, color: p.brand)),
+                    const SizedBox(height: 12),
+                    Text(tr('splash_sub'), textAlign: TextAlign.center, style: TextStyle(fontSize: 14.5, color: p.muted, height: 1.5, fontWeight: FontWeight.w500)),
+                  ]),
+                ),
               ),
               const SizedBox(height: 26),
               FadeIn(
-                delay: const Duration(milliseconds: 400),
-                child: const Text('VidyaDesk', style: TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.w900, letterSpacing: -1.2)),
+                delay: const Duration(milliseconds: 700),
+                child: Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: PrimaryButton(label: tr('get_started'), onPressed: _go)),
               ),
-              const SizedBox(height: 6),
-              FadeIn(
-                delay: const Duration(milliseconds: 650),
-                child: Text(tr('tagline'), textAlign: TextAlign.center, style: const TextStyle(color: Color(0xCCFFFFFF), fontSize: 15, fontWeight: FontWeight.w600)),
-              ),
-              const SizedBox(height: 40),
-              SizedBox(
-                width: 150,
-                child: AnimatedBuilder(
-                  animation: _bar,
-                  builder: (context, _) => ClipRRect(
-                    borderRadius: BorderRadius.circular(9),
-                    child: LinearProgressIndicator(
-                      value: Curves.easeInOut.transform(_bar.value),
-                      minHeight: 5,
-                      backgroundColor: const Color(0x33FFFFFF),
-                      valueColor: const AlwaysStoppedAnimation(Color(0xFFF5A524)),
-                    ),
-                  ),
-                ),
-              ),
+              const SizedBox(height: 18),
+              Text(tr('made_in_india'), style: TextStyle(color: p.muted, fontSize: 12, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 14),
             ]),
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 36,
-            child: FadeIn(
-              delay: const Duration(milliseconds: 900),
-              child: Text(tr('made_in_india'), textAlign: TextAlign.center, style: const TextStyle(color: Color(0x99FFFFFF), fontSize: 13, fontWeight: FontWeight.w600)),
-            ),
-          ),
-        ]),
+          ]),
+        ),
       ),
     );
   }
 }
 
-class _Glow extends StatelessWidget {
-  const _Glow({required this.size, required this.color});
+class _Dot extends StatelessWidget {
+  const _Dot(this.size, this.color);
   final double size;
   final Color color;
   @override
-  Widget build(BuildContext context) => Floaty(
-        amount: 14,
-        child: Container(width: size, height: size, decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [color, color.withValues(alpha: 0)]))),
-      );
+  Widget build(BuildContext context) => Floaty(amount: 10, child: Container(width: size, height: size, decoration: BoxDecoration(color: color, shape: BoxShape.circle)));
 }
 
 // ---------------------------------------------------------------------------
@@ -134,106 +130,116 @@ class _LanguageScreenState extends State<LanguageScreen> {
   @override
   Widget build(BuildContext context) {
     final p = context.pal;
-    return Scaffold(
-      appBar: widget.firstTime ? null : InnerBar(title: tr('language')),
-      body: SafeArea(
-        top: widget.firstTime,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
-          children: [
-            if (widget.firstTime) ...[
-              FadeIn(child: Row(children: [const AppLogo(size: 44), const SizedBox(width: 10), Text('VidyaDesk', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: p.brand))])),
-              const SizedBox(height: 28),
-              FadeIn(delay: stagger(1), child: const Text('Choose your language', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: -.6))),
-              const SizedBox(height: 4),
-              FadeIn(delay: stagger(2), child: Text('अपनी भाषा चुनें · Apni bhasha chunein', style: TextStyle(color: p.muted, fontSize: 15, fontFamily: 'NotoDeva'))),
-              const SizedBox(height: 24),
-            ],
-            for (var i = 0; i < _opts.length; i++)
-              FadeIn(
-                delay: stagger(i + 3),
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _LangCard(
-                    code: _opts[i].$1,
-                    title: _opts[i].$2,
-                    sample: _opts[i].$3,
-                    glyph: _opts[i].$4,
-                    selected: _sel == _opts[i].$1,
-                    isDefault: i == 0,
-                    onTap: () {
-                      setState(() => _sel = _opts[i].$1);
-                      if (!widget.firstTime) context.appRead.setLanguage(_opts[i].$1);
-                    },
-                  ),
+    final app = context.app;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return AppScaffold(
+      title: widget.firstTime ? null : tr('language'),
+      bottom: widget.firstTime ? PrimaryButton(label: 'Continue', onPressed: () => app.setLanguage(_sel)) : null,
+      body: ListView(
+        padding: EdgeInsets.fromLTRB(18, widget.firstTime ? MediaQuery.of(context).padding.top + 24 : 8, 18, 24),
+        children: [
+          if (widget.firstTime) ...[
+            FadeIn(child: Align(alignment: Alignment.centerLeft, child: IconBox(Icons.translate_rounded, fg: p.brand, bg: p.brandTint, size: 52))),
+            const SizedBox(height: 18),
+            FadeIn(delay: stagger(1), child: const Text('Choose your language', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -.8))),
+            const SizedBox(height: 6),
+            FadeIn(delay: stagger(2), child: Text('अपनी भाषा चुनें · Apni bhasha chunein', style: TextStyle(color: p.muted, fontSize: 14.5, fontFamily: 'NotoDeva'))),
+            const SizedBox(height: 24),
+          ],
+          for (var i = 0; i < _opts.length; i++)
+            FadeIn(
+              delay: stagger(i + 3),
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _LangCard(
+                  title: _opts[i].$2,
+                  sample: _opts[i].$3,
+                  glyph: _opts[i].$4,
+                  deva: _opts[i].$1 == 'hi',
+                  selected: _sel == _opts[i].$1,
+                  isDefault: i == 0,
+                  onTap: () {
+                    setState(() => _sel = _opts[i].$1);
+                    if (!widget.firstTime) app.setLanguage(_opts[i].$1);
+                  },
                 ),
               ),
-            const SizedBox(height: 10),
-            if (widget.firstTime)
-              FadeIn(
-                delay: stagger(7),
-                child: PrimaryButton(label: 'Continue', onPressed: () => context.appRead.setLanguage(_sel)),
-              ),
-            if (!widget.firstTime)
-              Text(tr('lang_change_note'), textAlign: TextAlign.center, style: TextStyle(color: p.muted, fontSize: 13)),
+            ),
+          FadeIn(
+            delay: stagger(7),
+            child: AppCard(
+              color: p.cardAlt,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              child: Row(children: [
+                Icon(dark ? Icons.dark_mode_rounded : Icons.light_mode_rounded, color: p.brand, size: 21),
+                const SizedBox(width: 10),
+                Expanded(child: Text(tr('dark_mode'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5))),
+                Switch(value: dark, activeThumbColor: Colors.white, activeTrackColor: p.brand, onChanged: (v) => app.setTheme(v ? ThemeMode.dark : ThemeMode.light)),
+              ]),
+            ),
+          ),
+          if (!widget.firstTime) ...[
+            const SizedBox(height: 14),
+            Text(tr('lang_change_note'), textAlign: TextAlign.center, style: TextStyle(color: p.muted, fontSize: 13)),
           ],
-        ),
+        ],
       ),
     );
   }
 }
 
 class _LangCard extends StatelessWidget {
-  const _LangCard({required this.code, required this.title, required this.sample, required this.glyph, required this.selected, required this.isDefault, required this.onTap});
-  final String code, title, sample, glyph;
-  final bool selected, isDefault;
+  const _LangCard({required this.title, required this.sample, required this.glyph, required this.deva, required this.selected, required this.isDefault, required this.onTap});
+  final String title, sample, glyph;
+  final bool deva, selected, isDefault;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final p = context.pal;
-    final deva = code == 'hi';
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 280),
+        duration: const Duration(milliseconds: 260),
         curve: Curves.easeOutCubic,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: selected ? p.brandTint : p.card,
-          borderRadius: BorderRadius.circular(22),
+          color: p.card,
+          borderRadius: BorderRadius.circular(Gap.rCard),
           border: Border.all(color: selected ? p.brand : p.border, width: selected ? 2 : 1),
-          boxShadow: selected ? p.shadow : null,
+          boxShadow: selected ? [...p.shadow, BoxShadow(color: p.brandTint, spreadRadius: 4)] : p.shadow,
         ),
         child: Row(children: [
           AnimatedContainer(
-            duration: const Duration(milliseconds: 280),
+            duration: const Duration(milliseconds: 260),
             width: 52,
             height: 52,
-            decoration: BoxDecoration(gradient: selected ? p.gold : null, color: selected ? null : p.cardAlt, borderRadius: BorderRadius.circular(16)),
+            decoration: BoxDecoration(color: selected ? p.brand : p.cardAlt, borderRadius: BorderRadius.circular(16)),
             alignment: Alignment.center,
-            child: Text(glyph, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: selected ? const Color(0xFF073B3F) : p.brand, fontFamily: deva ? 'NotoDeva' : null)),
+            child: Text(glyph, style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800, color: selected ? Colors.white : p.brand, fontFamily: deva ? 'NotoDeva' : null)),
           ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
-                Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, fontFamily: deva ? 'NotoDeva' : null)),
+                Text(title, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, fontFamily: deva ? 'NotoDeva' : null)),
                 if (isDefault) ...[const SizedBox(width: 8), Tag('Default', fg: p.warn, bg: p.warnTint)],
               ]),
               const SizedBox(height: 2),
-              Text(sample, style: TextStyle(color: p.muted, fontSize: 14, fontFamily: deva ? 'NotoDeva' : null)),
+              Text(sample, style: TextStyle(color: p.muted, fontSize: 13.5, fontWeight: FontWeight.w600, fontFamily: deva ? 'NotoDeva' : null)),
             ]),
           ),
-          AnimatedScale(
-            scale: selected ? 1 : 0,
-            duration: const Duration(milliseconds: 320),
-            curve: Curves.easeOutBack,
-            child: Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(color: p.brand, shape: BoxShape.circle),
-              child: Icon(Icons.check_rounded, size: 18, color: p.dark ? const Color(0xFF0B1220) : Colors.white),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: selected ? p.brand : p.border, width: 2)),
+            alignment: Alignment.center,
+            child: AnimatedScale(
+              scale: selected ? 1 : 0,
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOutBack,
+              child: Container(width: 12, height: 12, decoration: BoxDecoration(color: p.brand, shape: BoxShape.circle)),
             ),
           ),
         ]),
@@ -247,95 +253,144 @@ class _LangCard extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 IconData roleIcon(Role r) => switch (r) {
-      Role.admin => Icons.business_center_rounded,
-      Role.teacher => Icons.co_present_rounded,
-      Role.student => Icons.school_rounded,
-      Role.parent => Icons.family_restroom_rounded,
+      Role.admin => Icons.apartment_rounded,
+      Role.teacher => Icons.co_present_outlined,
+      Role.student => Icons.school_outlined,
+      Role.parent => Icons.verified_user_outlined,
     };
 
 String roleName(Role r) => tr('role_${r.name}');
 
-class RoleScreen extends StatelessWidget {
+(Color, Color) roleColors(Palette p, Role r) => switch (r) {
+      Role.admin => (p.brand, p.brandTint),
+      Role.teacher => (p.indigo, p.indigoTint),
+      Role.student => (p.warn, p.warnTint),
+      Role.parent => (p.success, p.successTint),
+    };
+
+class RoleScreen extends StatefulWidget {
   const RoleScreen({super.key});
+  @override
+  State<RoleScreen> createState() => _RoleScreenState();
+}
+
+class _RoleScreenState extends State<RoleScreen> {
+  Role _sel = Role.admin;
 
   @override
   Widget build(BuildContext context) {
     final p = context.pal;
     final app = context.app;
-    final colors = [
-      (p.brand, p.brandTint),
-      (p.indigo, p.indigoTint),
-      (p.warn, p.warnTint),
-      (p.success, p.successTint),
-    ];
-    return Scaffold(
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 30),
-          children: [
-            FadeIn(
+    return AppScaffold(
+      topBar: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 8, 18, 6),
+          child: Row(children: [
+            const AppLogo(size: 34),
+            const SizedBox(width: 9),
+            const Expanded(child: Text('VidyaDesk', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, letterSpacing: -.3))),
+            if (app.signedIn != null)
+              IconBtn(icon: Icons.logout_rounded, tooltip: tr('logout'), onTap: () => app.signOut())
+            else
+              IconBtn(icon: Icons.translate_rounded, tooltip: tr('language'), onTap: () => push(context, const LanguageScreen())),
+          ]),
+        ),
+      ),
+      bottom: PrimaryButton(label: trf('continue_as', {'role': roleName(_sel)}), onPressed: () => app.chooseRole(_sel)),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(18, 14, 18, 20),
+        children: [
+          FadeIn(child: Text(tr('who_are_you'), style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -.8))),
+          const SizedBox(height: 4),
+          FadeIn(delay: stagger(1), child: Text(tr('who_are_you_sub'), style: TextStyle(color: p.muted, fontSize: 14.5, fontWeight: FontWeight.w500))),
+          const SizedBox(height: 20),
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: .95,
+            children: [
+              for (var i = 0; i < Role.values.length; i++)
+                FadeIn(
+                  delay: stagger(i + 2, stepMs: 70),
+                  child: _RoleCard(role: Role.values[i], selected: _sel == Role.values[i], onTap: () => setState(() => _sel = Role.values[i])),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          FadeIn(
+            delay: stagger(7),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: p.brandTint, borderRadius: BorderRadius.circular(Gap.rCard)),
               child: Row(children: [
-                const AppLogo(size: 40),
-                const SizedBox(width: 10),
-                Text('VidyaDesk', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: p.brand)),
-                const Spacer(),
-                if (app.signedIn != null)
-                  TextButton(onPressed: () => app.signOut(), child: Text(tr('logout')))
-                else
-                  IconButton(
-                    tooltip: tr('language'),
-                    onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LanguageScreen())),
-                    icon: Icon(Icons.translate_rounded, color: p.brand),
-                  ),
+                const Mascot(size: 48, book: false, cap: false),
+                const SizedBox(width: 8),
+                Expanded(child: Text(tr('role_tip'), style: TextStyle(fontSize: 12.5, color: p.ink2, height: 1.45, fontWeight: FontWeight.w600))),
               ]),
             ),
-            const SizedBox(height: 26),
-            FadeIn(delay: stagger(1), child: Text(tr('who_are_you'), style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: -.6))),
-            const SizedBox(height: 4),
-            FadeIn(delay: stagger(2), child: Text(tr('who_are_you_sub'), style: TextStyle(color: p.muted, fontSize: 15))),
-            const SizedBox(height: 22),
-            for (var i = 0; i < Role.values.length; i++)
-              FadeIn(
-                delay: stagger(i + 3, stepMs: 80),
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: AppCard(
-                    onTap: () => app.chooseRole(Role.values[i]),
-                    child: Row(children: [
-                      IconBox(roleIcon(Role.values[i]), fg: colors[i].$1, bg: colors[i].$2, size: 54),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text(roleName(Role.values[i]), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-                          const SizedBox(height: 2),
-                          Text(tr('role_${Role.values[i].name}_sub'), style: TextStyle(color: p.muted, fontSize: 13, height: 1.3)),
-                        ]),
-                      ),
-                      Icon(Icons.chevron_right_rounded, color: p.muted),
-                    ]),
-                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RoleCard extends StatelessWidget {
+  const _RoleCard({required this.role, required this.selected, required this.onTap});
+  final Role role;
+  final bool selected;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pal;
+    final c = roleColors(p, role);
+    return GestureDetector(
+      onTap: onTap,
+      child: Pressable(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 240),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: p.card,
+            borderRadius: BorderRadius.circular(Gap.rCard),
+            border: Border.all(color: selected ? p.brand : p.border, width: selected ? 2 : 1),
+            boxShadow: selected ? [...p.shadow, BoxShadow(color: p.brandTint, spreadRadius: 4)] : p.shadow,
+          ),
+          child: Stack(children: [
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              IconBox(roleIcon(role), fg: c.$1, bg: c.$2, size: 50),
+              const Spacer(),
+              Text(roleName(role), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, letterSpacing: -.2)),
+              const SizedBox(height: 2),
+              Text(tr('role_${role.name}_short'), maxLines: 2, style: TextStyle(color: p.muted, fontSize: 12.5, fontWeight: FontWeight.w600, height: 1.3)),
+            ]),
+            Positioned(
+              top: 0,
+              right: 0,
+              child: AnimatedScale(
+                scale: selected ? 1 : 0,
+                duration: const Duration(milliseconds: 260),
+                curve: Curves.easeOutBack,
+                child: Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(color: p.brand, shape: BoxShape.circle),
+                  child: const Icon(Icons.check_rounded, size: 16, color: Colors.white),
                 ),
               ),
-            const SizedBox(height: 8),
-            FadeIn(
-              delay: stagger(8),
-              child: AppCard(
-                color: p.cardAlt,
-                child: Row(children: [
-                  Icon(Icons.lightbulb_rounded, color: p.accent),
-                  const SizedBox(width: 10),
-                  Expanded(child: Text(tr('role_tip'), style: TextStyle(fontSize: 13, color: p.muted, height: 1.35))),
-                ]),
-              ),
             ),
-          ],
+          ]),
         ),
       ),
     );
   }
 }
 
-/// Yellow strip that says the app is running with sample data.
+/// Amber strip that says the app is running with sample data.
 class DemoBanner extends StatelessWidget {
   const DemoBanner({super.key});
   @override
@@ -346,9 +401,9 @@ class DemoBanner extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(color: p.warnTint, borderRadius: BorderRadius.circular(14)),
+      decoration: BoxDecoration(color: p.warnTint, borderRadius: BorderRadius.circular(16)),
       child: Row(children: [
-        Icon(Icons.science_rounded, color: p.warn, size: 20),
+        Icon(Icons.science_outlined, color: p.warn, size: 19),
         const SizedBox(width: 8),
         Expanded(child: Text(tr('demo_banner'), style: TextStyle(color: p.warn, fontSize: 12.5, fontWeight: FontWeight.w700, height: 1.3))),
       ]),

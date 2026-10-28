@@ -9,6 +9,7 @@ import '../data/backend.dart';
 import '../data/demo_backend.dart';
 import '../data/models.dart';
 import '../ui/widgets.dart';
+import '../ui/mascot.dart';
 import 'auth.dart';
 import 'onboarding.dart';
 
@@ -28,27 +29,34 @@ class JoinFlow extends StatelessWidget {
       body: ListView(
         padding: EdgeInsets.zero,
         children: [
-          HeroHeader(
-            bottomPad: 30,
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                _HeroIconButton(
-                  icon: canClose ? Icons.close_rounded : Icons.swap_horiz_rounded,
-                  tooltip: canClose ? tr('cancel') : tr('change_role'),
-                  onTap: () => canClose ? app.cancelJoin() : app.chooseRole(null),
-                ),
-                const Spacer(),
-                Tag(roleName(role), fg: const Color(0xFF073B3F), bg: const Color(0xFFFFD27A), leading: Icon(roleIcon(role), size: 14, color: const Color(0xFF073B3F))),
-                if (!canClose) ...[
-                  const SizedBox(width: 8),
-                  _HeroIconButton(icon: Icons.logout_rounded, tooltip: tr('logout'), onTap: () => app.signOut()),
-                ],
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 8, 18, 0),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  IconBtn(
+                    icon: canClose ? Icons.close_rounded : Icons.chevron_left_rounded,
+                    size: canClose ? 21 : 26,
+                    tooltip: canClose ? tr('cancel') : tr('change_role'),
+                    onTap: () => canClose ? app.cancelJoin() : app.chooseRole(null),
+                  ),
+                  const Spacer(),
+                  Builder(builder: (context) {
+                    final c = roleColors(p, role);
+                    return Tag(roleName(role), fg: c.$1, bg: c.$2, leading: Icon(roleIcon(role), size: 14, color: c.$1));
+                  }),
+                  if (!canClose) ...[
+                    const SizedBox(width: 10),
+                    IconBtn(icon: Icons.logout_rounded, tooltip: tr('logout'), onTap: () => app.signOut()),
+                  ],
+                ]),
+                const SizedBox(height: 18),
+                FadeIn(child: Text(tr('join_title_${role.name}'), style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -.8))),
+                const SizedBox(height: 4),
+                FadeIn(delay: stagger(1), child: Text(tr('join_sub_${role.name}'), style: TextStyle(color: p.muted, fontSize: 14.5, height: 1.4, fontWeight: FontWeight.w500))),
               ]),
-              const SizedBox(height: 18),
-              Text(tr('join_title_${role.name}'), style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: -.5)),
-              const SizedBox(height: 4),
-              Text(tr('join_sub_${role.name}'), style: const TextStyle(color: Color(0xCCFFFFFF), fontSize: 14, height: 1.35)),
-            ]),
+            ),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(18, 18, 18, 40),
@@ -593,33 +601,47 @@ class _PendingScreenState extends State<PendingScreen> with SingleTickerProvider
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
           children: [
             Row(children: [
-              const AppLogo(size: 36),
-              const SizedBox(width: 8),
-              Text('VidyaDesk', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: p.brand)),
-              const Spacer(),
-              TextButton.icon(onPressed: () => app.signOut(), icon: const Icon(Icons.logout_rounded, size: 18), label: Text(tr('logout'))),
+              const AppLogo(size: 34),
+              const SizedBox(width: 9),
+              const Expanded(child: Text('VidyaDesk', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, letterSpacing: -.3))),
+              IconBtn(icon: Icons.logout_rounded, tooltip: tr('logout'), onTap: () => app.signOut()),
             ]),
-            const SizedBox(height: 30),
+            const SizedBox(height: 16),
             Center(
-              child: rejected
-                  ? IconBox(Icons.block_rounded, fg: p.danger, bg: p.dangerTint, size: 110)
-                  : Stack(alignment: Alignment.center, children: [
-                      RotationTransition(
-                        turns: _spin,
-                        child: Container(
-                          width: 130,
-                          height: 130,
-                          decoration: BoxDecoration(shape: BoxShape.circle, gradient: SweepGradient(colors: [p.accent.withValues(alpha: 0), p.accent])),
-                        ),
+              child: SizedBox(
+                width: 240,
+                height: 240,
+                child: Stack(alignment: Alignment.center, children: [
+                  RotationTransition(
+                    turns: _spin,
+                    child: Container(
+                      width: 232,
+                      height: 232,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: SweepGradient(colors: [(rejected ? p.danger : p.brand).withValues(alpha: 0), (rejected ? p.danger : p.brand).withValues(alpha: .35)]),
                       ),
-                      Container(width: 116, height: 116, decoration: BoxDecoration(shape: BoxShape.circle, color: p.bg)),
-                      Floaty(child: Icon(Icons.hourglass_top_rounded, size: 54, color: p.accent)),
-                    ]),
+                    ),
+                  ),
+                  Container(width: 222, height: 222, decoration: BoxDecoration(shape: BoxShape.circle, color: p.bg)),
+                  const Floaty(child: Mascot(size: 200, book: false)),
+                  Positioned(
+                    right: 18,
+                    top: 18,
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(color: p.card, shape: BoxShape.circle, boxShadow: p.shadow),
+                      child: Icon(rejected ? Icons.block_rounded : Icons.schedule_rounded, color: rejected ? p.danger : p.warn, size: 24),
+                    ),
+                  ),
+                ]),
+              ),
             ),
             const SizedBox(height: 22),
             FadeIn(
               child: Text(rejected ? tr('request_rejected') : tr('request_sent'),
-                  textAlign: TextAlign.center, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: -.5)),
+                  textAlign: TextAlign.center, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -.8)),
             ),
             const SizedBox(height: 6),
             FadeIn(
@@ -627,10 +649,22 @@ class _PendingScreenState extends State<PendingScreen> with SingleTickerProvider
               child: Text(
                 rejected ? tr('request_rejected_sub') : trf('request_sent_sub', {'who': m.role == Role.teacher ? tr('the_admin') : tr('the_teacher')}),
                 textAlign: TextAlign.center,
-                style: TextStyle(color: p.muted, fontSize: 15, height: 1.4),
+                style: TextStyle(color: p.muted, fontSize: 14.5, height: 1.5, fontWeight: FontWeight.w500),
               ),
             ),
-            const SizedBox(height: 22),
+            const SizedBox(height: 20),
+            if (!rejected)
+              FadeIn(
+                delay: stagger(2),
+                child: AppCard(
+                  child: Column(children: [
+                    _step(p, tr('step_sent'), tr('step_sent_sub'), 2, true),
+                    _step(p, tr('step_review'), tr('step_review_sub'), 1, true),
+                    _step(p, tr('step_in'), tr('step_in_sub'), 0, false),
+                  ]),
+                ),
+              ),
+            const SizedBox(height: 12),
             FadeIn(
               delay: stagger(2),
               child: AppCard(
@@ -676,6 +710,35 @@ class _PendingScreenState extends State<PendingScreen> with SingleTickerProvider
       ),
     );
   }
+
+  Widget _step(Palette p, String title, String sub, int state, bool line) => Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Column(children: [
+          Container(
+            width: 26,
+            height: 26,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: state == 2 ? p.success : (state == 1 ? p.warnTint : p.cardAlt),
+              border: state == 0 ? Border.all(color: p.border, width: 1.5) : null,
+            ),
+            alignment: Alignment.center,
+            child: state == 2
+                ? const Icon(Icons.check_rounded, size: 16, color: Colors.white)
+                : (state == 1 ? PulseDot(color: p.warn, size: 9) : null),
+          ),
+          if (line) Container(width: 2, height: 24, color: p.border),
+        ]),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+              Text(sub, style: TextStyle(color: p.muted, fontSize: 12.5, fontWeight: FontWeight.w600)),
+            ]),
+          ),
+        ),
+      ]);
 
   Widget _row(Palette p, IconData icon, String k, String v) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),

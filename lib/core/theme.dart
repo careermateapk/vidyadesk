@@ -1,16 +1,24 @@
 import 'package:flutter/material.dart';
 
-/// Colours used across the app. One set for light mode, one for dark mode.
+/// VidyaDesk design system — colours.
+///
+/// Field names stay the same as before so every screen keeps working:
+///   brand   = Iris (main purple)        success = Mint  (present / paid)
+///   indigo  = Sky  (info / blue)        warn    = Amber (pending)
+///   accent  = Amber (highlights)        danger  = Rose  (absent / due)
 class Palette {
   const Palette({
     required this.dark,
     required this.bg,
+    required this.top,
     required this.card,
     required this.cardAlt,
     required this.border,
     required this.ink,
+    required this.ink2,
     required this.muted,
     required this.brand,
+    required this.brand2,
     required this.brandDeep,
     required this.brandTint,
     required this.accent,
@@ -25,125 +33,158 @@ class Palette {
   });
 
   final bool dark;
-  final Color bg, card, cardAlt, border, ink, muted;
-  final Color brand, brandDeep, brandTint, accent;
+  final Color bg, top, card, cardAlt, border, ink, ink2, muted;
+  final Color brand, brand2, brandDeep, brandTint, accent;
   final Color success, successTint, danger, dangerTint, warn, warnTint;
   final Color indigo, indigoTint;
 
   static const light = Palette(
     dark: false,
-    bg: Color(0xFFF3F6F5),
+    bg: Color(0xFFF6F5FB),
+    top: Color(0xFFECE8FF),
     card: Color(0xFFFFFFFF),
-    cardAlt: Color(0xFFF7F9F8),
-    border: Color(0xFFE1E7E5),
-    ink: Color(0xFF0E1726),
-    muted: Color(0xFF5A6577),
-    brand: Color(0xFF0C5C61),
-    brandDeep: Color(0xFF073B3F),
-    brandTint: Color(0xFFE2F0EF),
-    accent: Color(0xFFF5A524),
-    success: Color(0xFF15803D),
-    successTint: Color(0xFFE3F5EA),
-    danger: Color(0xFFC2281D),
-    dangerTint: Color(0xFFFDECEA),
-    warn: Color(0xFF8A5300),
-    warnTint: Color(0xFFFEF3DC),
-    indigo: Color(0xFF4338CA),
-    indigoTint: Color(0xFFEEF0FF),
+    cardAlt: Color(0xFFF8F7FD),
+    border: Color(0xFFECEAF5),
+    ink: Color(0xFF17153A),
+    ink2: Color(0xFF47446A),
+    muted: Color(0xFF8A87A6),
+    brand: Color(0xFF6C5CE7),
+    brand2: Color(0xFF8B7CF6),
+    brandDeep: Color(0xFF4B3FC4),
+    brandTint: Color(0xFFEFEDFF),
+    accent: Color(0xFFE8930C),
+    success: Color(0xFF12B886),
+    successTint: Color(0xFFE3F8F0),
+    danger: Color(0xFFF0466E),
+    dangerTint: Color(0xFFFDE8EE),
+    warn: Color(0xFFE8930C),
+    warnTint: Color(0xFFFFF4DB),
+    indigo: Color(0xFF3B9EF5),
+    indigoTint: Color(0xFFE5F2FE),
   );
 
   static const night = Palette(
     dark: true,
-    bg: Color(0xFF0B1220),
-    card: Color(0xFF141C2E),
-    cardAlt: Color(0xFF1A2337),
-    border: Color(0xFF243049),
-    ink: Color(0xFFE6EBF5),
-    muted: Color(0xFF94A3B8),
-    brand: Color(0xFF5ED6C8),
-    brandDeep: Color(0xFF0F2A2E),
-    brandTint: Color(0xFF16343A),
-    accent: Color(0xFFFFC861),
-    success: Color(0xFF86EFAC),
-    successTint: Color(0x2622C55E),
-    danger: Color(0xFFFCA5A5),
-    dangerTint: Color(0x26EF4444),
-    warn: Color(0xFFFDE68A),
-    warnTint: Color(0x26F59E0B),
-    indigo: Color(0xFFA5B4FC),
-    indigoTint: Color(0x266366F1),
+    bg: Color(0xFF0F0E1A),
+    top: Color(0xFF1B1835),
+    card: Color(0xFF191829),
+    cardAlt: Color(0xFF201F33),
+    border: Color(0xFF2A2842),
+    ink: Color(0xFFF2F1FA),
+    ink2: Color(0xFFC9C6E0),
+    muted: Color(0xFF8E8BAA),
+    brand: Color(0xFF8B7CFF),
+    brand2: Color(0xFFA79BFF),
+    brandDeep: Color(0xFF6C5CE7),
+    brandTint: Color(0xFF26224A),
+    accent: Color(0xFFFBBF24),
+    success: Color(0xFF34D399),
+    successTint: Color(0xFF143329),
+    danger: Color(0xFFFB7193),
+    dangerTint: Color(0xFF3A1A26),
+    warn: Color(0xFFFBBF24),
+    warnTint: Color(0xFF33290F),
+    indigo: Color(0xFF60B4FA),
+    indigoTint: Color(0xFF14283D),
   );
 
-  /// Header gradient (teal) used on the big top areas.
-  LinearGradient get hero => LinearGradient(
+  /// Purple feature-card gradient (balance card, next class, ID card).
+  LinearGradient get hero => const LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
-        colors: dark ? const [Color(0xFF134E4A), Color(0xFF0F2A2E)] : const [Color(0xFF0E6A70), Color(0xFF073B3F)],
+        colors: [Color(0xFF7A6AF0), Color(0xFF5545D6)],
       );
 
-  LinearGradient get gold => const LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Color(0xFFFFC861), Color(0xFFE08A0B)],
-      );
+  /// Main button gradient.
+  LinearGradient get button => LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [brand2, brand]);
+
+  /// Soft lavender wash behind the top of every page.
+  LinearGradient get pageTop => LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [top, bg]);
+
+  LinearGradient get gold => const LinearGradient(colors: [Color(0xFFFFC870), Color(0xFFF59F00)]);
 
   List<BoxShadow> get shadow => dark
-      ? const [BoxShadow(color: Color(0x66000000), blurRadius: 24, offset: Offset(0, 12), spreadRadius: -12)]
+      ? const [
+          BoxShadow(color: Color(0x4D000000), blurRadius: 2, offset: Offset(0, 1)),
+          BoxShadow(color: Color(0x99000000), blurRadius: 28, offset: Offset(0, 10), spreadRadius: -14),
+        ]
       : const [
-          BoxShadow(color: Color(0x0A0F172A), blurRadius: 2, offset: Offset(0, 1)),
-          BoxShadow(color: Color(0x240F172A), blurRadius: 28, offset: Offset(0, 12), spreadRadius: -14),
+          BoxShadow(color: Color(0x0A17153A), blurRadius: 2, offset: Offset(0, 1)),
+          BoxShadow(color: Color(0x384C3FC4), blurRadius: 28, offset: Offset(0, 10), spreadRadius: -14),
         ];
+
+  List<BoxShadow> glow(Color c) => [BoxShadow(color: c.withValues(alpha: .45), blurRadius: 24, offset: const Offset(0, 12), spreadRadius: -12)];
 }
 
 extension PaletteX on BuildContext {
   Palette get pal => Theme.of(this).brightness == Brightness.dark ? Palette.night : Palette.light;
 }
 
+/// Spacing and corner sizes used everywhere.
+class Gap {
+  static const double xs = 4, s = 8, m = 12, l = 16, xl = 20, xxl = 28;
+  static const double rCard = 22, rTile = 13, rInput = 15, rButton = 16;
+  static const double page = 18;
+}
+
 ThemeData buildTheme(Palette p, {bool hindi = false}) {
   final base = p.dark ? ThemeData.dark(useMaterial3: true) : ThemeData.light(useMaterial3: true);
   final family = hindi ? 'NotoDeva' : 'Hanken';
-  final text = base.textTheme.apply(
-    fontFamily: family,
-    fontFamilyFallback: const ['Hanken', 'NotoDeva'],
-    bodyColor: p.ink,
-    displayColor: p.ink,
-  );
+  const fallback = ['Hanken', 'NotoDeva'];
+  final text = base.textTheme.apply(fontFamily: family, fontFamilyFallback: fallback, bodyColor: p.ink, displayColor: p.ink);
+  OutlineInputBorder ob(Color c, [double w = 1.5]) =>
+      OutlineInputBorder(borderRadius: BorderRadius.circular(Gap.rInput), borderSide: BorderSide(color: c, width: w));
   return base.copyWith(
-    scaffoldBackgroundColor: p.bg,
-    colorScheme: base.colorScheme.copyWith(
-      primary: p.brand,
-      secondary: p.accent,
-      surface: p.card,
-      onSurface: p.ink,
-      error: p.danger,
-    ),
+    scaffoldBackgroundColor: Colors.transparent,
+    colorScheme: base.colorScheme.copyWith(primary: p.brand, secondary: p.accent, surface: p.card, onSurface: p.ink, error: p.danger),
     textTheme: text,
     dividerColor: p.border,
+    splashFactory: InkSparkle.splashFactory,
     appBarTheme: AppBarTheme(
-      backgroundColor: p.bg,
+      backgroundColor: Colors.transparent,
       foregroundColor: p.ink,
       elevation: 0,
       scrolledUnderElevation: 0,
       centerTitle: false,
-      titleTextStyle: TextStyle(fontFamily: family, fontFamilyFallback: const ['Hanken', 'NotoDeva'], fontSize: 20, fontWeight: FontWeight.w800, color: p.ink),
+      titleTextStyle: TextStyle(fontFamily: family, fontFamilyFallback: fallback, fontSize: 21, fontWeight: FontWeight.w800, color: p.ink),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: p.cardAlt,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
-      hintStyle: TextStyle(color: p.muted),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: p.border)),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: p.border)),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: p.brand, width: 2)),
-      errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: p.danger)),
+      fillColor: p.card,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+      hintStyle: TextStyle(color: p.muted, fontWeight: FontWeight.w500),
+      prefixIconColor: p.muted,
+      border: ob(p.border),
+      enabledBorder: ob(p.border),
+      focusedBorder: ob(p.brand, 2),
+      errorBorder: ob(p.danger),
+      focusedErrorBorder: ob(p.danger, 2),
+    ),
+    chipTheme: base.chipTheme.copyWith(
+      backgroundColor: p.card,
+      selectedColor: p.brandTint,
+      side: BorderSide(color: p.border),
+      shape: const StadiumBorder(),
+      labelStyle: TextStyle(fontFamily: family, fontWeight: FontWeight.w700, color: p.ink2),
     ),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
-      backgroundColor: p.dark ? const Color(0xFFE6EBF5) : const Color(0xFF0E1726),
-      contentTextStyle: TextStyle(fontFamily: family, color: p.dark ? const Color(0xFF0E1726) : Colors.white, fontWeight: FontWeight.w600),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      backgroundColor: p.dark ? const Color(0xFFF2F1FA) : const Color(0xFF17153A),
+      contentTextStyle: TextStyle(fontFamily: family, color: p.dark ? const Color(0xFF17153A) : Colors.white, fontWeight: FontWeight.w700),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      insetPadding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
     ),
-    bottomSheetTheme: BottomSheetThemeData(backgroundColor: p.card, showDragHandle: true),
-    dialogTheme: DialogThemeData(backgroundColor: p.card),
+    bottomSheetTheme: BottomSheetThemeData(
+      backgroundColor: p.card,
+      showDragHandle: true,
+      dragHandleColor: p.border,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
+    ),
+    dialogTheme: DialogThemeData(backgroundColor: p.card, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24))),
+    filledButtonTheme: FilledButtonThemeData(style: FilledButton.styleFrom(backgroundColor: p.brand, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)))),
+    textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(foregroundColor: p.brand, textStyle: TextStyle(fontFamily: family, fontWeight: FontWeight.w700))),
+    progressIndicatorTheme: ProgressIndicatorThemeData(color: p.brand),
+    timePickerTheme: TimePickerThemeData(backgroundColor: p.card),
+    datePickerTheme: DatePickerThemeData(backgroundColor: p.card),
   );
 }

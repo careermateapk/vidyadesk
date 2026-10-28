@@ -9,6 +9,8 @@ import '../data/demo_backend.dart';
 import '../data/models.dart';
 import '../data/places.dart';
 import '../ui/widgets.dart';
+import '../ui/mascot.dart';
+import 'common.dart';
 import 'onboarding.dart';
 
 String errorText(Object e) {
@@ -129,66 +131,61 @@ class _LoginScreenState extends State<LoginScreen> {
     final p = context.pal;
     final app = context.app;
     final role = app.chosenRole ?? Role.student;
+    final rc = roleColors(p, role);
     return Scaffold(
-      body: ListView(
-        padding: EdgeInsets.zero,
-        children: [
-          HeroHeader(
-            bottomPad: 34,
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Material(
-                  color: const Color(0x26FFFFFF),
-                  borderRadius: BorderRadius.circular(14),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(14),
-                    onTap: () => app.chooseRole(null),
-                    child: const SizedBox(width: 44, height: 44, child: Icon(Icons.chevron_left_rounded, color: Colors.white, size: 28)),
-                  ),
-                ),
-                const Spacer(),
-                Tag(roleName(role), fg: const Color(0xFF073B3F), bg: const Color(0xFFFFD27A), leading: Icon(roleIcon(role), size: 14, color: const Color(0xFF073B3F))),
-              ]),
-              const SizedBox(height: 18),
-              Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 300),
-                      child: Text(_tab == 0 ? tr('welcome_back') : tr('create_account'),
-                          key: ValueKey(_tab), style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: -.6)),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(_tab == 0 ? tr('login_sub') : tr('signup_sub'), style: const TextStyle(color: Color(0xCCFFFFFF), fontSize: 14, height: 1.35)),
-                  ]),
-                ),
-                const SizedBox(width: 12),
-                const Floaty(child: AppLogo(size: 64)),
-              ]),
-            ]),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 18, 18, 30),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              const DemoBanner(),
-              Segmented(items: [tr('login'), tr('signup')], index: _tab, onChanged: (i) => setState(() {
-                    _tab = i;
-                    _error = null;
-                  })),
-              const SizedBox(height: 18),
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 380),
-                transitionBuilder: (c, a) => FadeTransition(opacity: a, child: SlideTransition(position: Tween(begin: const Offset(.06, 0), end: Offset.zero).animate(a), child: c)),
-                child: _tab == 0 ? _loginBody(p) : _signupBody(p),
+      backgroundColor: p.bg,
+      body: PageBg(
+        height: 420,
+        child: ListView(
+          padding: EdgeInsets.fromLTRB(18, MediaQuery.of(context).padding.top + 8, 18, 30),
+          children: [
+            Row(children: [
+              IconBtn(icon: Icons.chevron_left_rounded, size: 26, tooltip: tr('back'), onTap: () => app.chooseRole(null)),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(999), boxShadow: p.shadow),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(roleIcon(role), size: 15, color: rc.$1),
+                  const SizedBox(width: 6),
+                  Text(roleName(role), style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, color: rc.$1)),
+                ]),
               ),
-              _ErrorBox(text: _error, shake: _shake),
-              if (app.isDemo) ...[
-                const SizedBox(height: 18),
-                _SampleAccounts(onPick: _busy ? null : _sample),
-              ],
             ]),
-          ),
-        ],
+            const SizedBox(height: 14),
+            Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    child: Text(_tab == 0 ? tr('welcome_back') : tr('create_account'),
+                        key: ValueKey(_tab), style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: -1)),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(_tab == 0 ? tr('login_sub') : tr('signup_sub'), style: TextStyle(color: p.muted, fontSize: 14.5, height: 1.35, fontWeight: FontWeight.w500)),
+                ]),
+              ),
+              const Floaty(child: Mascot(size: 92, book: false, wave: true)),
+            ]),
+            const SizedBox(height: 16),
+            const DemoBanner(),
+            Segmented(items: [tr('login'), tr('signup')], index: _tab, onChanged: (i) => setState(() {
+                  _tab = i;
+                  _error = null;
+                })),
+            const SizedBox(height: 18),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 380),
+              transitionBuilder: (c, a) => FadeTransition(opacity: a, child: SlideTransition(position: Tween(begin: const Offset(.06, 0), end: Offset.zero).animate(a), child: c)),
+              child: _tab == 0 ? _loginBody(p) : _signupBody(p),
+            ),
+            _ErrorBox(text: _error, shake: _shake),
+            if (app.isDemo) ...[
+              const SizedBox(height: 18),
+              _SampleAccounts(onPick: _busy ? null : _sample),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -244,7 +241,7 @@ class _LoginScreenState extends State<LoginScreen> {
       PrimaryButton(
         label: tr('email_signup'),
         icon: Icons.mail_rounded,
-        onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ProfileFormScreen(withEmail: true))),
+        onPressed: () => push(context, const ProfileFormScreen(withEmail: true)),
       ),
       const SizedBox(height: 12),
       Center(child: TextButton(onPressed: () => setState(() => _tab = 0), child: Text(tr('have_account_login')))),
@@ -294,16 +291,22 @@ class _SampleAccounts extends StatelessWidget {
       color: p.cardAlt,
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Icon(Icons.play_circle_fill_rounded, color: p.accent),
-          const SizedBox(width: 8),
-          Expanded(child: Text(tr('try_sample'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15))),
+          IconBox(Icons.play_arrow_rounded, fg: p.warn, bg: p.warnTint, size: 38),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(tr('try_sample'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+              Text(tr('try_sample_sub'), style: TextStyle(color: p.muted, fontSize: 12.5, fontWeight: FontWeight.w600)),
+            ]),
+          ),
         ]),
-        const SizedBox(height: 4),
-        Text(tr('try_sample_sub'), style: TextStyle(color: p.muted, fontSize: 12.5)),
         const SizedBox(height: 12),
         Wrap(spacing: 8, runSpacing: 8, children: [
           for (final r in Role.values)
-            SoftButton(label: roleName(r), icon: roleIcon(r), height: 40, onPressed: onPick == null ? null : () => onPick!(r)),
+            Builder(builder: (context) {
+              final c = roleColors(p, r);
+              return SoftButton(label: roleName(r), icon: roleIcon(r), height: 40, color: c.$2, textColor: c.$1, onPressed: onPick == null ? null : () => onPick!(r));
+            }),
         ]),
       ]),
     );

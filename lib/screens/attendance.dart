@@ -104,7 +104,7 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
                       children: [
                         AppCard(
                           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text(widget.batch.title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
+                            Text(widget.batch.title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
                             Text('${daysCode(widget.batch.days)} · ${timeLabel(widget.batch.startMin)}', style: TextStyle(color: p.muted, fontSize: 13)),
                             const SizedBox(height: 12),
                             Row(children: [
@@ -132,7 +132,7 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
                                 stroke: 7,
                                 color: p.success,
                                 track: p.successTint,
-                                center: Text('$presentCount/${studs.length}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
+                                center: Text('$presentCount/${studs.length}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
                               ),
                             ]),
                             if (!runs) ...[
@@ -235,7 +235,7 @@ class _PA extends StatelessWidget {
           height: 40,
           decoration: BoxDecoration(color: on ? color : p.cardAlt, borderRadius: BorderRadius.circular(12)),
           alignment: Alignment.center,
-          child: Text(label, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: on ? Colors.white : p.muted)),
+          child: Text(label, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: on ? Colors.white : p.muted)),
         ),
       ),
     );
@@ -288,7 +288,7 @@ class MyAttendancePage extends StatelessWidget {
                       color: col,
                       track: p.cardAlt,
                       center: Column(mainAxisSize: MainAxisSize.min, children: [
-                        c.total == 0 ? Text('—', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: p.muted)) : CountUp(v, suffix: '%', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: col)),
+                        c.total == 0 ? Text('—', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: p.muted)) : CountUp(v, suffix: '%', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: col)),
                         Text(tr('overall'), style: TextStyle(color: p.muted, fontSize: 11, fontWeight: FontWeight.w700)),
                       ]),
                     ),
@@ -327,7 +327,7 @@ class MyAttendancePage extends StatelessWidget {
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                           Row(children: [
                             Expanded(child: Text(bb?.title ?? tr('batch'), style: const TextStyle(fontWeight: FontWeight.w800))),
-                            Text('${pct(bc.present, bc.total)}%', style: TextStyle(fontWeight: FontWeight.w900, color: p.brand)),
+                            Text('${pct(bc.present, bc.total)}%', style: TextStyle(fontWeight: FontWeight.w800, color: p.brand)),
                           ]),
                           const SizedBox(height: 8),
                           GrowBar(value: bc.total == 0 ? 0 : bc.present / bc.total, color: p.brand, track: p.brandTint),
@@ -350,7 +350,7 @@ class MyAttendancePage extends StatelessWidget {
           Container(width: 8, height: 8, decoration: BoxDecoration(color: c, shape: BoxShape.circle)),
           const SizedBox(width: 8),
           Expanded(child: Text(k, style: TextStyle(color: p.muted, fontWeight: FontWeight.w600))),
-          Text(v, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+          Text(v, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
         ]),
       );
 }

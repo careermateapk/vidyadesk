@@ -11,6 +11,7 @@ import 'auth.dart';
 import 'common.dart';
 import 'join.dart';
 import 'people.dart';
+import 'schedule.dart';
 
 String batchShareText(Batch b, String instituteName) => trf('share_batch_code', {
       'inst': instituteName,
@@ -20,118 +21,165 @@ String batchShareText(Batch b, String instituteName) => trf('share_batch_code', 
       'code': b.code,
     });
 
-class BatchesPage extends StatelessWidget {
+class BatchesPage extends StatefulWidget {
   const BatchesPage({super.key, required this.m});
   final Membership m;
+  @override
+  State<BatchesPage> createState() => _BatchesPageState();
+}
 
-  Future<(List<Batch>, List<Membership>)> _load(BuildContext context) async {
+class _BatchesPageState extends State<BatchesPage> {
+  int _filter = 0; // all, mine, today, then subjects
+  int _v = 0;
+
+  Future<(List<Batch>, List<Membership>)> _load() async {
     final b = context.appRead.backend;
-    return (await b.batches(m.instituteId), await b.members(m.instituteId));
+    return (await b.batches(widget.m.instituteId), await b.members(widget.m.instituteId));
   }
 
   @override
   Widget build(BuildContext context) {
-    final p = context.pal;
-    return Scaffold(
-      appBar: InnerBar(title: tr('nav_batches'), showBack: false),
-      body: Loader<(List<Batch>, List<Membership>)>(
-        load: () => _load(context),
-        builder: (context, d, reload) {
-          final list = myBatches(m, d.$1);
-          return Stack(children: [
-            ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(16, 6, 16, 110),
-              children: [
-                if (list.isEmpty) EmptyState(icon: Icons.class_rounded, text: tr('no_batches_yet')),
-                for (var i = 0; i < list.length; i++)
-                  FadeIn(
-                    delay: stagger(i),
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: BatchCard(
-                        b: list[i],
-                        count: approvedStudents(d.$2, batchId: list[i].id).length,
-                        mine: list[i].teacherUid == m.uid,
-                        onTap: () async {
-                          await push(context, BatchDetailScreen(m: m, batch: list[i]));
-                          reload();
-                        },
+    final m = widget.m;
+    return Loader<(List<Batch>, List<Membership>)>(
+      key: ValueKey(_v),
+      load: _load,
+      builder: (context, d, reload) {
+        final all = myBatches(m, d.$1);
+        final subjects = {for (final b in all) b.subject}.toList()..sort();
+        final filters = [tr('all'), if (m.role == Role.admin && m.teaches) tr('mine'), tr('today'), ...subjects];
+        final f = _filter.clamp(0, filters.length - 1);
+        final now = DateTime.now();
+        final label = filters[f];
+        final list = all.where((b) {
+          if (f == 0) return true;
+          if (label == tr('mine')) return b.teacherUid == m.uid;
+          if (label == tr('today')) return b.runsOn(now);
+          return b.subject == label;
+        }).toList();
+        Future<void> add() async {
+          await push(context, CreateBatchScreen(m: m, members: d.$2));
+          setState(() => _v++);
+        }
+
+        return Column(children: [
+          InnerBar(
+            title: tr('nav_batches'),
+            subtitle: trf('n_active_batches', {'n': '${all.length}'}),
+            showBack: false,
+            trailing: IconBtn(icon: Icons.add_rounded, filled: true, tooltip: tr('new_batch'), onTap: add),
+          ),
+          const SizedBox(height: 6),
+          PillBar(items: filters, index: f, onChanged: (v) => setState(() => _filter = v)),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: reload,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
+                children: [
+                  if (all.isEmpty)
+                    AppCard(
+                      child: Column(children: [
+                        EmptyState(icon: Icons.layers_outlined, text: tr('no_batches_yet')),
+                        PrimaryButton(label: tr('new_batch'), icon: Icons.add_rounded, arrow: false, onPressed: add),
+                      ]),
+                    )
+                  else if (list.isEmpty)
+                    EmptyState(icon: Icons.filter_alt_off_outlined, text: tr('nothing_here_filter')),
+                  for (var i = 0; i < list.length; i++)
+                    FadeIn(
+                      delay: stagger(i),
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: BatchCard(
+                          b: list[i],
+                          colorIndex: all.indexOf(list[i]),
+                          instituteName: m.instituteName,
+                          count: approvedStudents(d.$2, batchId: list[i].id).length,
+                          mine: list[i].teacherUid == m.uid,
+                          onTap: () async {
+                            await push(context, BatchDetailScreen(m: m, batch: list[i]));
+                            reload();
+                          },
+                        ),
                       ),
                     ),
-                  ),
-              ],
-            ),
-            Positioned(
-              left: 16,
-              right: 16,
-              bottom: 16,
-              child: PrimaryButton(
-                label: tr('new_batch'),
-                icon: Icons.add_rounded,
-                arrow: false,
-                gradient: LinearGradient(colors: [p.indigo, p.indigo.withValues(alpha: .8)]),
-                onPressed: () async {
-                  await push(context, CreateBatchScreen(m: m, members: d.$2));
-                  reload();
-                },
+                ],
               ),
             ),
-          ]);
-        },
-      ),
+          ),
+        ]);
+      },
     );
   }
 }
 
 class BatchCard extends StatelessWidget {
-  const BatchCard({super.key, required this.b, required this.count, required this.mine, required this.onTap});
+  const BatchCard({super.key, required this.b, required this.count, required this.mine, required this.onTap, this.colorIndex = 0, this.instituteName = ''});
   final Batch b;
-  final int count;
+  final int count, colorIndex;
   final bool mine;
+  final String instituteName;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final p = context.pal;
+    final c = batchColors(p, colorIndex);
     return AppCard(
       onTap: onTap,
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          IconBox(Icons.menu_book_rounded, fg: p.indigo, bg: p.indigoTint, size: 46),
+          IconBox(Icons.menu_book_outlined, fg: c.$1, bg: c.$2, size: 48),
           const SizedBox(width: 12),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(b.subject, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
-              Text('${b.className} · ${mine ? tr('you') : b.teacherName}', style: TextStyle(color: p.muted, fontSize: 13)),
+              Text(b.subject, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17, letterSpacing: -.2)),
+              Text('${b.className} · ${mine ? tr('you') : b.teacherName}', style: TextStyle(color: p.muted, fontSize: 13, fontWeight: FontWeight.w600)),
             ]),
           ),
-          Tag(daysCode(b.days), fg: p.indigo, bg: p.indigoTint),
+          Tag(daysCode(b.days), fg: c.$1, bg: c.$2),
         ]),
+        const SizedBox(height: 14),
+        _WeekStrip(days: b.days, color: c.$1, tint: c.$2),
+        const SizedBox(height: 14),
+        const Line(),
         const SizedBox(height: 12),
         Row(children: [
           Icon(Icons.schedule_rounded, size: 16, color: p.muted),
-          const SizedBox(width: 4),
-          Text('${timeLabel(b.startMin)} – ${timeLabel(b.endMin)}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+          const SizedBox(width: 5),
+          Text('${timeLabel(b.startMin)} – ${timeLabel(b.endMin)}', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: p.ink2)),
           const SizedBox(width: 14),
-          Icon(Icons.groups_rounded, size: 16, color: p.muted),
-          const SizedBox(width: 4),
-          Text('$count', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-          const Spacer(),
-          Icon(Icons.key_rounded, size: 15, color: p.brand),
-          const SizedBox(width: 3),
-          Text(b.code, style: TextStyle(color: p.brand, fontWeight: FontWeight.w900, fontSize: 12.5, letterSpacing: .5)),
+          Icon(Icons.groups_outlined, size: 17, color: p.muted),
+          const SizedBox(width: 5),
+          Text('$count', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: p.ink2)),
         ]),
-        const SizedBox(height: 10),
-        _WeekStrip(days: b.days),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
+          decoration: BoxDecoration(color: p.cardAlt, borderRadius: BorderRadius.circular(12)),
+          child: Row(children: [
+            Text(tr('code'), style: TextStyle(fontSize: 12, color: p.muted, fontWeight: FontWeight.w600)),
+            const SizedBox(width: 10),
+            Expanded(child: Text(b.code, style: TextStyle(color: p.brand, fontWeight: FontWeight.w800, fontSize: 13.5, letterSpacing: .6))),
+            IconButton(visualDensity: VisualDensity.compact, onPressed: () => copyText(context, b.code), icon: Icon(Icons.copy_rounded, size: 17, color: p.muted), tooltip: tr('copy')),
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              onPressed: () => SharePlus.instance.share(ShareParams(text: batchShareText(b, instituteName))),
+              icon: Icon(Icons.share_outlined, size: 17, color: p.muted),
+              tooltip: tr('share'),
+            ),
+          ]),
+        ),
       ]),
     );
   }
 }
 
 class _WeekStrip extends StatelessWidget {
-  const _WeekStrip({required this.days});
+  const _WeekStrip({required this.days, required this.color, required this.tint});
   final List<int> days;
+  final Color color, tint;
   @override
   Widget build(BuildContext context) {
     final p = context.pal;
@@ -142,16 +190,16 @@ class _WeekStrip extends StatelessWidget {
         final on = days.contains(d);
         return Expanded(
           child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 2),
-            padding: const EdgeInsets.symmetric(vertical: 5),
+            margin: const EdgeInsets.symmetric(horizontal: 2.5),
+            padding: const EdgeInsets.symmetric(vertical: 6),
             decoration: BoxDecoration(
-              color: on ? p.indigo.withValues(alpha: d == today ? 1 : .16) : Colors.transparent,
-              borderRadius: BorderRadius.circular(8),
+              color: on ? (d == today ? color : tint) : Colors.transparent,
+              borderRadius: BorderRadius.circular(9),
               border: d == today && !on ? Border.all(color: p.border) : null,
             ),
             alignment: Alignment.center,
             child: Text(dayShort(d).substring(0, 1),
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: on ? (d == today ? Colors.white : p.indigo) : p.muted.withValues(alpha: .6))),
+                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: on ? (d == today ? Colors.white : color) : p.muted.withValues(alpha: .55))),
           ),
         );
       }),
@@ -195,12 +243,12 @@ class BatchDetailScreen extends StatelessWidget {
             children: [
               FadeIn(
                 child: AppCard(
-                  gradient: LinearGradient(colors: [p.indigo, p.indigo.withValues(alpha: .75)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                  gradient: p.hero,
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Row(children: [
                       Expanded(
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text(b.subject, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900)),
+                          Text(b.subject, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800)),
                           Text('${b.className} · ${b.teacherName}', style: const TextStyle(color: Color(0xCCFFFFFF), fontWeight: FontWeight.w600)),
                         ]),
                       ),
@@ -210,7 +258,7 @@ class BatchDetailScreen extends StatelessWidget {
                         stroke: 8,
                         color: Colors.white,
                         track: const Color(0x33FFFFFF),
-                        center: Text(tt == 0 ? '—' : '${pct(tp, tt)}%', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+                        center: Text(tt == 0 ? '—' : '${pct(tp, tt)}%', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
                       ),
                     ]),
                     const SizedBox(height: 12),
@@ -227,7 +275,7 @@ class BatchDetailScreen extends StatelessWidget {
                 delay: stagger(1),
                 child: AppCard(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                    Text(tr('batch_code'), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                    Text(tr('batch_code'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
                     Text(tr('batch_code_sub'), style: TextStyle(color: p.muted, fontSize: 12.5)),
                     const SizedBox(height: 10),
                     CodeBox(code: b.code, big: false),
@@ -288,7 +336,7 @@ class BatchDetailScreen extends StatelessWidget {
                       child: Row(children: [
                         Text(prettyDay(dateFromKey(a.dateKey)), style: const TextStyle(fontWeight: FontWeight.w700)),
                         const Spacer(),
-                        Text('${a.present.length}/${a.marked.length}', style: TextStyle(fontWeight: FontWeight.w900, color: p.success)),
+                        Text('${a.present.length}/${a.marked.length}', style: TextStyle(fontWeight: FontWeight.w800, color: p.success)),
                         const SizedBox(width: 8),
                         SizedBox(width: 60, child: GrowBar(value: a.marked.isEmpty ? 0 : a.present.length / a.marked.length, color: p.success, track: p.successTint)),
                       ]),
@@ -326,7 +374,7 @@ class _StudentAttRow extends StatelessWidget {
             Text(s.studentCode, style: TextStyle(color: p.muted, fontSize: 12)),
           ]),
         ),
-        Text(count.total == 0 ? '—' : '$v%', style: TextStyle(fontWeight: FontWeight.w900, color: c)),
+        Text(count.total == 0 ? '—' : '$v%', style: TextStyle(fontWeight: FontWeight.w800, color: c)),
         if (count.total > 0 && v < 60) ...[const SizedBox(width: 6), Icon(Icons.warning_amber_rounded, color: p.danger, size: 18)],
       ]),
     );
@@ -462,7 +510,7 @@ class _CreateBatchScreenState extends State<CreateBatchScreen> {
               Row(children: [
                 IconBox(Icons.calendar_month_rounded, fg: p.indigo, bg: p.indigoTint),
                 const SizedBox(width: 10),
-                Expanded(child: Text(tr('class_days'), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16))),
+                Expanded(child: Text(tr('class_days'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16))),
                 AnimatedSwitcher(
                   duration: const Duration(milliseconds: 250),
                   child: Tag(_days.isEmpty ? '—' : daysCode(_days), key: ValueKey(daysCode(_days)), fg: p.indigo, bg: p.indigoTint),

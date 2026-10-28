@@ -42,7 +42,7 @@ class SettingsPage extends StatelessWidget {
               const SizedBox(width: 14),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(name, style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900)),
+                  Text(name, style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w800)),
                   Text(u?.email ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xCCFFFFFF), fontSize: 12.5)),
                   const SizedBox(height: 8),
                   Wrap(spacing: 6, runSpacing: 6, children: [
@@ -186,7 +186,7 @@ class SettingsPage extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text(tr('add_role'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+            Text(tr('add_role'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
             const SizedBox(height: 4),
             Text(tr('add_role_sub'), style: TextStyle(color: p.muted, fontSize: 13)),
             const SizedBox(height: 12),
@@ -285,7 +285,7 @@ class _RemoveRoleSheetState extends State<_RemoveRoleSheet> {
   Widget _line(String mark, String text, Color c) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(mark, style: TextStyle(color: c, fontWeight: FontWeight.w900)),
+          Text(mark, style: TextStyle(color: c, fontWeight: FontWeight.w800)),
           const SizedBox(width: 8),
           Expanded(child: Text(text, style: TextStyle(color: c, fontWeight: FontWeight.w600, height: 1.35))),
         ]),
@@ -320,7 +320,7 @@ class _RemoveRoleSheetState extends State<_RemoveRoleSheet> {
           Text(
             _owner ? trf('delete_inst_q', {'name': x.instituteName}) : (pending ? tr('cancel_request_q') : trf('leave_q', {'name': x.instituteName})),
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900, color: _owner ? p.danger : p.ink),
+            style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800, color: _owner ? p.danger : p.ink),
           ),
           const SizedBox(height: 6),
           Text(

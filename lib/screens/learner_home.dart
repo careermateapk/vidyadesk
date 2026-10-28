@@ -11,6 +11,8 @@ import 'common.dart';
 import 'home_shell.dart';
 import 'notices.dart';
 import 'onboarding.dart';
+import 'schedule.dart';
+import '../ui/mascot.dart';
 
 class _LearnerData {
   _LearnerData(this.batches, this.att, this.fees, this.notices);
@@ -171,67 +173,106 @@ class _LearnerBody extends StatelessWidget {
     final shell = HomeShell.of(context);
 
     return ListView(
-      padding: const EdgeInsets.only(bottom: 30),
+      padding: EdgeInsets.fromLTRB(0, MediaQuery.of(context).padding.top + 8, 0, 24),
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
-        HeroHeader(
-          gradient: isParent ? LinearGradient(colors: [p.success, const Color(0xFF0E6A70)], begin: Alignment.topLeft, end: Alignment.bottomRight) : null,
-          bottomPad: 70,
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('${greeting()} 👋', style: const TextStyle(color: Color(0xCCFFFFFF), fontSize: 14, fontWeight: FontWeight.w600)),
-                  Text(firstName(isParent ? (app.profile?.name ?? m.name) : name),
-                      maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: -.5)),
-                ]),
-              ),
-              if (!isParent)
-                _HeroBtn(icon: Icons.badge_rounded, label: tr('id_card'), onTap: () => push(context, IdCardScreen(m: m, batches: batches))),
-            ]),
-            const SizedBox(height: 10),
-            Wrap(spacing: 8, runSpacing: 6, children: [
-              Tag(m.instituteName, fg: Colors.white, bg: const Color(0x26FFFFFF), leading: const Icon(Icons.apartment_rounded, size: 14, color: Colors.white)),
-              if (isParent) Tag('${tr('child')}: $name', fg: const Color(0xFF073B3F), bg: const Color(0xFFFFD27A)),
-            ]),
-            if (childSwitcher != null) ...[const SizedBox(height: 10), childSwitcher!],
-          ]),
-        ),
-        Transform.translate(
-          offset: const Offset(0, -50),
+        SizedBox(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 18),
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              item(Row(children: [
+                GestureDetector(onTap: () => shell?.goToNamed('profile'), child: Avatar(app.profile?.name ?? m.name, size: 46)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('${greeting()} 👋', style: TextStyle(color: p.muted, fontSize: 12.5, fontWeight: FontWeight.w600)),
+                    Text(app.profile?.name ?? m.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, letterSpacing: -.3)),
+                  ]),
+                ),
+                if (!isParent) ...[
+                  IconBtn(icon: Icons.badge_outlined, tooltip: tr('id_card'), onTap: () => push(context, IdCardScreen(m: m, batches: batches))),
+                  const SizedBox(width: 10),
+                ],
+                IconBtn(
+                  icon: Icons.notifications_none_rounded,
+                  dot: notices.any((n) => now.millisecondsSinceEpoch - n.createdAt < 86400000),
+                  tooltip: tr('nav_notices'),
+                  onTap: () => push(context, NoticesPage(m: m, back: true)),
+                ),
+              ])),
+              if (childSwitcher != null) ...[const SizedBox(height: 14), childSwitcher!],
+              const SizedBox(height: 16),
+              item(FeatureCard(
+                onTap: () => push(context, ScheduleScreen(m: m)),
+                padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Row(children: [
+                        Flexible(
+                          child: Text(
+                            (next == null ? tr('no_upcoming') : (live ? tr('class_on_now') : '${tr('next_class')} · ${nextClassText(next)}')).toUpperCase(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.white70, fontSize: 11.5, fontWeight: FontWeight.w800, letterSpacing: .4),
+                          ),
+                        ),
+                        if (live) ...[const SizedBox(width: 6), const PulseDot(color: Color(0xFF4ADE80), size: 8)],
+                      ]),
+                      const SizedBox(height: 6),
+                      Text(next?.subject ?? m.instituteName, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -.4)),
+                      if (next != null)
+                        Text('${timeLabel(next.startMin)} – ${timeLabel(next.endMin)} · ${next.teacherName}',
+                            maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 13)),
+                      const SizedBox(height: 12),
+                      Wrap(spacing: 8, runSpacing: 6, children: [
+                        GlassChip(tr('nav_schedule'), icon: Icons.calendar_month_outlined, solid: true),
+                        if (isParent) GlassChip(firstName(name)),
+                      ]),
+                    ]),
+                  ),
+                  const Mascot(size: 96, book: false),
+                ]),
+              )),
+              const SizedBox(height: 12),
               item(Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Expanded(
                   child: AppCard(
-                    onTap: () => shell?.goTo(1),
-                    child: Column(children: [
+                    onTap: () => shell?.goToNamed('attendance'),
+                    padding: const EdgeInsets.all(14),
+                    child: Row(children: [
                       Ring(
                         value: c.total == 0 ? 0 : c.present / c.total,
-                        size: 92,
-                        stroke: 10,
+                        size: 58,
+                        stroke: 7,
                         color: col,
-                        track: p.cardAlt,
-                        center: c.total == 0
-                            ? Text('—', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 22, color: p.muted))
-                            : CountUp(v, suffix: '%', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 22, color: col)),
+                        track: c.total == 0 ? p.cardAlt : col.withValues(alpha: .15),
+                        center: Text(c.total == 0 ? '—' : '$v%', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: col)),
                       ),
-                      const SizedBox(height: 8),
-                      Text(tr('attendance'), style: const TextStyle(fontWeight: FontWeight.w800)),
-                      Text('${c.present}/${c.total} ${tr('days')}', style: TextStyle(color: p.muted, fontSize: 12)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text(tr('attendance'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                          Text('${c.present}/${c.total} ${tr('days')}', style: TextStyle(color: p.muted, fontSize: 12, fontWeight: FontWeight.w600)),
+                        ]),
+                      ),
                     ]),
                   ),
                 ),
                 const SizedBox(width: 10),
-                Expanded(
+                SizedBox(
+                  width: 138,
                   child: AppCard(
-                    onTap: () => shell?.goTo(2),
+                    onTap: () => shell?.goToNamed('fees'),
+                    padding: const EdgeInsets.all(14),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      IconBox(paid ? Icons.verified_rounded : Icons.account_balance_wallet_rounded, fg: paid ? p.success : p.danger, bg: paid ? p.successTint : p.dangerTint, size: 42),
-                      const SizedBox(height: 10),
-                      Text(trf('fees_of', {'m': tr('m${now.month}')}), style: TextStyle(color: p.muted, fontSize: 12.5, fontWeight: FontWeight.w600)),
-                      Text(feeAmt == 0 ? '—' : rupees(feeAmt), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+                      Row(children: [
+                        IconBox(paid ? Icons.check_rounded : Icons.account_balance_wallet_outlined, fg: paid ? p.success : p.danger, bg: paid ? p.successTint : p.dangerTint, size: 30),
+                        const SizedBox(width: 6),
+                        Expanded(child: Text(tr('m${now.month}'), style: TextStyle(color: p.muted, fontSize: 12, fontWeight: FontWeight.w700))),
+                      ]),
+                      const SizedBox(height: 8),
+                      Text(feeAmt == 0 ? '—' : rupees(feeAmt), style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, letterSpacing: -.4)),
                       const SizedBox(height: 4),
                       Tag(paid ? tr('paid') : tr('due'), fg: paid ? p.success : p.danger, bg: paid ? p.successTint : p.dangerTint),
                     ]),
@@ -240,9 +281,9 @@ class _LearnerBody extends StatelessWidget {
               ])),
               if (c.total > 0 && v < 75) ...[
                 const SizedBox(height: 10),
-                item(AppCard(
-                  color: p.dangerTint,
+                item(Container(
                   padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: p.dangerTint, borderRadius: BorderRadius.circular(16)),
                   child: Row(children: [
                     Icon(Icons.warning_amber_rounded, color: p.danger),
                     const SizedBox(width: 8),
@@ -252,29 +293,6 @@ class _LearnerBody extends StatelessWidget {
               ],
               const SizedBox(height: 12),
               const DemoBanner(),
-              if (next != null)
-                item(AppCard(
-                  gradient: LinearGradient(colors: [p.indigo, p.indigo.withValues(alpha: .78)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-                  child: Row(children: [
-                    Container(
-                      width: 52,
-                      height: 52,
-                      decoration: BoxDecoration(color: const Color(0x26FFFFFF), borderRadius: BorderRadius.circular(16)),
-                      child: const Icon(Icons.alarm_rounded, color: Colors.white, size: 28),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Row(children: [
-                          Text(live ? tr('class_on_now') : tr('next_class'), style: const TextStyle(color: Color(0xCCFFFFFF), fontWeight: FontWeight.w700, fontSize: 12.5)),
-                          if (live) ...[const SizedBox(width: 6), const PulseDot(color: Color(0xFF4ADE80), size: 8)],
-                        ]),
-                        Text(next.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
-                        Text('${nextClassText(next)} · ${next.teacherName}', style: const TextStyle(color: Color(0xDDFFFFFF), fontSize: 12.5)),
-                      ]),
-                    ),
-                  ]),
-                )),
               const SizedBox(height: 16),
               item(SectionTitle(isParent ? tr('child_timetable') : tr('my_timetable'))),
               const SizedBox(height: 8),
@@ -290,7 +308,7 @@ class _LearnerBody extends StatelessWidget {
                         const SizedBox(width: 10),
                         Expanded(
                           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text(b.title, style: const TextStyle(fontWeight: FontWeight.w900)),
+                            Text(b.title, style: const TextStyle(fontWeight: FontWeight.w800)),
                             Text('${b.teacherName} · ${timeLabel(b.startMin)}–${timeLabel(b.endMin)}', style: TextStyle(color: p.muted, fontSize: 12.5)),
                           ]),
                         ),
@@ -341,7 +359,7 @@ class _LearnerBody extends StatelessWidget {
               ],
               if (notices.isNotEmpty) ...[
                 const SizedBox(height: 16),
-                item(SectionTitle(tr('latest_notice'), trailing: TextButton(onPressed: () => shell?.goTo(3), child: Text(tr('see_all'))))),
+                item(SectionTitle(tr('latest_notice'), trailing: TextButton(onPressed: () => push(context, NoticesPage(m: m, back: true)), child: Text(tr('see_all'))))),
                 item(NoticeCard(n: notices.first, instituteName: m.instituteName)),
               ],
               const SizedBox(height: 14),
@@ -356,30 +374,6 @@ class _LearnerBody extends StatelessWidget {
       ],
     );
   }
-}
-
-class _HeroBtn extends StatelessWidget {
-  const _HeroBtn({required this.icon, required this.label, required this.onTap});
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  @override
-  Widget build(BuildContext context) => Material(
-        color: const Color(0x26FFFFFF),
-        borderRadius: BorderRadius.circular(14),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(14),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(icon, color: Colors.white, size: 20),
-              const SizedBox(width: 6),
-              Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-            ]),
-          ),
-        ),
-      );
 }
 
 // ---------------------------------------------------------------------------
@@ -428,7 +422,7 @@ class IdCardScreen extends StatelessWidget {
                         const SizedBox(width: 10),
                         Expanded(
                           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text(m.instituteName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
+                            Text(m.instituteName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 17)),
                             Text(tr('student_id_card'), style: const TextStyle(color: Color(0xCCFFFFFF), fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: .5)),
                           ]),
                         ),
@@ -449,7 +443,7 @@ class IdCardScreen extends StatelessWidget {
                         Transform.translate(
                           offset: const Offset(0, -24),
                           child: Column(children: [
-                            Text(name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+                            Text(name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
                             const SizedBox(height: 4),
                             Text(batches.map((b) => b.title).join('\n'), textAlign: TextAlign.center, style: TextStyle(color: p.muted, fontWeight: FontWeight.w600)),
                             const SizedBox(height: 14),
@@ -464,7 +458,7 @@ class IdCardScreen extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(height: 10),
-                            Text(m.studentCode, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 1.5, color: p.brand)),
+                            Text(m.studentCode, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: 1.5, color: p.brand)),
                             if (u != null) ...[
                               const SizedBox(height: 6),
                               Text(u.fullPhone, style: TextStyle(color: p.muted)),

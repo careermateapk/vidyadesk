@@ -60,7 +60,7 @@ class _FeesPageState extends State<FeesPage> {
             Expanded(
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 250),
-                child: Text(monthLabel(monthKey(_month)), key: ValueKey(_month), textAlign: TextAlign.center, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+                child: Text(monthLabel(monthKey(_month)), key: ValueKey(_month), textAlign: TextAlign.center, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
               ),
             ),
             IconButton.filledTonal(onPressed: isThis ? null : () => _shift(1), icon: const Icon(Icons.chevron_right_rounded)),
@@ -90,13 +90,13 @@ class _FeesPageState extends State<FeesPage> {
                           stroke: 11,
                           color: const Color(0xFFF5A524),
                           track: const Color(0x33FFFFFF),
-                          center: Text('${pct(got, got + due)}%', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
+                          center: Text('${pct(got, got + due)}%', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 20)),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
                           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                             Text(tr('collected'), style: const TextStyle(color: Color(0xCCFFFFFF), fontWeight: FontWeight.w700, fontSize: 12.5)),
-                            CountUp(got, prefix: '₹', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 26)),
+                            CountUp(got, prefix: '₹', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 26)),
                             const SizedBox(height: 6),
                             Text('${tr('pending')}: ${rupees(due)}', style: const TextStyle(color: Color(0xFFFFD27A), fontWeight: FontWeight.w800)),
                             Text('${paid.length} ${tr('paid_of')} ${rows.length}', style: const TextStyle(color: Color(0xCCFFFFFF), fontSize: 12.5)),
@@ -279,7 +279,7 @@ class _FeeSheetState extends State<_FeeSheet> {
             const SizedBox(width: 12),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(r.s.name, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w900)),
+                Text(r.s.name, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
                 Text(monthLabel(r.f.month), style: TextStyle(color: p.muted)),
               ]),
             ),
@@ -290,7 +290,7 @@ class _FeeSheetState extends State<_FeeSheet> {
             AppCard(
               color: p.successTint,
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(rupees(r.f.amount), style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: p.success)),
+                Text(rupees(r.f.amount), style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: p.success)),
                 Text('${r.f.mode} · ${prettyDate(DateTime.fromMillisecondsSinceEpoch(r.f.paidOn))}', style: TextStyle(color: p.success, fontWeight: FontWeight.w700)),
                 if (r.f.receiptNo.isNotEmpty) Text('${tr('receipt')}: ${r.f.receiptNo}', style: TextStyle(color: p.success)),
               ]),
@@ -319,7 +319,7 @@ class _FeeSheetState extends State<_FeeSheet> {
               controller: _amt,
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
               decoration: const InputDecoration(prefixText: '₹ '),
             ),
             const SizedBox(height: 12),
@@ -397,7 +397,7 @@ class MyFeesPage extends StatelessWidget {
                       Tag(paidThis ? tr('paid') : tr('due'), fg: paidThis ? p.success : const Color(0xFF7A4A00), bg: paidThis ? Colors.white : const Color(0xFFFFD27A)),
                     ]),
                     const SizedBox(height: 8),
-                    Text(rupees(thisOne?.amount ?? monthly), style: const TextStyle(color: Colors.white, fontSize: 34, fontWeight: FontWeight.w900, letterSpacing: -.5)),
+                    Text(rupees(thisOne?.amount ?? monthly), style: const TextStyle(color: Colors.white, fontSize: 34, fontWeight: FontWeight.w800, letterSpacing: -.5)),
                     const SizedBox(height: 4),
                     Text(
                       paidThis ? '${tr('paid_on')} ${prettyDate(DateTime.fromMillisecondsSinceEpoch(thisOne!.paidOn))} · ${thisOne.mode}' : tr('pay_at_institute'),
@@ -439,7 +439,7 @@ class MyFeesPage extends StatelessWidget {
                             ),
                           ]),
                         ),
-                        Text(rupees(fees[i].amount), style: TextStyle(fontWeight: FontWeight.w900, color: fees[i].paid ? p.success : p.danger)),
+                        Text(rupees(fees[i].amount), style: TextStyle(fontWeight: FontWeight.w800, color: fees[i].paid ? p.success : p.danger)),
                       ]),
                     ),
                   ),
@@ -456,7 +456,7 @@ class MyFeesPage extends StatelessWidget {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(k, style: TextStyle(color: p.muted, fontSize: 12.5, fontWeight: FontWeight.w600)),
           const SizedBox(height: 4),
-          Text(v, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: c)),
+          Text(v, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20, color: c)),
         ]),
       );
 }

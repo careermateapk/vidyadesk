@@ -285,7 +285,7 @@ Future<void> showCodeSheet(BuildContext context, {required String title, require
               ),
             ),
             const SizedBox(height: 12),
-            Text(title, textAlign: TextAlign.center, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+            Text(title, textAlign: TextAlign.center, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
             const SizedBox(height: 4),
             Text(sub, textAlign: TextAlign.center, style: TextStyle(color: p.muted, height: 1.35)),
             const SizedBox(height: 16),
@@ -329,7 +329,7 @@ class CodeBox extends StatelessWidget {
         decoration: BoxDecoration(color: p.brandTint, borderRadius: BorderRadius.circular(18), border: Border.all(color: p.brand.withValues(alpha: .5), width: 1.5)),
         child: FittedBox(
           fit: BoxFit.scaleDown,
-          child: Text(code, style: TextStyle(fontSize: big ? 30 : 22, fontWeight: FontWeight.w900, letterSpacing: 2, color: p.brand)),
+          child: Text(code, style: TextStyle(fontSize: big ? 30 : 22, fontWeight: FontWeight.w800, letterSpacing: 2, color: p.brand)),
         ),
       ),
     );
@@ -435,7 +435,7 @@ class _JoinWithCodeState extends State<_JoinWithCode> {
             TextField(
               controller: _code,
               textCapitalization: TextCapitalization.characters,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 1.5),
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: 1.5),
               onChanged: (_) {
                 if (_found != null || _error != null) {
                   setState(() {
@@ -509,7 +509,7 @@ class _JoinWithCodeState extends State<_JoinWithCode> {
           Row(children: [
             Icon(Icons.verified_rounded, color: p.success),
             const SizedBox(width: 8),
-            Text(tr('code_found'), style: TextStyle(color: p.success, fontWeight: FontWeight.w900, fontSize: 16)),
+            Text(tr('code_found'), style: TextStyle(color: p.success, fontWeight: FontWeight.w800, fontSize: 16)),
           ]),
           const SizedBox(height: 10),
           for (final l in lines)

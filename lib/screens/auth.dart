@@ -700,7 +700,7 @@ class _StepDot extends StatelessWidget {
         height: 30,
         decoration: BoxDecoration(shape: BoxShape.circle, color: on ? p.brand : p.cardAlt, border: Border.all(color: on ? p.brand : p.border)),
         alignment: Alignment.center,
-        child: Text('$n', style: TextStyle(fontWeight: FontWeight.w900, color: on ? (p.dark ? const Color(0xFF0B1220) : Colors.white) : p.muted)),
+        child: Text('$n', style: TextStyle(fontWeight: FontWeight.w800, color: on ? (p.dark ? const Color(0xFF0B1220) : Colors.white) : p.muted)),
       ),
       const SizedBox(height: 4),
       Text(label, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: on ? p.brand : p.muted)),
@@ -764,7 +764,7 @@ class _SearchSheetState extends State<_SearchSheet> {
         Padding(
           padding: const EdgeInsets.fromLTRB(18, 0, 18, 10),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(widget.title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+            Text(widget.title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
             const SizedBox(height: 10),
             if (widget.items.length > 8)
               TextField(

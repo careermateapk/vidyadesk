@@ -41,7 +41,7 @@ class NoticeCard extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(tr('kind_${n.kind}'), style: TextStyle(fontWeight: FontWeight.w900, color: s.$2)),
+              Text(tr('kind_${n.kind}'), style: TextStyle(fontWeight: FontWeight.w800, color: s.$2)),
               Text('${n.byName} · ${ago(n.createdAt)}', style: TextStyle(color: p.muted, fontSize: 12)),
             ]),
           ),
@@ -63,14 +63,15 @@ class NoticeCard extends StatelessWidget {
 }
 
 class NoticesPage extends StatelessWidget {
-  const NoticesPage({super.key, required this.m});
+  const NoticesPage({super.key, required this.m, this.back = false});
   final Membership m;
+  final bool back;
 
   @override
   Widget build(BuildContext context) {
     final p = context.pal;
     return Scaffold(
-      appBar: InnerBar(title: tr('nav_notices'), showBack: false),
+      appBar: InnerBar(title: tr('nav_notices'), showBack: back),
       body: Loader<(List<Notice>, List<Batch>)>(
         load: () async {
           final b = context.appRead.backend;
@@ -105,7 +106,6 @@ class NoticesPage extends StatelessWidget {
                   label: tr('send_notice'),
                   icon: Icons.campaign_rounded,
                   arrow: false,
-                  gradient: LinearGradient(colors: [p.accent, const Color(0xFFE08A0B)]),
                   onPressed: () async {
                     await push(context, PostNoticeScreen(m: m, batches: myBatches(m, d.$2)));
                     reload();

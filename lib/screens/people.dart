@@ -103,7 +103,7 @@ class _RequestCardState extends State<_RequestCard> {
             const SizedBox(width: 12),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(r.name, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                Text(r.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
                 Text(r.phone, style: TextStyle(color: p.muted, fontSize: 12.5)),
               ]),
             ),
@@ -127,7 +127,7 @@ class _RequestCardState extends State<_RequestCard> {
             Row(children: [
               Icon(_result! ? Icons.check_circle_rounded : Icons.cancel_rounded, color: _result! ? p.success : p.danger),
               const SizedBox(width: 6),
-              Text(_result! ? tr('approved') : tr('rejected'), style: TextStyle(fontWeight: FontWeight.w900, color: _result! ? p.success : p.danger)),
+              Text(_result! ? tr('approved') : tr('rejected'), style: TextStyle(fontWeight: FontWeight.w800, color: _result! ? p.success : p.danger)),
             ])
           else
             Row(children: [
@@ -267,7 +267,7 @@ class PersonScreen extends StatelessWidget {
                   child: Column(children: [
                     Avatar(x.name, size: 76),
                     const SizedBox(height: 10),
-                    Text(x.name, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900)),
+                    Text(x.name, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800)),
                     const SizedBox(height: 4),
                     Tag(roleName(x.role), fg: p.indigo, bg: p.indigoTint),
                     if (isStudent && x.studentCode.isNotEmpty) ...[
@@ -312,7 +312,7 @@ class PersonScreen extends StatelessWidget {
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Text(tr('attendance'), style: TextStyle(color: p.muted, fontWeight: FontWeight.w600, fontSize: 12.5)),
                         const SizedBox(height: 4),
-                        Text(c.total == 0 ? '—' : '${pct(c.present, c.total)}%', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 24, color: p.brand)),
+                        Text(c.total == 0 ? '—' : '${pct(c.present, c.total)}%', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 24, color: p.brand)),
                         Text('${c.present}/${c.total} ${tr('days')}', style: TextStyle(color: p.muted, fontSize: 12)),
                       ]),
                     ),
@@ -324,7 +324,7 @@ class PersonScreen extends StatelessWidget {
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                           Text(tr('this_month_fee'), style: TextStyle(color: p.muted, fontWeight: FontWeight.w600, fontSize: 12.5)),
                           const SizedBox(height: 4),
-                          Text(rupees(cur?.amount ?? x.monthlyFee), style: TextStyle(fontWeight: FontWeight.w900, fontSize: 24, color: cur?.paid == true ? p.success : p.danger)),
+                          Text(rupees(cur?.amount ?? x.monthlyFee), style: TextStyle(fontWeight: FontWeight.w800, fontSize: 24, color: cur?.paid == true ? p.success : p.danger)),
                           Text(cur?.paid == true ? tr('paid') : tr('due'), style: TextStyle(color: p.muted, fontSize: 12)),
                         ]),
                       ),
@@ -401,7 +401,7 @@ class _InstituteCodeScreenState extends State<InstituteCodeScreen> {
               FadeIn(
                 child: AppCard(
                   child: Column(children: [
-                    Text(inst.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+                    Text(inst.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
                     Text(inst.city, style: TextStyle(color: p.muted)),
                     const SizedBox(height: 16),
                     Container(
@@ -437,7 +437,7 @@ class _InstituteCodeScreenState extends State<InstituteCodeScreen> {
               AppCard(
                 color: p.cardAlt,
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(tr('which_code_who'), style: const TextStyle(fontWeight: FontWeight.w900)),
+                  Text(tr('which_code_who'), style: const TextStyle(fontWeight: FontWeight.w800)),
                   const SizedBox(height: 8),
                   _line(p, Icons.co_present_rounded, tr('codes_teacher')),
                   _line(p, Icons.school_rounded, tr('codes_student')),

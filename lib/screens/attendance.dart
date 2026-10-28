@@ -247,15 +247,16 @@ class _PA extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class MyAttendancePage extends StatelessWidget {
-  const MyAttendancePage({super.key, required this.m, required this.studentUid, required this.studentName});
+  const MyAttendancePage({super.key, required this.m, required this.studentUid, required this.studentName, this.back = false});
   final Membership m;
   final String studentUid, studentName;
+  final bool back;
 
   @override
   Widget build(BuildContext context) {
     final p = context.pal;
     return Scaffold(
-      appBar: InnerBar(title: m.role == Role.parent ? '${tr('attendance')} · ${firstName(studentName)}' : tr('my_attendance'), showBack: false),
+      appBar: InnerBar(title: m.role == Role.parent ? '${tr('attendance')} · ${firstName(studentName)}' : tr('my_attendance'), showBack: back),
       body: Loader<(List<AttendanceDay>, List<Batch>)>(
         load: () async {
           final b = context.appRead.backend;

@@ -35,6 +35,18 @@ class AppState extends ChangeNotifier {
 
   bool get isDemo => backend.isDemo;
 
+  /// Parent: which child is selected (shared by every screen).
+  int childIndex = 0;
+
+  /// When the notifications screen was last opened (ms).
+  int lastSeenNotif = 0;
+
+  Future<void> markNotifSeen() async {
+    lastSeenNotif = DateTime.now().millisecondsSinceEpoch;
+    await _prefs?.setInt('notifSeen', lastSeenNotif);
+    notifyListeners();
+  }
+
   Future<void> start() async {
     try {
       _prefs = await SharedPreferences.getInstance();
@@ -42,6 +54,7 @@ class AppState extends ChangeNotifier {
     lang = _prefs?.getString('lang') ?? 'en';
     languageChosen = _prefs?.getBool('langChosen') ?? false;
     themeMode = switch (_prefs?.getString('theme')) { 'dark' => ThemeMode.dark, 'system' => ThemeMode.system, _ => ThemeMode.light };
+    lastSeenNotif = _prefs?.getInt('notifSeen') ?? 0;
     final r = _prefs?.getString('role');
     chosenRole = r == null ? null : roleFrom(r);
     Strings.lang = lang;

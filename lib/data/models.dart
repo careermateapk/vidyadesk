@@ -424,3 +424,211 @@ String daysCode(List<int> days) {
   const n = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   return s.map((d) => n[d]).join(', ');
 }
+
+// ---------------------------------------------------------------------------
+// Phase 2: study material, tests, doubts
+// ---------------------------------------------------------------------------
+
+List<Map<String, dynamic>> _lm(Object? v) => v is List ? v.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList() : <Map<String, dynamic>>[];
+
+/// kinds: video | notes | homework | paper | photo | important | syllabus | link
+class Resource {
+  Resource({
+    required this.id,
+    required this.kind,
+    required this.title,
+    this.desc = '',
+    this.batchId = '',
+    this.chapter = '',
+    this.url = '',
+    this.images = const [],
+    this.dueAt = 0,
+    this.byUid = '',
+    this.byName = '',
+    this.createdAt = 0,
+  });
+  final String id, kind, title, desc, batchId, chapter, url, byUid, byName;
+  final List<String> images; // small base64 JPEGs (board photos)
+  final int dueAt, createdAt;
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'kind': kind,
+        'title': title,
+        'desc': desc,
+        'batchId': batchId,
+        'chapter': chapter,
+        'url': url,
+        'images': images,
+        'dueAt': dueAt,
+        'byUid': byUid,
+        'byName': byName,
+        'createdAt': createdAt,
+      };
+  factory Resource.fromMap(Map<String, dynamic> m) => Resource(
+        id: _s(m['id']),
+        kind: _s(m['kind']).isEmpty ? 'notes' : _s(m['kind']),
+        title: _s(m['title']),
+        desc: _s(m['desc']),
+        batchId: _s(m['batchId']),
+        chapter: _s(m['chapter']),
+        url: _s(m['url']),
+        images: _ls(m['images']),
+        dueAt: _i(m['dueAt']),
+        byUid: _s(m['byUid']),
+        byName: _s(m['byName']),
+        createdAt: _i(m['createdAt']),
+      );
+}
+
+/// A student's homework answer. Id "<resourceId>_<studentUid>".
+class Submission {
+  Submission({
+    required this.resourceId,
+    required this.studentUid,
+    required this.studentName,
+    this.text = '',
+    this.images = const [],
+    this.submittedAt = 0,
+    this.checked = false,
+    this.marks = '',
+    this.remark = '',
+  });
+  final String resourceId, studentUid, studentName, text;
+  final List<String> images;
+  final int submittedAt;
+  bool checked;
+  String marks, remark;
+
+  String get id => '${resourceId}_$studentUid';
+  Map<String, dynamic> toMap() => {
+        'resourceId': resourceId,
+        'studentUid': studentUid,
+        'studentName': studentName,
+        'text': text,
+        'images': images,
+        'submittedAt': submittedAt,
+        'checked': checked,
+        'marks': marks,
+        'remark': remark,
+      };
+  factory Submission.fromMap(Map<String, dynamic> m) => Submission(
+        resourceId: _s(m['resourceId']),
+        studentUid: _s(m['studentUid']),
+        studentName: _s(m['studentName']),
+        text: _s(m['text']),
+        images: _ls(m['images']),
+        submittedAt: _i(m['submittedAt']),
+        checked: _b(m['checked']),
+        marks: _s(m['marks']),
+        remark: _s(m['remark']),
+      );
+}
+
+class TestPaper {
+  TestPaper({
+    required this.id,
+    required this.batchId,
+    required this.title,
+    required this.subject,
+    required this.maxMarks,
+    required this.date,
+    this.published = false,
+    Map<String, double>? marks,
+    this.byName = '',
+  }) : marks = marks ?? {};
+  final String id, batchId, title, subject, byName;
+  final int maxMarks;
+  final int date; // ms
+  bool published;
+  final Map<String, double> marks; // studentUid -> marks
+
+  double? get average => marks.isEmpty ? null : marks.values.reduce((a, b) => a + b) / marks.length;
+  double? get highest => marks.isEmpty ? null : marks.values.reduce((a, b) => a > b ? a : b);
+  int rankOf(String uid) {
+    final m = marks[uid];
+    if (m == null) return 0;
+    return marks.values.where((v) => v > m).length + 1;
+  }
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'batchId': batchId,
+        'title': title,
+        'subject': subject,
+        'maxMarks': maxMarks,
+        'date': date,
+        'published': published,
+        'marks': marks,
+        'byName': byName,
+      };
+  factory TestPaper.fromMap(Map<String, dynamic> m) => TestPaper(
+        id: _s(m['id']),
+        batchId: _s(m['batchId']),
+        title: _s(m['title']),
+        subject: _s(m['subject']),
+        maxMarks: _i(m['maxMarks']) == 0 ? 100 : _i(m['maxMarks']),
+        date: _i(m['date']),
+        published: _b(m['published']),
+        marks: m['marks'] is Map ? (m['marks'] as Map).map((k, v) => MapEntry(k.toString(), v is num ? v.toDouble() : double.tryParse('$v') ?? 0)) : {},
+        byName: _s(m['byName']),
+      );
+}
+
+class DoubtReply {
+  const DoubtReply({required this.byUid, required this.byName, required this.text, required this.at, this.staff = false, this.image = ''});
+  final String byUid, byName, text, image;
+  final int at;
+  final bool staff;
+  Map<String, dynamic> toMap() => {'byUid': byUid, 'byName': byName, 'text': text, 'at': at, 'staff': staff, 'image': image};
+  factory DoubtReply.fromMap(Map<String, dynamic> m) =>
+      DoubtReply(byUid: _s(m['byUid']), byName: _s(m['byName']), text: _s(m['text']), at: _i(m['at']), staff: _b(m['staff']), image: _s(m['image']));
+}
+
+class Doubt {
+  Doubt({
+    required this.id,
+    required this.batchId,
+    required this.subject,
+    required this.studentUid,
+    required this.studentName,
+    required this.text,
+    this.image = '',
+    required this.createdAt,
+    List<DoubtReply>? replies,
+    this.solved = false,
+  }) : replies = replies ?? [];
+  final String id, batchId, subject, studentUid, studentName, text, image;
+  final int createdAt;
+  final List<DoubtReply> replies;
+  bool solved;
+
+  bool get answered => replies.any((r) => r.staff);
+  int get lastAt => replies.isEmpty ? createdAt : replies.last.at;
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'batchId': batchId,
+        'subject': subject,
+        'studentUid': studentUid,
+        'studentName': studentName,
+        'text': text,
+        'image': image,
+        'createdAt': createdAt,
+        'replies': replies.map((r) => r.toMap()).toList(),
+        'solved': solved,
+        'answered': answered,
+      };
+  factory Doubt.fromMap(Map<String, dynamic> m) => Doubt(
+        id: _s(m['id']),
+        batchId: _s(m['batchId']),
+        subject: _s(m['subject']),
+        studentUid: _s(m['studentUid']),
+        studentName: _s(m['studentName']),
+        text: _s(m['text']),
+        image: _s(m['image']),
+        createdAt: _i(m['createdAt']),
+        replies: _lm(m['replies']).map(DoubtReply.fromMap).toList(),
+        solved: _b(m['solved']),
+      );
+}

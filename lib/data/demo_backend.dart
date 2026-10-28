@@ -16,6 +16,10 @@ class DemoBackend implements Backend {
   final Map<String, AttendanceDay> _attendance = {};
   final Map<String, FeeRecord> _fees = {};
   final Map<String, List<Notice>> _notices = {};
+  final Map<String, Resource> _res = {}; // key inst_id
+  final Map<String, Submission> _subs = {};
+  final Map<String, TestPaper> _tests = {};
+  final Map<String, Doubt> _doubts = {};
 
   static const demoInstituteCode = 'SHRM-4821';
   static const demoBatchCode = 'ECO-TTS-5PM-38';
@@ -115,6 +119,34 @@ class DemoBackend implements Backend {
       Notice(id: 'n1', text: 'Diwali ke avsar par 29 Oct se 2 Nov tak coaching band rahegi. 3 November se sabhi class apne samay par.', kind: 'holiday', byName: 'Rakesh Sharma', createdAt: now - 3600000),
       Notice(id: 'n2', text: 'November ki fees 5 tareekh tak jama karein.', kind: 'fees', byName: 'Rakesh Sharma', createdAt: now - 86400000),
     ];
+    // Study material, tests and a doubt
+    final day = 86400000;
+    for (final r in [
+      Resource(id: 'r1', kind: 'video', title: 'Demand and Supply — full chapter', batchId: 'b1', chapter: 'Ch 3 · Demand', url: 'https://www.youtube.com/watch?v=LwLh6ax0zTE', byUid: owner, byName: 'Rakesh Sharma', createdAt: now - 2 * 3600000),
+      Resource(id: 'r2', kind: 'notes', title: 'Demand — full notes', batchId: 'b1', chapter: 'Ch 3 · Demand', url: 'https://www.africau.edu/images/default/sample.pdf', desc: '6 pages', byUid: owner, byName: 'Rakesh Sharma', createdAt: now - 3600000),
+      Resource(id: 'r3', kind: 'homework', title: 'Elasticity worksheet', batchId: 'b1', chapter: 'Ch 4 · Elasticity', desc: 'Solve Q1–Q10. Show the formula and steps for every answer.', dueAt: now + day, byUid: owner, byName: 'Rakesh Sharma', createdAt: now - day),
+      Resource(id: 'r4', kind: 'important', title: 'Most asked 3-mark questions', batchId: '', chapter: 'Ch 3 · Demand', desc: '1. Law of demand with schedule\n2. Why does the demand curve slope downward?\n3. Difference between change in demand and change in quantity demanded', byUid: owner, byName: 'Rakesh Sharma', createdAt: now - 3 * day),
+      Resource(id: 'r5', kind: 'syllabus', title: 'Economics Class 12 — Board syllabus', batchId: 'b1', url: 'https://cbseacademic.nic.in/curriculum_2025.html', byUid: owner, byName: 'Rakesh Sharma', createdAt: now - 20 * day),
+      Resource(id: 'r6', kind: 'link', title: 'NCERT Economics books (free)', batchId: '', url: 'https://ncert.nic.in/textbook.php', byUid: owner, byName: 'Rakesh Sharma', createdAt: now - 10 * day),
+      Resource(id: 'r7', kind: 'paper', title: 'Board paper 2025 — Economics', batchId: 'b1', url: 'https://cbseacademic.nic.in/SQP_CLASSXII_2024-25.html', byUid: owner, byName: 'Rakesh Sharma', createdAt: now - 6 * day),
+    ]) {
+      _res['${instId}_${r.id}'] = r;
+    }
+    _tests['${instId}_t1'] = TestPaper(id: 't1', batchId: 'b1', title: 'Unit Test 2', subject: 'Economics', maxMarks: 50, date: now - 5 * day, published: true, marks: {'s0': 42, 's2': 47, 's4': 18, 's6': 39}, byName: 'Rakesh Sharma');
+    _tests['${instId}_t0'] = TestPaper(id: 't0', batchId: 'b1', title: 'Unit Test 1', subject: 'Economics', maxMarks: 50, date: now - 26 * day, published: true, marks: {'s0': 36, 's2': 41, 's4': 22, 's6': 35}, byName: 'Rakesh Sharma');
+    _tests['${instId}_t2'] = TestPaper(id: 't2', batchId: 'b2', title: 'Monthly test', subject: 'Accounts', maxMarks: 50, date: now - 12 * day, published: true, marks: {'s1': 33, 's3': 44, 's5': 28}, byName: 'Anil Verma');
+    _doubts['${instId}_d1'] = Doubt(
+      id: 'd1',
+      batchId: 'b1',
+      subject: 'Economics',
+      studentUid: 's0',
+      studentName: 'Aarav Kumar',
+      text: 'Sir, demand curve neeche ki taraf kyun jaata hai? Q4 samajh nahi aaya',
+      createdAt: now - 5 * 3600000,
+      replies: [
+        DoubtReply(byUid: owner, byName: 'Rakesh Sharma', text: '3 reasons: 1) Law of diminishing utility 2) Income effect 3) Substitution effect. Price kam → zyada log khareedte hain.', at: now - 4 * 3600000, staff: true),
+      ],
+    );
   }
 
   // ---------- login ----------
@@ -419,6 +451,64 @@ class DemoBackend implements Backend {
   Future<List<FeeRecord>> feeClaims(String instituteId) async =>
       _fees.entries.where((e) => e.key.startsWith('${instituteId}_') && e.value.waiting).map((e) => e.value).toList()
         ..sort((a, b) => b.claimAt.compareTo(a.claimAt));
+
+  // ---------- study material ----------
+
+  @override
+  Future<List<Resource>> resources(String instituteId) async =>
+      _res.entries.where((e) => e.key.startsWith('${instituteId}_')).map((e) => e.value).toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+  @override
+  Future<void> saveResource(String instituteId, Resource r) async {
+    await _wait();
+    _res['${instituteId}_${r.id}'] = r;
+  }
+
+  @override
+  Future<void> deleteResource(String instituteId, String id) async => _res.remove('${instituteId}_$id');
+
+  @override
+  Future<List<Submission>> submissionsFor(String instituteId, String resourceId) async =>
+      _subs.entries.where((e) => e.key.startsWith('${instituteId}_') && e.value.resourceId == resourceId).map((e) => e.value).toList();
+
+  @override
+  Future<Submission?> mySubmission(String instituteId, String resourceId, String studentUid) async => _subs['${instituteId}_${resourceId}_$studentUid'];
+
+  @override
+  Future<void> saveSubmission(String instituteId, Submission s) async {
+    await _wait();
+    _subs['${instituteId}_${s.id}'] = s;
+  }
+
+  // ---------- tests ----------
+
+  @override
+  Future<List<TestPaper>> tests(String instituteId, {bool publishedOnly = false}) async =>
+      _tests.entries.where((e) => e.key.startsWith('${instituteId}_') && (!publishedOnly || e.value.published)).map((e) => e.value).toList()..sort((a, b) => b.date.compareTo(a.date));
+
+  @override
+  Future<void> saveTest(String instituteId, TestPaper t) async {
+    await _wait();
+    _tests['${instituteId}_${t.id}'] = t;
+  }
+
+  @override
+  Future<void> deleteTest(String instituteId, String id) async => _tests.remove('${instituteId}_$id');
+
+  // ---------- doubts ----------
+
+  @override
+  Future<List<Doubt>> doubts(String instituteId, {String? studentUid}) async => _doubts.entries
+      .where((e) => e.key.startsWith('${instituteId}_') && (studentUid == null || e.value.studentUid == studentUid))
+      .map((e) => e.value)
+      .toList()
+    ..sort((a, b) => b.lastAt.compareTo(a.lastAt));
+
+  @override
+  Future<void> saveDoubt(String instituteId, Doubt d) async {
+    await _wait();
+    _doubts['${instituteId}_${d.id}'] = d;
+  }
 
   // ---------- notices ----------
 

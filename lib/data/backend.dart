@@ -86,6 +86,25 @@ abstract class Backend {
   /// UPI payments waiting for confirmation.
   Future<List<FeeRecord>> feeClaims(String instituteId);
 
+  // ---- study material ----
+  Future<List<Resource>> resources(String instituteId);
+  Future<void> saveResource(String instituteId, Resource r);
+  Future<void> deleteResource(String instituteId, String id);
+  Future<List<Submission>> submissionsFor(String instituteId, String resourceId);
+  Future<Submission?> mySubmission(String instituteId, String resourceId, String studentUid);
+  Future<void> saveSubmission(String instituteId, Submission s);
+
+  // ---- tests ----
+  /// Students and parents must pass publishedOnly: true.
+  Future<List<TestPaper>> tests(String instituteId, {bool publishedOnly = false});
+  Future<void> saveTest(String instituteId, TestPaper t);
+  Future<void> deleteTest(String instituteId, String id);
+
+  // ---- doubts ----
+  /// Staff: every doubt. Student: pass [studentUid] to get only theirs.
+  Future<List<Doubt>> doubts(String instituteId, {String? studentUid});
+  Future<void> saveDoubt(String instituteId, Doubt d);
+
   // ---- notices ----
   Future<List<Notice>> notices(String instituteId);
   Future<void> postNotice(String instituteId, Notice n);

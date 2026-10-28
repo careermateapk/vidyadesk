@@ -13,9 +13,11 @@ import 'fees.dart';
 import 'learner_home.dart';
 import 'notices.dart';
 import 'people.dart';
+import 'resources.dart';
 import 'schedule.dart';
 import 'settings.dart';
 import 'staff_home.dart';
+import 'tests.dart';
 
 class _Tab {
   const _Tab(this.icon, this.activeIcon, this.label, this.page);
@@ -41,8 +43,17 @@ class HomeShellState extends State<HomeShell> {
   int _child = 0;
   int _refresh = 0;
 
+  @override
+  void initState() {
+    super.initState();
+    context.appRead.childIndex = 0;
+  }
+
   int get childIndex => _child;
-  void setChild(int i) => setState(() => _child = i);
+  void setChild(int i) {
+    context.appRead.childIndex = i;
+    setState(() => _child = i);
+  }
 
   /// Go to a tab by its index in the tab list.
   void goTo(int tab) => setState(() => _i = tab);
@@ -58,8 +69,8 @@ class HomeShellState extends State<HomeShell> {
   List<String> _names() => switch (widget.m.role) {
         Role.admin => ['home', 'batches', 'fees', 'profile'],
         Role.teacher => ['home', 'batches', 'students', 'profile'],
-        Role.student => ['home', 'schedule', 'attendance', 'fees', 'profile'],
-        Role.parent => ['home', 'attendance', 'fees', 'profile'],
+        Role.student => ['home', 'schedule', 'resources', 'fees', 'profile'],
+        Role.parent => ['home', 'attendance', 'resources', 'fees', 'profile'],
       };
 
   List<_Tab> _tabs() {
@@ -89,7 +100,7 @@ class HomeShellState extends State<HomeShell> {
         return [
           home,
           _Tab(Icons.calendar_month_outlined, Icons.calendar_month_rounded, tr('nav_schedule'), ScheduleScreen(m: m, tab: true)),
-          _Tab(Icons.fact_check_outlined, Icons.fact_check_rounded, tr('nav_attendance'), MyAttendancePage(m: m, studentUid: m.uid, studentName: m.name)),
+          _Tab(Icons.folder_copy_outlined, Icons.folder_copy_rounded, tr('nav_resources'), ResourcesPage(m: m)),
           _Tab(Icons.account_balance_wallet_outlined, Icons.account_balance_wallet_rounded, tr('nav_fees'), MyFeesPage(m: m, studentUid: m.uid, studentName: m.name)),
           more,
         ];
@@ -100,6 +111,7 @@ class HomeShellState extends State<HomeShell> {
         return [
           home,
           _Tab(Icons.fact_check_outlined, Icons.fact_check_rounded, tr('nav_attendance'), MyAttendancePage(key: ValueKey('att-$cu'), m: m, studentUid: cu, studentName: cn)),
+          _Tab(Icons.folder_copy_outlined, Icons.folder_copy_rounded, tr('nav_resources'), ResourcesPage(key: ValueKey('res-$cu'), m: m)),
           _Tab(Icons.account_balance_wallet_outlined, Icons.account_balance_wallet_rounded, tr('nav_fees'), MyFeesPage(key: ValueKey('fee-$cu'), m: m, studentUid: cu, studentName: cn)),
           more,
         ];
@@ -268,9 +280,12 @@ Future<void> showQuickAdd(BuildContext context, Membership m, {HomeShellState? s
         tile('batch', Icons.layers_outlined, tr('new_batch'), p.brand, p.brandTint, 3),
         tile('week', Icons.calendar_month_outlined, tr('week_schedule'), p.indigo, p.indigoTint, 4),
         tile('invite', Icons.person_add_alt_1_outlined, tr('invite_people'), p.brand, p.brandTint, 5),
+        tile('res', Icons.folder_copy_outlined, tr('add_resource'), const Color(0xFF0EA5B7), const Color(0xFF0EA5B7).withValues(alpha: .13), 6),
+        tile('hw', Icons.edit_note_rounded, tr('give_homework'), p.warn, p.warnTint, 7),
+        tile('test', Icons.quiz_outlined, tr('tests_marks'), p.success, p.successTint, 8),
       ];
       return SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(tr('quick_add'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: -.3)),
@@ -303,6 +318,11 @@ Future<void> showQuickAdd(BuildContext context, Membership m, {HomeShellState? s
       if (context.mounted) await push(context, CreateBatchScreen(m: m, members: members));
     case 'week':
       await push(context, ScheduleScreen(m: m));
+    case 'res' || 'hw':
+      final batches = myBatches(m, await b.batches(m.instituteId));
+      if (context.mounted) await push(context, AddResourceScreen(m: m, batches: batches, kind: pick == 'hw' ? 'homework' : null));
+    case 'test':
+      await push(context, TestsPage(m: m));
     case 'invite':
       if (admin) {
         await push(context, InstituteCodeScreen(m: m));

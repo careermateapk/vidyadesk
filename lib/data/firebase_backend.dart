@@ -465,6 +465,77 @@ class FirebaseBackend implements Backend {
   @override
   Future<void> saveFee(String instituteId, FeeRecord fee) => _inst(instituteId).collection('fees').doc(fee.id).set(fee.toMap());
 
+  // ---------- study material ----------
+
+  @override
+  Future<List<Resource>> resources(String instituteId) async {
+    final q = await _inst(instituteId).collection('resources').get();
+    final list = q.docs.map((d) => Resource.fromMap(d.data())).toList();
+    list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return list;
+  }
+
+  @override
+  Future<void> saveResource(String instituteId, Resource r) => _inst(instituteId).collection('resources').doc(r.id).set(r.toMap());
+
+  @override
+  Future<void> deleteResource(String instituteId, String id) => _inst(instituteId).collection('resources').doc(id).delete();
+
+  @override
+  Future<List<Submission>> submissionsFor(String instituteId, String resourceId) async {
+    final q = await _inst(instituteId).collection('submissions').where('resourceId', isEqualTo: resourceId).get();
+    return q.docs.map((d) => Submission.fromMap(d.data())).toList();
+  }
+
+  @override
+  Future<Submission?> mySubmission(String instituteId, String resourceId, String studentUid) async {
+    try {
+      final d = await _inst(instituteId).collection('submissions').doc('${resourceId}_$studentUid').get();
+      if (!d.exists || d.data() == null) return null;
+      return Submission.fromMap(d.data()!);
+    } on FirebaseException catch (e) {
+      // a parent may not see a missing answer of their child
+      if (e.code == 'permission-denied') return null;
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> saveSubmission(String instituteId, Submission s) => _inst(instituteId).collection('submissions').doc(s.id).set(s.toMap());
+
+  // ---------- tests ----------
+
+  @override
+  Future<List<TestPaper>> tests(String instituteId, {bool publishedOnly = false}) async {
+    Query<Map<String, dynamic>> c = _inst(instituteId).collection('tests');
+    if (publishedOnly) c = c.where('published', isEqualTo: true);
+    final q = await c.get();
+    final list = q.docs.map((d) => TestPaper.fromMap(d.data())).toList();
+    list.sort((a, b) => b.date.compareTo(a.date));
+    return list;
+  }
+
+  @override
+  Future<void> saveTest(String instituteId, TestPaper t) => _inst(instituteId).collection('tests').doc(t.id).set(t.toMap());
+
+  @override
+  Future<void> deleteTest(String instituteId, String id) => _inst(instituteId).collection('tests').doc(id).delete();
+
+  // ---------- doubts ----------
+
+  @override
+  Future<List<Doubt>> doubts(String instituteId, {String? studentUid}) async {
+    Query<Map<String, dynamic>> q = _inst(instituteId).collection('doubts');
+    if (studentUid != null) q = q.where('studentUid', isEqualTo: studentUid);
+    final r = await q.get();
+    final list = r.docs.map((d) => Doubt.fromMap(d.data())).toList();
+    list.sort((a, b) => b.lastAt.compareTo(a.lastAt));
+    return list;
+  }
+
+  @override
+  Future<void> saveDoubt(String instituteId, Doubt d) => _inst(instituteId).collection('doubts').doc(d.id).set(d.toMap());
+
   // ---------- notices ----------
 
   @override

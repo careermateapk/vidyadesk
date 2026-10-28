@@ -9,7 +9,10 @@ import '../data/models.dart';
 import '../ui/widgets.dart';
 import 'common.dart';
 import 'home_shell.dart';
+import 'attendance.dart';
 import 'notices.dart';
+import 'notifications.dart';
+import 'tools.dart';
 import 'onboarding.dart';
 import 'schedule.dart';
 import '../ui/mascot.dart';
@@ -237,9 +240,9 @@ class _LearnerBody extends StatelessWidget {
                 ],
                 IconBtn(
                   icon: Icons.notifications_none_rounded,
-                  dot: notices.any((n) => now.millisecondsSinceEpoch - n.createdAt < 86400000),
-                  tooltip: tr('nav_notices'),
-                  onTap: () => push(context, NoticesPage(m: m, back: true)),
+                  dot: notices.any((n) => n.createdAt > app.lastSeenNotif),
+                  tooltip: tr('notifications'),
+                  onTap: () => push(context, NotificationsScreen(m: m)),
                 ),
               ])),
               if (childSwitcher != null) ...[const SizedBox(height: 14), childSwitcher!],
@@ -280,7 +283,7 @@ class _LearnerBody extends StatelessWidget {
               item(Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Expanded(
                   child: AppCard(
-                    onTap: () => shell?.goToNamed('attendance'),
+                    onTap: () => isParent ? shell?.goToNamed('attendance') : push(context, MyAttendancePage(m: m, studentUid: studentUid, studentName: name, back: true)),
                     padding: const EdgeInsets.all(14),
                     child: Row(children: [
                       Ring(
@@ -333,6 +336,8 @@ class _LearnerBody extends StatelessWidget {
                   ]),
                 )),
               ],
+              const SizedBox(height: 12),
+              item(ToolsRow(m: m, studentUid: studentUid, studentName: name)),
               const SizedBox(height: 12),
               const DemoBanner(),
               const SizedBox(height: 16),

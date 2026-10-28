@@ -71,6 +71,26 @@ service cloud.firestore {
         allow read: if isMember(inst);
         allow write: if isStaff(inst);
       }
+      match /resources/{id} {
+        allow read: if isMember(inst);
+        allow write: if isStaff(inst);
+      }
+      match /tests/{id} {
+        allow read: if isStaff(inst) || (isMember(inst) && resource.data.published == true);
+        allow write: if isStaff(inst);
+      }
+      match /submissions/{id} {
+        // id is "<resourceId>_<studentUid>", so a missing answer can be checked too
+        allow get: if isMember(inst) && id.matches('.*_' + request.auth.uid);
+        allow read: if isStaff(inst) || (isMember(inst) && (resource.data.studentUid == request.auth.uid || resource.data.studentUid in mem(inst).childUids));
+        allow create, update: if isStaff(inst)
+          || (isMember(inst) && request.resource.data.studentUid == request.auth.uid && request.resource.data.checked == false);
+      }
+      match /doubts/{id} {
+        allow read: if isStaff(inst) || (isMember(inst) && (resource.data.studentUid == request.auth.uid || resource.data.studentUid in mem(inst).childUids));
+        allow create: if isMember(inst) && request.resource.data.studentUid == request.auth.uid;
+        allow update: if isStaff(inst) || (isMember(inst) && resource.data.studentUid == request.auth.uid);
+      }
       match /fees/{id} {
         allow read: if isStaff(inst)
           || (isMember(inst) && (resource.data.studentUid == request.auth.uid || resource.data.studentUid in mem(inst).childUids));

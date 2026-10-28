@@ -9,9 +9,11 @@ import 'attendance.dart';
 import 'common.dart';
 import 'home_shell.dart';
 import 'notices.dart';
+import 'notifications.dart';
 import 'onboarding.dart';
 import 'people.dart';
 import 'schedule.dart';
+import 'tools.dart';
 
 class _StaffData {
   _StaffData(this.members, this.batches, this.today, this.fees, this.lastFees, this.notices, this.week);
@@ -106,7 +108,7 @@ class _StaffHomeState extends State<StaffHome> {
     }
     final lastGot = d.lastFees.where((f) => f.paid).fold<int>(0, (a, f) => a + f.amount);
     final change = lastGot == 0 ? null : ((got - lastGot) * 100 / lastGot).round();
-    final freshNotice = d.notices.any((n) => now.millisecondsSinceEpoch - n.createdAt < 86400000);
+    final freshNotice = d.notices.any((n) => n.createdAt > app.lastSeenNotif) || pending.isNotEmpty;
     final nowMin = now.hour * 60 + now.minute;
     final next = todays.where((b) => b.endMin >= nowMin).firstOrNull;
 
@@ -132,9 +134,9 @@ class _StaffHomeState extends State<StaffHome> {
           IconBtn(
             icon: Icons.notifications_none_rounded,
             dot: freshNotice,
-            tooltip: tr('nav_notices'),
+            tooltip: tr('notifications'),
             onTap: () async {
-              await push(context, NoticesPage(m: m, back: true));
+              await push(context, NotificationsScreen(m: m));
               reload();
             },
           ),
@@ -195,6 +197,8 @@ class _StaffHomeState extends State<StaffHome> {
           const SizedBox(width: 10),
           Expanded(child: StatTile(icon: Icons.fact_check_outlined, value: pct(present, marked), suffix: '%', label: tr('today_present'), fg: p.success, bg: p.successTint, empty: marked == 0)),
         ])),
+        const SizedBox(height: 12),
+        item(ToolsRow(m: m, onBack: reload)),
         const SizedBox(height: 12),
         const DemoBanner(),
         if (pending.isNotEmpty)

@@ -67,6 +67,8 @@ abstract class Backend {
   Future<AttendanceDay?> attendance(String instituteId, String batchId, String dateKey);
   Future<void> saveAttendance(String instituteId, AttendanceDay day);
   Future<List<AttendanceDay>> attendanceForBatch(String instituteId, String batchId);
+  /// Every class day where this student was on the list (newest first).
+  Future<List<AttendanceDay>> attendanceForStudent(String instituteId, String studentUid);
 
   // ---- fees ----
   Future<List<FeeRecord>> feesForMonth(String instituteId, String month);

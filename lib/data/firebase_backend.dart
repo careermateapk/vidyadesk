@@ -379,6 +379,14 @@ class FirebaseBackend implements Backend {
   }
 
   @override
+  Future<List<AttendanceDay>> attendanceForStudent(String instituteId, String studentUid) async {
+    final q = await _inst(instituteId).collection('attendance').where('marked', arrayContains: studentUid).get();
+    final list = q.docs.map((d) => AttendanceDay.fromMap(d.data())).toList();
+    list.sort((a, b) => b.dateKey.compareTo(a.dateKey));
+    return list;
+  }
+
+  @override
   Future<List<FeeRecord>> feesForStudent(String instituteId, String studentUid) async {
     final q = await _inst(instituteId).collection('fees').where('studentUid', isEqualTo: studentUid).get();
     final list = q.docs.map((d) => FeeRecord.fromMap(d.data())).toList();

@@ -1,0 +1,80 @@
+rules_version = '2';
+
+// VidyaDesk security rules.
+// Copy everything in this file into Firebase console -> Firestore Database -> Rules -> Publish.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function memPath(inst) { return /databases/$(database)/documents/memberships/$(request.auth.uid + '_' + inst); }
+    function mem(inst) { return get(memPath(inst)).data; }
+    function isMember(inst) { return signedIn() && exists(memPath(inst)) && mem(inst).status == 'approved'; }
+    function isStaff(inst) { return isMember(inst) && mem(inst).role in ['admin', 'teacher']; }
+    function isAdmin(inst) { return isMember(inst) && mem(inst).role == 'admin'; }
+    function isOwner(inst) {
+      return signedIn() && get(/databases/$(database)/documents/institutes/$(inst)).data.ownerUid == request.auth.uid;
+    }
+
+    // Each person's own profile
+    match /users/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    // Join codes: anyone logged in can look one up by its exact code
+    match /codes/{code} {
+      allow get: if signedIn();
+      allow list: if false;
+      allow create: if signedIn() && (isStaff(request.resource.data.instituteId) || isOwner(request.resource.data.instituteId));
+      allow update: if false;
+      allow delete: if signedIn() && isAdmin(resource.data.instituteId);
+    }
+
+    // Who belongs where. Id is "<uid>_<instituteId>".
+    match /memberships/{memId} {
+      function own() { return signedIn() && memId.matches(request.auth.uid + '_.+'); }
+      function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
+
+      allow get: if own() || isStaff(resource.data.instituteId);
+      allow list: if signedIn() && (resource.data.uid == request.auth.uid || isStaff(resource.data.instituteId));
+
+      allow create: if own()
+        && request.resource.data.uid == request.auth.uid
+        && memId == request.auth.uid + '_' + request.resource.data.instituteId
+        && (
+          (request.resource.data.status == 'pending' && request.resource.data.role in ['teacher', 'student', 'parent'])
+          || (request.resource.data.status == 'approved' && request.resource.data.role == 'admin' && isOwner(request.resource.data.instituteId))
+        );
+
+      allow update: if (own() && changed().hasOnly(['batchIds', 'childUids', 'childNames']))
+        || (isStaff(resource.data.instituteId)
+            && changed().hasOnly(['status', 'studentCode', 'monthlyFee'])
+            && (resource.data.role in ['student', 'parent'] || isAdmin(resource.data.instituteId)));
+
+      allow delete: if own();
+    }
+
+    match /institutes/{inst} {
+      allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid;
+      allow get: if isMember(inst) || isOwner(inst);
+      allow update: if isAdmin(inst);
+
+      match /batches/{id} {
+        allow read: if isMember(inst);
+        allow write: if isStaff(inst);
+      }
+      match /attendance/{id} {
+        allow read: if isMember(inst);
+        allow write: if isStaff(inst);
+      }
+      match /notices/{id} {
+        allow read: if isMember(inst);
+        allow write: if isStaff(inst);
+      }
+      match /fees/{id} {
+        allow read: if isStaff(inst)
+          || (isMember(inst) && (resource.data.studentUid == request.auth.uid || resource.data.studentUid in mem(inst).childUids));
+        allow write: if isAdmin(inst);
+      }
+    }
+  }
+}

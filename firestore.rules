@@ -16,7 +16,8 @@ service cloud.firestore {
     }
     // VidyaDesk owner (owner panel): confirms plan payments
     function appOwner() {
-      return signedIn() && request.auth.token.email in ['support.sangam360@gmail.com'];
+      return signedIn() && request.auth.token.email_verified == true
+        && request.auth.token.email in ['support.sangam360@gmail.com'];
     }
     // Plan still running? After it ends the app is view-only (no changes saved).
     function live(inst) {

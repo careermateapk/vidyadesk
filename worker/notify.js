@@ -46,7 +46,8 @@ export async function verifyIdToken(idToken, projectId, now = Date.now(), fetchK
 export async function verifyLogin(idToken, projectId, now = Date.now(), fetchKeys = defaultKeys) {
   await verifyIdToken(idToken, projectId, now, fetchKeys);
   const payload = JSON.parse(b64urlDecodeStr(idToken.split('.')[1]));
-  return { uid: payload.sub, email: String(payload.email || '').toLowerCase() };
+  // Only a verified email counts (owner / demo checks use it).
+  return { uid: payload.sub, email: payload.email_verified === true ? String(payload.email || '').toLowerCase() : '' };
 }
 async function defaultKeys(now) {
   if (!jwks || now - jwksAt > 3600e3) {

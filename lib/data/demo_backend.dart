@@ -45,7 +45,7 @@ class DemoBackend implements Backend {
   void _seed() {
     const instId = 'demo-inst';
     const owner = 'demo-owner';
-    _institutes[instId] = const Institute(id: instId, name: 'Sharma Classes', city: 'Darbhanga', code: demoInstituteCode, ownerUid: owner, address: 'Laheriasarai Road, Darbhanga', phone: '+91 98765 43210', upiId: 'sharmaclasses@ybl', upiName: 'Sharma Classes', dueDay: 10, lateFee: 100);
+    _institutes[instId] = const Institute(id: instId, name: 'Sharma Classes', city: 'Darbhanga', code: demoInstituteCode, ownerUid: owner, address: 'Laheriasarai Road, Darbhanga', phone: '+91 98765 43210', upiId: 'sharmaclasses@ybl', upiName: 'Sharma Classes', dueDay: 10, lateFee: 100, geoCheckin: true, geoLat: 26.1542, geoLng: 85.8963, geoRadius: 100, geoAddress: 'Laheriasarai Road, Darbhanga');
     _codes[demoInstituteCode] = const JoinCode(code: demoInstituteCode, type: CodeType.institute, instituteId: instId, instituteName: 'Sharma Classes');
     final now = DateTime.now().millisecondsSinceEpoch;
     _members['${owner}_$instId'] = Membership(
@@ -57,7 +57,7 @@ class DemoBackend implements Backend {
     _codes[b1.code] = JoinCode(code: b1.code, type: CodeType.batch, instituteId: instId, instituteName: 'Sharma Classes', batchId: b1.id, batchTitle: '${b1.title} · TTS · 5:00 PM', teacherName: 'Rakesh Sharma');
     _codes[b2.code] = JoinCode(code: b2.code, type: CodeType.batch, instituteId: instId, instituteName: 'Sharma Classes', batchId: b2.id, batchTitle: '${b2.title} · MWF · 7:00 AM', teacherName: 'Anil Verma');
     _members['t1_$instId'] = Membership(
-        uid: 't1', instituteId: instId, instituteName: 'Sharma Classes', role: Role.teacher, status: MemberStatus.approved, name: 'Anil Verma', phone: '+919431122558', subjects: ['Accounts'], createdAt: now, salary: 9000);
+        uid: 't1', instituteId: instId, instituteName: 'Sharma Classes', role: Role.teacher, status: MemberStatus.approved, name: 'Anil Verma', phone: '+919431122558', subjects: ['Accounts'], createdAt: now, salary: 9000, upiId: 'anil.verma@okaxis');
     final names = ['Aarav Kumar', 'Priya Jha', 'Rohit Mishra', 'Sneha Karn', 'Ankit Yadav', 'Neha Thakur', 'Vikas Sah'];
     for (var i = 0; i < names.length; i++) {
       final uid = 's$i';
@@ -164,7 +164,7 @@ class DemoBackend implements Backend {
     for (var d = 1; d <= 12; d++) {
       final day0 = DateTime(today.year, today.month, today.day).subtract(Duration(days: d));
       if (day0.weekday == 7 || monthKey(day0) != mk) continue;
-      final c = CheckIn(uid: 't1', name: 'Anil Verma', dateKey: dateKey(day0), inAt: day0.add(const Duration(hours: 6, minutes: 50)).millisecondsSinceEpoch, outAt: day0.add(const Duration(hours: 8, minutes: 40)).millisecondsSinceEpoch);
+      final c = CheckIn(uid: 't1', name: 'Anil Verma', dateKey: dateKey(day0), inAt: day0.add(const Duration(hours: 6, minutes: 50)).millisecondsSinceEpoch, outAt: day0.add(const Duration(hours: 8, minutes: 40)).millisecondsSinceEpoch, mode: 'coaching', dist: 20 + d * 3);
       _checkins['${instId}_${c.id}'] = c;
     }
     _syllabus['${instId}_b1'] = Syllabus(batchId: 'b1', updatedAt: now - day, chapters: [
@@ -304,6 +304,13 @@ class DemoBackend implements Backend {
         ?..salary = salary
         ..payType = payType;
     }
+  }
+
+  @override
+  Future<void> setUpi(Membership m, String upi) async {
+    await _wait();
+    _members[m.id]?.upiId = upi;
+    m.upiId = upi;
   }
 
   @override

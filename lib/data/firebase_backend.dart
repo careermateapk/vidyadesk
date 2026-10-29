@@ -224,6 +224,12 @@ class FirebaseBackend implements Backend {
   }
 
   @override
+  Future<void> setUpi(Membership m, String upi) async {
+    await _mem.doc(m.id).update({'upiId': upi});
+    m.upiId = upi;
+  }
+
+  @override
   Future<void> leave(Membership m) => _mem.doc(m.id).delete();
 
   Future<void> _deleteAll(List<DocumentReference<Map<String, dynamic>>> refs) async {
@@ -306,7 +312,7 @@ class FirebaseBackend implements Backend {
 
   @override
   Future<void> updateInstitute(Institute inst) =>
-      _inst(inst.id).update({'name': inst.name, 'city': inst.city, 'address': inst.address, 'phone': inst.phone, 'upiId': inst.upiId, 'upiName': inst.upiName, 'dueDay': inst.dueDay, 'lateFee': inst.lateFee});
+      _inst(inst.id).update({'name': inst.name, 'city': inst.city, 'address': inst.address, 'phone': inst.phone, 'upiId': inst.upiId, 'upiName': inst.upiName, 'dueDay': inst.dueDay, 'lateFee': inst.lateFee, ...inst.geoMap});
 
   @override
   Future<String> newInstituteCode(Institute inst) async {

@@ -9,14 +9,24 @@ import '../services/receipt.dart';
 import '../services/upi.dart';
 import '../ui/widgets.dart';
 import 'common.dart';
+import 'file_sheet.dart';
 
-/// Makes the PDF receipt for a paid fee and opens the share sheet.
+/// Receipt PDF for a paid fee: download it or share it.
 Future<void> shareFeeReceipt(BuildContext context, String instituteId, FeeRecord fee, {Institute? inst, String studentCode = ''}) async {
-  toast(context, tr('making_pdf'));
   try {
     final i = inst ?? await context.appRead.backend.institute(instituteId);
     if (i == null) throw Exception('no institute');
-    await shareReceipt(inst: i, fee: fee, studentCode: studentCode);
+    if (!context.mounted) return;
+    final safe = fee.studentName.replaceAll(RegExp(r'[^A-Za-z0-9]+'), '_');
+    await showFileSheet(context, title: tr('receipt_pdf'), subtitle: '${fee.studentName} · ${monthLabel(fee.month)}', files: [
+      FileOption(
+        label: 'PDF',
+        name: 'Receipt_${safe}_${fee.month}.pdf',
+        mime: 'application/pdf',
+        make: () => buildReceipt(inst: i, fee: fee, studentCode: studentCode),
+        text: '${i.name} — fee receipt ${fee.receiptNo}',
+      ),
+    ]);
   } catch (e) {
     if (context.mounted) toast(context, errorMessage(e));
   }
@@ -91,7 +101,7 @@ class _PaySheetState extends State<_PaySheet> {
         case UpiStatus.unknown:
           var utr = r.utr;
           if (utr.isEmpty || r.status == UpiStatus.unknown) {
-            final typed = await _askUtr(context, utr);
+            final typed = await askUtr(context, utr);
             if (typed == null) return;
             utr = typed;
           }
@@ -199,7 +209,7 @@ class _PaySheetState extends State<_PaySheet> {
 }
 
 /// Asks for the UTR when the UPI app did not send it back.
-Future<String?> _askUtr(BuildContext context, String guess) {
+Future<String?> askUtr(BuildContext context, String guess) {
   final c = TextEditingController(text: guess);
   return showDialog<String>(
     context: context,

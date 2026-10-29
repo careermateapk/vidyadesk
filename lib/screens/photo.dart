@@ -80,10 +80,17 @@ class _PhotoCropScreenState extends State<PhotoCropScreen> {
   bool _flip = false;
   bool _busy = false;
   double _zoom = 1;
+  Size? _src; // picture size in pixels
+  double _circle = 300;
 
   @override
   void initState() {
     super.initState();
+    decodeImageFromList(widget.bytes).then((img) {
+      if (!mounted) return;
+      setState(() => _src = Size(img.width.toDouble(), img.height.toDouble()));
+      WidgetsBinding.instance.addPostFrameCallback((_) => _center());
+    });
     _ctrl.addListener(() {
       final z = _ctrl.value.getMaxScaleOnAxis();
       if ((z - _zoom).abs() > .01) setState(() => _zoom = z);
@@ -96,11 +103,36 @@ class _PhotoCropScreenState extends State<PhotoCropScreen> {
     super.dispose();
   }
 
-  void _setZoom(double z, double box) {
-    final c = box / 2;
-    // ignore: deprecated_member_use
-    final m = Matrix4.identity()..translate(c, c)..scale(z)..translate(-c, -c);
-    _ctrl.value = m;
+  /// The picture's size on screen (after rotation) so that it just covers the circle.
+  Size _childSize() {
+    final src = _src ?? const Size(1, 1);
+    final w = _turns.isOdd ? src.height : src.width;
+    final h = _turns.isOdd ? src.width : src.height;
+    final c = _circle;
+    return w >= h ? Size(c * w / h, c) : Size(c, c * h / w);
+  }
+
+  /// Move/zoom so the picture always fills the whole circle — no empty edges.
+  void _apply(double z, double tx, double ty) {
+    final cs = _childSize();
+    final c = _circle;
+    tx = tx.clamp(c - cs.width * z, 0.0).toDouble();
+    ty = ty.clamp(c - cs.height * z, 0.0).toDouble();
+    _ctrl.value = Matrix4.diagonal3Values(z, z, 1)..setTranslationRaw(tx, ty, 0);
+  }
+
+  void _center() {
+    final cs = _childSize();
+    _apply(1, (_circle - cs.width) / 2, (_circle - cs.height) / 2);
+  }
+
+  void _setZoom(double z) {
+    final m = _ctrl.value;
+    final s0 = m.getMaxScaleOnAxis();
+    final t = m.getTranslation();
+    final c = _circle / 2;
+    final cx = (c - t.x) / s0, cy = (c - t.y) / s0;
+    _apply(z, c - cx * z, c - cy * z);
   }
 
   Future<void> _save() async {
@@ -123,7 +155,9 @@ class _PhotoCropScreenState extends State<PhotoCropScreen> {
   Widget build(BuildContext context) {
     final w = MediaQuery.of(context).size.width;
     final box = w;
-    final circle = w * .76;
+    _circle = w * .76;
+    final circle = _circle;
+    final cs = _childSize();
     return Scaffold(
       backgroundColor: const Color(0xFF0B0A14),
       body: SafeArea(
@@ -134,11 +168,11 @@ class _PhotoCropScreenState extends State<PhotoCropScreen> {
               _darkBtn(Icons.close_rounded, () => Navigator.of(context).pop()),
               Expanded(child: Text(tr('crop_photo'), textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800))),
               _darkBtn(Icons.restart_alt_rounded, () {
-                _ctrl.value = Matrix4.identity();
                 setState(() {
                   _turns = 0;
                   _flip = false;
                 });
+                WidgetsBinding.instance.addPostFrameCallback((_) => _center());
               }),
             ]),
           ),
@@ -148,34 +182,33 @@ class _PhotoCropScreenState extends State<PhotoCropScreen> {
             height: box,
             child: Stack(children: [
               Center(
-                child: RepaintBoundary(
-                  key: _boundary,
-                  child: ClipRect(
-                    child: SizedBox(
-                      width: circle,
-                      height: circle,
-                      child: OverflowBox(
-                        maxWidth: box,
-                        maxHeight: box,
-                        child: InteractiveViewer(
-                          transformationController: _ctrl,
-                          minScale: 1,
-                          maxScale: 5,
-                          clipBehavior: Clip.none,
-                          boundaryMargin: EdgeInsets.all(box),
+                child: _src == null
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : RepaintBoundary(
+                        key: _boundary,
+                        child: ClipRect(
                           child: SizedBox(
-                            width: box,
-                            height: box,
-                            child: RotatedBox(
-                              quarterTurns: _turns,
-                              child: Transform.flip(flipX: _flip, child: Image.memory(widget.bytes, fit: BoxFit.cover)),
+                            width: circle,
+                            height: circle,
+                            child: InteractiveViewer(
+                              transformationController: _ctrl,
+                              minScale: 1,
+                              maxScale: 5,
+                              constrained: false,
+                              boundaryMargin: EdgeInsets.zero,
+                              clipBehavior: Clip.hardEdge,
+                              child: SizedBox(
+                                width: cs.width,
+                                height: cs.height,
+                                child: RotatedBox(
+                                  quarterTurns: _turns,
+                                  child: Transform.flip(flipX: _flip, child: Image.memory(widget.bytes, fit: BoxFit.fill, gaplessPlayback: true)),
+                                ),
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                ),
               ),
               IgnorePointer(child: CustomPaint(size: Size(box, box), painter: _CircleMask(circle / 2))),
               Positioned(
@@ -198,14 +231,17 @@ class _PhotoCropScreenState extends State<PhotoCropScreen> {
                   max: 5,
                   activeColor: const Color(0xFF8B7CF6),
                   inactiveColor: Colors.white24,
-                  onChanged: (v) => _setZoom(v, box),
+                  onChanged: _src == null ? null : _setZoom,
                 ),
               ),
               const Icon(Icons.photo_size_select_large_rounded, color: Colors.white, size: 22),
             ]),
           ),
           Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            _tool(Icons.rotate_right_rounded, tr('rotate'), () => setState(() => _turns = (_turns + 1) % 4)),
+            _tool(Icons.rotate_right_rounded, tr('rotate'), () {
+              setState(() => _turns = (_turns + 1) % 4);
+              WidgetsBinding.instance.addPostFrameCallback((_) => _center());
+            }),
             const SizedBox(width: 18),
             _tool(Icons.flip_rounded, tr('flip'), () => setState(() => _flip = !_flip)),
           ]),
@@ -224,7 +260,7 @@ class _PhotoCropScreenState extends State<PhotoCropScreen> {
                 ),
               ),
               const SizedBox(width: 12),
-              Expanded(child: PrimaryButton(label: tr('save_photo'), icon: Icons.check_rounded, arrow: false, busy: _busy, onPressed: _save)),
+              Expanded(child: PrimaryButton(label: tr('save_photo'), icon: Icons.check_rounded, arrow: false, busy: _busy, onPressed: _src == null ? null : _save)),
             ]),
           ),
         ]),

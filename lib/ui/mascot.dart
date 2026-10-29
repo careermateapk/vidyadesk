@@ -1,17 +1,69 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-/// "Vidu" — VidyaDesk's owl mascot, drawn as SVG.
-class Mascot extends StatelessWidget {
-  const Mascot({super.key, this.size = 200, this.cap = true, this.book = true, this.wave = false, this.closed = false});
+/// "Vidu" — VidyaDesk's owl mascot, drawn as SVG. Blinks every few seconds
+/// (each owl at its own rhythm) unless [blink] is false.
+class Mascot extends StatefulWidget {
+  const Mascot({super.key, this.size = 200, this.cap = true, this.book = true, this.wave = false, this.closed = false, this.blink = true});
   final double size;
-  final bool cap, book, wave, closed;
+  final bool cap, book, wave, closed, blink;
+
+  @override
+  State<Mascot> createState() => _MascotState();
+}
+
+final _rnd = math.Random();
+
+class _MascotState extends State<Mascot> {
+  bool _shut = false;
+  Timer? _next;
+  final List<Timer> _steps = [];
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.blink && !widget.closed) _schedule(600 + _rnd.nextInt(2200));
+  }
+
+  void _schedule(int ms) {
+    _next = Timer(Duration(milliseconds: ms), () {
+      if (!mounted) return;
+      const pattern = [(0, true), (130, false), (290, true), (420, false)];
+      _steps.removeWhere((t) => !t.isActive);
+      for (final s in pattern) {
+        _steps.add(Timer(Duration(milliseconds: s.$1), () {
+          if (mounted) setState(() => _shut = s.$2);
+        }));
+      }
+      _schedule(3000 + _rnd.nextInt(2200));
+    });
+  }
+
+  @override
+  void dispose() {
+    _next?.cancel();
+    for (final t in _steps) {
+      t.cancel();
+    }
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return SvgPicture.string(_owl(cap: cap, book: book, wave: wave, closed: closed), width: size, height: size);
+    final w = widget;
+    final open = SvgPicture.string(_owl(cap: w.cap, book: w.book, wave: w.wave, closed: w.closed), width: w.size, height: w.size);
+    if (!w.blink || w.closed) return open;
+    return SizedBox(
+      width: w.size,
+      height: w.size,
+      child: Stack(children: [
+        Offstage(offstage: _shut, child: open),
+        Offstage(offstage: !_shut, child: SvgPicture.string(_owl(cap: w.cap, book: w.book, wave: w.wave, closed: true), width: w.size, height: w.size)),
+      ]),
+    );
   }
 }
 
@@ -60,7 +112,7 @@ class _BlinkingMascotState extends State<BlinkingMascot> {
         width: widget.size,
         height: widget.size,
         child: Stack(children: [
-          Offstage(offstage: _closed, child: Mascot(size: widget.size, cap: widget.cap, book: widget.book, wave: widget.wave)),
+          Offstage(offstage: _closed, child: Mascot(size: widget.size, cap: widget.cap, book: widget.book, wave: widget.wave, blink: false)),
           Offstage(offstage: !_closed, child: Mascot(size: widget.size, cap: widget.cap, book: widget.book, wave: widget.wave, closed: true)),
         ]),
       );

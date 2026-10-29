@@ -462,11 +462,12 @@ class Tag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
+        constraints: const BoxConstraints(maxWidth: 240),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           if (leading != null) ...[leading!, const SizedBox(width: 5)],
-          Text(text, style: TextStyle(color: fg, fontSize: 11.5, fontWeight: FontWeight.w800)),
+          Flexible(child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: fg, fontSize: 11.5, fontWeight: FontWeight.w800))),
         ]),
       );
 }
@@ -885,11 +886,13 @@ class AppLogo extends StatelessWidget {
         width: size,
         height: size,
         decoration: BoxDecoration(
-          gradient: const LinearGradient(colors: [Color(0xFF8B7CF6), Color(0xFF6C5CE7)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-          borderRadius: BorderRadius.circular(size * 0.32),
+          gradient: const LinearGradient(colors: [Color(0xFF8B7CF6), Color(0xFF4B3FC4)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+          borderRadius: BorderRadius.circular(size * 0.26),
           boxShadow: [BoxShadow(color: const Color(0xFF6C5CE7).withValues(alpha: .4), blurRadius: size * .5, offset: Offset(0, size * .2), spreadRadius: -size * .2)],
         ),
-        child: Icon(Icons.school_outlined, color: Colors.white, size: size * 0.54),
+        clipBehavior: Clip.antiAlias,
+        alignment: Alignment.center,
+        child: Padding(padding: EdgeInsets.only(top: size * .04), child: Mascot(size: size * .95, book: false, blink: false)),
       );
 }
 
@@ -1259,11 +1262,12 @@ class GlassChip extends StatelessWidget {
   final bool solid;
   @override
   Widget build(BuildContext context) => Container(
+        constraints: const BoxConstraints(maxWidth: 300),
         padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
         decoration: BoxDecoration(color: solid ? Colors.white : Colors.white.withValues(alpha: .18), borderRadius: BorderRadius.circular(999)),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           if (icon != null) ...[Icon(icon, size: 13, color: solid ? const Color(0xFF4B3FC4) : Colors.white), const SizedBox(width: 5)],
-          Text(text, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: solid ? const Color(0xFF4B3FC4) : Colors.white)),
+          Flexible(fit: FlexFit.loose, child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: solid ? const Color(0xFF4B3FC4) : Colors.white))),
         ]),
       );
 }

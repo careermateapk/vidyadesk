@@ -45,12 +45,12 @@ service cloud.firestore {
           || (request.resource.data.status == 'approved' && request.resource.data.role == 'admin' && isOwner(request.resource.data.instituteId))
         );
 
-      allow update: if (own() && changed().hasOnly(['batchIds', 'childUids', 'childNames', 'photo']))
+      allow update: if (own() && changed().hasOnly(['batchIds', 'childUids', 'childNames', 'photo', 'upiId']))
         || (isStaff(resource.data.instituteId)
             && changed().hasOnly(['status', 'studentCode', 'monthlyFee'])
             && (resource.data.role in ['student', 'parent'] || isAdmin(resource.data.instituteId)))
         || (isAdmin(resource.data.instituteId)
-            && changed().hasOnly(['monthlyFee', 'discount', 'feeNote', 'salary', 'payType']));
+            && changed().hasOnly(['monthlyFee', 'discount', 'feeNote', 'salary', 'payType', 'upiId']));
 
       allow delete: if own() || isAdmin(resource.data.instituteId);
     }

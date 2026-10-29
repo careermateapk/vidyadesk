@@ -69,13 +69,50 @@ class Institute {
     this.upiName = '',
     this.dueDay = 10,
     this.lateFee = 0,
+    this.geoCheckin = false,
+    this.geoLat = 0,
+    this.geoLng = 0,
+    this.geoRadius = 100,
+    this.geoAddress = '',
+    this.onlineCheckin = false,
+    this.onlineUids = const [],
   });
   final String id, name, city, code, ownerUid;
   final String address, phone, upiId, upiName;
   /// Fees are due by this day of the month; after it [lateFee] is added.
   final int dueDay, lateFee;
 
-  Institute copyWith({String? name, String? city, String? code, String? address, String? phone, String? upiId, String? upiName, int? dueDay, int? lateFee}) => Institute(
+  /// Teacher check-in only at the coaching: its point, allowed distance (m) and address.
+  final bool geoCheckin;
+  final double geoLat, geoLng;
+  final int geoRadius;
+  final String geoAddress;
+
+  /// Teachers may check in from home (online classes). Empty list = all teachers.
+  final bool onlineCheckin;
+  final List<String> onlineUids;
+  bool get hasPlace => geoLat != 0 || geoLng != 0;
+  bool canCheckInOnline(String uid) => onlineCheckin && (onlineUids.isEmpty || onlineUids.contains(uid));
+
+  Institute copyWith({
+    String? name,
+    String? city,
+    String? code,
+    String? address,
+    String? phone,
+    String? upiId,
+    String? upiName,
+    int? dueDay,
+    int? lateFee,
+    bool? geoCheckin,
+    double? geoLat,
+    double? geoLng,
+    int? geoRadius,
+    String? geoAddress,
+    bool? onlineCheckin,
+    List<String>? onlineUids,
+  }) =>
+      Institute(
         id: id,
         ownerUid: ownerUid,
         name: name ?? this.name,
@@ -87,10 +124,27 @@ class Institute {
         upiName: upiName ?? this.upiName,
         dueDay: dueDay ?? this.dueDay,
         lateFee: lateFee ?? this.lateFee,
+        geoCheckin: geoCheckin ?? this.geoCheckin,
+        geoLat: geoLat ?? this.geoLat,
+        geoLng: geoLng ?? this.geoLng,
+        geoRadius: geoRadius ?? this.geoRadius,
+        geoAddress: geoAddress ?? this.geoAddress,
+        onlineCheckin: onlineCheckin ?? this.onlineCheckin,
+        onlineUids: onlineUids ?? this.onlineUids,
       );
 
   Map<String, dynamic> toMap() =>
-      {'id': id, 'name': name, 'city': city, 'code': code, 'ownerUid': ownerUid, 'address': address, 'phone': phone, 'upiId': upiId, 'upiName': upiName, 'dueDay': dueDay, 'lateFee': lateFee};
+      {'id': id, 'name': name, 'city': city, 'code': code, 'ownerUid': ownerUid, 'address': address, 'phone': phone, 'upiId': upiId, 'upiName': upiName, 'dueDay': dueDay, 'lateFee': lateFee, ...geoMap};
+
+  Map<String, dynamic> get geoMap => {
+        'geoCheckin': geoCheckin,
+        'geoLat': geoLat,
+        'geoLng': geoLng,
+        'geoRadius': geoRadius,
+        'geoAddress': geoAddress,
+        'onlineCheckin': onlineCheckin,
+        'onlineUids': onlineUids,
+      };
   factory Institute.fromMap(Map<String, dynamic> m) => Institute(
         id: _s(m['id']),
         name: _s(m['name']),
@@ -103,6 +157,13 @@ class Institute {
         upiName: _s(m['upiName']),
         dueDay: _i(m['dueDay']) == 0 ? 10 : _i(m['dueDay']).clamp(1, 28),
         lateFee: _i(m['lateFee']),
+        geoCheckin: _b(m['geoCheckin']),
+        geoLat: m['geoLat'] is num ? (m['geoLat'] as num).toDouble() : 0,
+        geoLng: m['geoLng'] is num ? (m['geoLng'] as num).toDouble() : 0,
+        geoRadius: _i(m['geoRadius']) == 0 ? 100 : _i(m['geoRadius']),
+        geoAddress: _s(m['geoAddress']),
+        onlineCheckin: _b(m['onlineCheckin']),
+        onlineUids: _ls(m['onlineUids']),
       );
 }
 
@@ -136,6 +197,7 @@ class Membership {
     this.feeNote = '',
     this.salary = 0,
     this.payType = 'fixed',
+    this.upiId = '',
   });
 
   final String uid, instituteId, instituteName;
@@ -146,6 +208,8 @@ class Membership {
   /// Pay (teachers): fixed monthly salary, or ₹ per class when [payType] is "class".
   int salary;
   String payType;
+  /// Teacher's UPI ID — the admin pays the salary to it from the app.
+  String upiId;
   String photo;
   final Role role;
   MemberStatus status;
@@ -190,6 +254,7 @@ class Membership {
         'feeNote': feeNote,
         'salary': salary,
         'payType': payType,
+        'upiId': upiId,
       };
 
   factory Membership.fromMap(Map<String, dynamic> m) => Membership(
@@ -217,6 +282,7 @@ class Membership {
         feeNote: _s(m['feeNote']),
         salary: _i(m['salary']),
         payType: _s(m['payType']).isEmpty ? 'fixed' : _s(m['payType']),
+        upiId: _s(m['upiId']),
       );
 }
 
@@ -785,15 +851,28 @@ class Lead {
 
 /// Teacher arrived / left. Id "<uid>_<dateKey>".
 class CheckIn {
-  CheckIn({required this.uid, required this.name, required this.dateKey, required this.inAt, this.outAt = 0});
+  CheckIn({required this.uid, required this.name, required this.dateKey, required this.inAt, this.outAt = 0, this.mode = '', this.dist = -1});
   final String uid, name, dateKey;
   final int inAt;
+
+  /// "coaching" (checked in at the coaching), "online" (from home) or "" (no location rule).
+  final String mode;
+
+  /// Metres from the coaching when checking in (-1 = not measured).
+  final int dist;
   int outAt;
   String get id => '${uid}_$dateKey';
   String get month => '${dateKey.substring(0, 4)}-${dateKey.substring(4, 6)}';
-  Map<String, dynamic> toMap() => {'uid': uid, 'name': name, 'dateKey': dateKey, 'month': month, 'inAt': inAt, 'outAt': outAt};
-  factory CheckIn.fromMap(Map<String, dynamic> m) =>
-      CheckIn(uid: _s(m['uid']), name: _s(m['name']), dateKey: _s(m['dateKey']), inAt: _i(m['inAt']), outAt: _i(m['outAt']));
+  Map<String, dynamic> toMap() => {'uid': uid, 'name': name, 'dateKey': dateKey, 'month': month, 'inAt': inAt, 'outAt': outAt, 'mode': mode, 'dist': dist};
+  factory CheckIn.fromMap(Map<String, dynamic> m) => CheckIn(
+        uid: _s(m['uid']),
+        name: _s(m['name']),
+        dateKey: _s(m['dateKey']),
+        inAt: _i(m['inAt']),
+        outAt: _i(m['outAt']),
+        mode: _s(m['mode']),
+        dist: m['dist'] == null ? -1 : _i(m['dist']),
+      );
 }
 
 class Chapter {

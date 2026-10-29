@@ -106,16 +106,13 @@ class _BatchSyllabus extends StatelessWidget {
           children: [
             FadeIn(
               child: FeatureCard(
-                child: Row(children: [
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                 Row(children: [
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text(batch.title.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: .4)),
                       const SizedBox(height: 4),
                       Text(total == 0 ? tr('no_chapters') : trf('n_of_m_chapters', {'n': '$done', 'm': '$total'}), style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
-                      if (next != null) ...[
-                        const SizedBox(height: 8),
-                        GlassChip('${tr('now_teaching')}: ${next.name}', icon: Icons.play_arrow_rounded),
-                      ],
                     ]),
                   ),
                   const SizedBox(width: 10),
@@ -127,6 +124,29 @@ class _BatchSyllabus extends StatelessWidget {
                     track: Colors.white24,
                     center: Text('${(s.progress * 100).round()}%', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
                   ),
+                 ]),
+                 if (next != null) ...[
+                   const SizedBox(height: 14),
+                   Container(
+                     padding: const EdgeInsets.fromLTRB(10, 10, 12, 10),
+                     decoration: BoxDecoration(color: Colors.white.withValues(alpha: .16), borderRadius: BorderRadius.circular(14)),
+                     child: Row(children: [
+                       Container(
+                         width: 32,
+                         height: 32,
+                         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
+                         child: const Icon(Icons.play_arrow_rounded, color: Color(0xFF4B3FC4), size: 20),
+                       ),
+                       const SizedBox(width: 10),
+                       Expanded(
+                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                           Text(tr('now_teaching').toUpperCase(), style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w800)),
+                           Text(next.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14, height: 1.25)),
+                         ]),
+                       ),
+                     ]),
+                   ),
+                 ],
                 ]),
               ),
             ),

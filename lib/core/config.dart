@@ -11,3 +11,6 @@ bool get firebaseConfigured => fbProject.isNotEmpty && fbApiKey.isNotEmpty && fb
 /// Where "Contact Us" emails go. Change this when the real support email is ready.
 const String supportEmail = String.fromEnvironment('SUPPORT_EMAIL', defaultValue: 'support@vidyadesk.in');
 const String appVersion = '1.0';
+
+/// Ola Maps key (from the GitHub secret OLA_MAPS_KEY). Empty = maps hidden, GPS still works.
+const String olaMapsKey = String.fromEnvironment('OLA_MAPS_KEY');

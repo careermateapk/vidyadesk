@@ -47,6 +47,8 @@ abstract class Backend {
   Future<void> setFeePlan(Membership m, {required int monthlyFee, required int discount, required String note});
   /// Admin: a teacher's pay — fixed monthly, or per class when [payType] is "class".
   Future<void> setPay(Membership m, {required int salary, required String payType});
+  /// Teacher's UPI ID for salary (the teacher or the admin can set it).
+  Future<void> setUpi(Membership m, String upi);
   /// Remove one of my roles (also cancels a pending request).
   Future<void> leave(Membership m);
   /// Owner only: remove the whole institute with all its data.

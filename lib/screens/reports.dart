@@ -7,6 +7,7 @@ import '../data/models.dart';
 import '../services/reports.dart';
 import '../ui/widgets.dart';
 import 'common.dart';
+import 'file_sheet.dart';
 import 'insights.dart' show pickReportCard;
 import 'money.dart';
 
@@ -20,7 +21,6 @@ class ReportsScreen extends StatefulWidget {
 
 class _ReportsScreenState extends State<ReportsScreen> {
   DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
-  String? _busy;
 
   String get _mk => monthKey(_month);
   String get _inst => widget.m.instituteName;
@@ -156,20 +156,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
-  Future<void> _make(String id, Future<TableReport> Function() build, bool pdf) async {
-    setState(() => _busy = '$id$pdf');
-    try {
-      final r = await build();
-      if (pdf) {
-        await shareReportPdf(r);
-      } else {
-        await shareReportCsv(r);
-      }
-    } catch (e) {
-      if (mounted) toast(context, errorMessage(e));
-    } finally {
-      if (mounted) setState(() => _busy = null);
-    }
+  FileOption _opt(String id, Future<TableReport> Function() build, bool pdf) {
+    final name = 'VidyaDesk_${id}_$_mk';
+    return pdf
+        ? FileOption(label: 'PDF', name: '$name.pdf', mime: 'application/pdf', make: () async => reportPdf(await build()))
+        : FileOption(label: 'Excel', name: '$name.csv', mime: 'text/csv', make: () async => reportCsv(await build()));
   }
 
   @override
@@ -228,15 +219,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
                           ),
                         ]),
                         const SizedBox(height: 12),
-                        Row(children: [
-                          Expanded(
-                            child: _btn(p, 'PDF', Icons.picture_as_pdf_outlined, p.danger, _busy == '${items[i].$1}true', () => _make(items[i].$1, items[i].$4, true)),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: _btn(p, 'Excel', Icons.grid_on_rounded, p.success, _busy == '${items[i].$1}false', () => _make(items[i].$1, items[i].$4, false)),
-                          ),
-                        ]),
+                        FileActionsRow(f: _opt(items[i].$1, items[i].$4, true)),
+                        const SizedBox(height: 8),
+                        FileActionsRow(f: _opt(items[i].$1, items[i].$4, false)),
                       ]),
                     ),
                   ),
@@ -247,17 +232,4 @@ class _ReportsScreenState extends State<ReportsScreen> {
       ]),
     );
   }
-
-  Widget _btn(Palette p, String label, IconData icon, Color c, bool busy, VoidCallback onTap) => GestureDetector(
-        onTap: _busy == null ? onTap : null,
-        child: Container(
-          height: 44,
-          decoration: BoxDecoration(color: c.withValues(alpha: .1), borderRadius: BorderRadius.circular(12)),
-          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            if (busy) SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: c)) else Icon(icon, size: 18, color: c),
-            const SizedBox(width: 6),
-            Text(label, style: TextStyle(fontWeight: FontWeight.w800, color: c)),
-          ]),
-        ),
-      );
 }

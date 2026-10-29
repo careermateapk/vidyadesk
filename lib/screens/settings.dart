@@ -13,6 +13,7 @@ import 'photo.dart';
 import 'learner_home.dart';
 import 'admissions.dart';
 import 'checkin.dart';
+import 'geo.dart';
 import 'insights.dart';
 import 'money.dart';
 import 'syllabus.dart';
@@ -133,7 +134,27 @@ class SettingsPage extends StatelessWidget {
                 ),
               ]),
             )),
-          item(SoftButton(label: tr('add_role'), icon: Icons.add_rounded, onPressed: () => _addRole(context))),
+          // students & parents can't add roles or institutes; parents can only add a child
+          if (m.isStaff) item(SoftButton(label: tr('add_role'), icon: Icons.add_rounded, onPressed: () => _addRole(context))),
+          if (m.role == Role.parent) ...[
+            item(SectionTitle(tr('my_children'))),
+            if (m.childUids.isNotEmpty)
+              item(AppCard(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                child: Column(children: [
+                  for (var k = 0; k < m.childUids.length; k++)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Row(children: [
+                        Avatar(m.childNames.length > k ? m.childNames[k] : '?', size: 42, index: k),
+                        const SizedBox(width: 10),
+                        Expanded(child: Text(m.childNames.length > k ? m.childNames[k] : '—', style: const TextStyle(fontWeight: FontWeight.w800))),
+                      ]),
+                    ),
+                ]),
+              )),
+            item(SoftButton(label: tr('add_child'), icon: Icons.add_rounded, onPressed: () => app.startNewJoin(Role.parent))),
+          ],
 
           // ----- institute tools -----
           if (m.isStaff) ...[
@@ -150,6 +171,7 @@ class SettingsPage extends StatelessWidget {
                   _Tile(icon: Icons.bar_chart_rounded, color: p.brand, label: tr('reports'), onTap: () => push(context, ReportsScreen(m: m))),
                 ],
                 if (m.role == Role.admin) _Tile(icon: Icons.how_to_reg_outlined, color: p.success, label: tr('teacher_checkins'), onTap: () => push(context, CheckInsScreen(m: m))),
+                if (m.role == Role.admin) _Tile(icon: Icons.location_on_outlined, color: p.brand, label: tr('checkin_rules'), onTap: () => push(context, CheckInRulesScreen(m: m))),
                 _Tile(icon: Icons.person_search_rounded, color: p.warn, label: tr('admissions'), onTap: () => push(context, AdmissionsScreen(m: m))),
                 _Tile(icon: Icons.warning_amber_rounded, color: p.danger, label: tr('risk_alert'), onTap: () => push(context, RiskScreen(m: m))),
                 _Tile(icon: Icons.leaderboard_rounded, color: p.warn, label: tr('leaderboard'), onTap: () => push(context, LeaderboardScreen(m: m))),

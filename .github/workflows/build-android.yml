@@ -44,6 +44,7 @@ jobs:
           rm -f test/widget_test.dart
           sed -i 's/android:label="vidyadesk"/android:label="VidyaDesk"/' android/app/src/main/AndroidManifest.xml
           sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <application#' android/app/src/main/AndroidManifest.xml
+          sed -i 's#<application#<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28"/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>\n    <application#' android/app/src/main/AndroidManifest.xml
           python3 ci/patch_signing.py
           sed -i 's/applicationId = "com.vidyadesk.vidyadesk"/applicationId = "com.vidyadesk.app"/' android/app/build.gradle.kts
           # Firebase needs Android 7 (API 24) or newer
@@ -82,7 +83,7 @@ jobs:
 
       - name: Build APK
         run: |
-          DEFS="--dart-define=FB_PROJECT=${{ env.FB_PROJECT }} --dart-define=FB_API_KEY=${{ env.FB_API_KEY }} --dart-define=FB_APP_ID=${{ env.FB_APP_ID }} --dart-define=FB_SENDER=${{ env.FB_SENDER }} --dart-define=GOOGLE_CLIENT_ID=${{ env.GOOGLE_CLIENT_ID }}"
+          DEFS="--dart-define=FB_PROJECT=${{ env.FB_PROJECT }} --dart-define=FB_API_KEY=${{ env.FB_API_KEY }} --dart-define=FB_APP_ID=${{ env.FB_APP_ID }} --dart-define=FB_SENDER=${{ env.FB_SENDER }} --dart-define=GOOGLE_CLIENT_ID=${{ env.GOOGLE_CLIENT_ID }} --dart-define=OLA_MAPS_KEY=${{ secrets.OLA_MAPS_KEY }}"
           ci/run_and_report.sh flutter build apk --release $DEFS
           mkdir -p dist && cp build/app/outputs/flutter-apk/app-release.apk dist/VidyaDesk-all-phones.apk
           ci/run_and_report.sh flutter build apk --release --split-per-abi $DEFS

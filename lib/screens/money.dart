@@ -10,6 +10,9 @@ import '../services/reports.dart';
 import '../ui/widgets.dart';
 import 'checkin.dart';
 import 'common.dart';
+import 'file_sheet.dart';
+import 'payments.dart' show askUtr;
+import '../services/upi.dart';
 
 const expenseCats = ['rent', 'electricity', 'salary', 'stationery', 'marketing', 'internet', 'maintenance', 'other'];
 const incomeCats = ['admission', 'books', 'other_income'];
@@ -393,47 +396,9 @@ TableReport ledgerReport(String inst, String month, List<Txn> txns, int feeIncom
   );
 }
 
-/// Ask PDF or Excel, then share.
-Future<void> showReportShare(BuildContext context, TableReport r) async {
-  final p = context.pal;
-  final pick = await showModalBottomSheet<String>(
-    context: context,
-    builder: (c) => SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(r.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 8),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: IconBox(Icons.picture_as_pdf_outlined, fg: p.danger, bg: p.dangerTint),
-            title: Text(tr('as_pdf'), style: const TextStyle(fontWeight: FontWeight.w700)),
-            subtitle: Text(tr('as_pdf_sub')),
-            onTap: () => Navigator.pop(c, 'pdf'),
-          ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: IconBox(Icons.grid_on_rounded, fg: p.success, bg: p.successTint),
-            title: Text(tr('as_excel'), style: const TextStyle(fontWeight: FontWeight.w700)),
-            subtitle: Text(tr('as_excel_sub')),
-            onTap: () => Navigator.pop(c, 'csv'),
-          ),
-        ]),
-      ),
-    ),
-  );
-  if (pick == null || !context.mounted) return;
-  toast(context, tr('making_report'));
-  try {
-    if (pick == 'pdf') {
-      await shareReportPdf(r);
-    } else {
-      await shareReportCsv(r);
-    }
-  } catch (e) {
-    if (context.mounted) toast(context, errorMessage(e));
-  }
-}
+/// Download or share a report as PDF or Excel.
+Future<void> showReportShare(BuildContext context, TableReport r) =>
+    showFileSheet(context, title: r.title, subtitle: r.institute, files: [pdfOption(r), excelOption(r)]);
 
 // ---------------------------------------------------------------------------
 // Teacher payroll
@@ -596,12 +561,101 @@ class _PaySheetState extends State<_PaySheet> {
   late final _amt = TextEditingController(text: '${widget.r.paid?.amount ?? widget.r.due}');
   late final _note = TextEditingController(text: widget.r.paid?.note ?? '');
   late String _type = widget.r.t.payType;
+  late final _upi = TextEditingController(text: widget.r.t.upiId);
   String _mode = 'Bank';
+  int _app = 1;
   bool _busy = false;
 
   @override
+  void initState() {
+    super.initState();
+    _amt.addListener(() => setState(() {}));
+  }
+
+  Future<void> _savePaid(int amt, String mode, String note) {
+    final app = context.appRead;
+    final r = widget.r;
+    return _run(() => app.backend.saveTxn(
+          widget.m.instituteId,
+          Txn(
+            id: 'pay_${r.t.uid}_${widget.month}',
+            isIncome: false,
+            category: 'salary',
+            amount: amt,
+            date: monthKey(DateTime.now()) == widget.month
+                ? DateTime.now().millisecondsSinceEpoch
+                : DateTime(int.parse(widget.month.substring(0, 4)), int.parse(widget.month.substring(5)) + 1, 0, 12).millisecondsSinceEpoch,
+            note: note,
+            mode: mode,
+            refUid: r.t.uid,
+            refName: r.t.name,
+            byName: app.profile?.name ?? widget.m.name,
+          ),
+        ));
+  }
+
+  /// Opens GPay / PhonePe / Paytm with the teacher's UPI ID; marks paid with the UTR.
+  Future<void> _payUpi() async {
+    final app = context.appRead;
+    final r = widget.r;
+    final vpa = _upi.text.trim();
+    final amt = int.tryParse(_amt.text.trim()) ?? 0;
+    if (!RegExp(r'^[\w.\-]{2,}@[A-Za-z]{2,}$').hasMatch(vpa)) {
+      toast(context, tr('err_upi'));
+      return;
+    }
+    if (amt <= 0) {
+      toast(context, tr('err_amount'));
+      return;
+    }
+    final upiApp = upiApps[_app];
+    setState(() => _busy = true);
+    try {
+      if (vpa != r.t.upiId) await app.backend.setUpi(r.t, vpa);
+      UpiResult res;
+      if (app.isDemo) {
+        await Future<void>.delayed(const Duration(milliseconds: 900));
+        res = UpiResult(UpiStatus.success, utr: '${DateTime.now().millisecondsSinceEpoch}'.substring(1, 13));
+      } else {
+        res = await payByUpi(
+          vpa: vpa,
+          payee: r.t.name,
+          amount: amt,
+          note: 'Salary ${monthLabel(widget.month)}',
+          ref: 'VDS${DateTime.now().millisecondsSinceEpoch}',
+          package: upiApp.package,
+        );
+      }
+      if (!mounted) return;
+      setState(() => _busy = false);
+      switch (res.status) {
+        case UpiStatus.noApp:
+          toast(context, trf('upi_no_app', {'app': upiApp.name}));
+          return;
+        case UpiStatus.failed:
+          toast(context, tr('upi_failed'));
+          return;
+        case UpiStatus.success:
+        case UpiStatus.unknown:
+          var utr = res.utr;
+          if (utr.isEmpty || res.status == UpiStatus.unknown) {
+            final typed = await askUtr(context, utr);
+            if (typed == null) return;
+            utr = typed;
+          }
+          final note = _note.text.trim();
+          await _savePaid(amt, 'UPI · ${upiApp.name.split(' ').first}', ['UTR ${cleanUtr(utr)}', if (note.isNotEmpty) note].join(' · '));
+      }
+    } catch (e) {
+      if (mounted) toast(context, errorMessage(e));
+    } finally {
+      if (mounted && _busy) setState(() => _busy = false);
+    }
+  }
+
+  @override
   void dispose() {
-    for (final c in [_salary, _amt, _note]) {
+    for (final c in [_salary, _amt, _note, _upi]) {
       c.dispose();
     }
     super.dispose();
@@ -690,6 +744,13 @@ class _PaySheetState extends State<_PaySheet> {
               child: Text(tr('mark_unpaid'), style: TextStyle(color: p.danger)),
             ),
           ] else ...[
+            FieldLabel(tr('teacher_upi')),
+            TextField(
+              controller: _upi,
+              keyboardType: TextInputType.emailAddress,
+              decoration: InputDecoration(hintText: 'name@okaxis', prefixIcon: const Icon(Icons.account_balance_wallet_outlined), helperText: r.t.upiId.isEmpty ? tr('teacher_upi_help') : null),
+            ),
+            const SizedBox(height: 12),
             FieldLabel(tr('amount_to_pay')),
             TextField(
               controller: _amt,
@@ -700,43 +761,73 @@ class _PaySheetState extends State<_PaySheet> {
             ),
             const SizedBox(height: 10),
             TextField(controller: _note, decoration: InputDecoration(hintText: tr('salary_note_hint'))),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
+            FieldLabel(tr('pay_with')),
             Row(children: [
-              for (final mode in ['Bank', 'UPI', 'Cash'])
-                Expanded(child: Padding(padding: const EdgeInsets.only(right: 8), child: ChoicePill(label: mode, selected: _mode == mode, onTap: () => setState(() => _mode = mode)))),
+              for (var i = 0; i < upiApps.length; i++) ...[
+                if (i > 0) const SizedBox(width: 8),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _app = i),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: _app == i ? p.brandTint : p.card,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: _app == i ? p.brand : p.border, width: _app == i ? 2 : 1),
+                      ),
+                      child: Column(children: [
+                        Container(
+                          width: 32,
+                          height: 32,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(color: Color(upiApps[i].color), borderRadius: BorderRadius.circular(10)),
+                          child: Text(upiApps[i].letter, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12)),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(upiApps[i].name.split(' ').first, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11.5)),
+                      ]),
+                    ),
+                  ),
+                ),
+              ],
             ]),
             const SizedBox(height: 14),
             PrimaryButton(
-              label: tr('mark_salary_paid'),
-              icon: Icons.check_rounded,
+              label: trf('pay_amount_with', {'amt': rupees(int.tryParse(_amt.text.trim()) ?? 0), 'app': upiApps[_app].name.split(' ').first}),
+              icon: Icons.bolt_rounded,
               arrow: false,
               busy: _busy,
-              onPressed: () {
-                final amt = int.tryParse(_amt.text.trim()) ?? 0;
-                if (amt <= 0) {
-                  toast(context, tr('err_amount'));
-                  return;
-                }
-                final app = context.appRead;
-                _run(() => app.backend.saveTxn(
-                      widget.m.instituteId,
-                      Txn(
-                        id: 'pay_${r.t.uid}_${widget.month}',
-                        isIncome: false,
-                        category: 'salary',
-                        amount: amt,
-                        date: monthKey(DateTime.now()) == widget.month
-                            ? DateTime.now().millisecondsSinceEpoch
-                            : DateTime(int.parse(widget.month.substring(0, 4)), int.parse(widget.month.substring(5)) + 1, 0, 12).millisecondsSinceEpoch,
-                        note: _note.text.trim(),
-                        mode: _mode,
-                        refUid: r.t.uid,
-                        refName: r.t.name,
-                        byName: app.profile?.name ?? widget.m.name,
-                      ),
-                    ));
-              },
+              onPressed: _payUpi,
             ),
+            const SizedBox(height: 6),
+            Text(tr('salary_upi_note'), textAlign: TextAlign.center, style: TextStyle(color: p.muted, fontSize: 12, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 10),
+            Divider(color: p.border),
+            Text(tr('paid_other_way'), style: const TextStyle(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 8),
+            Row(children: [
+              for (final mode in ['Bank', 'Cash'])
+                Expanded(child: Padding(padding: const EdgeInsets.only(right: 8), child: ChoicePill(label: mode, selected: _mode == mode, onTap: () => setState(() => _mode = mode)))),
+              Expanded(
+                flex: 2,
+                child: SoftButton(
+                  label: tr('mark_salary_paid'),
+                  icon: Icons.check_rounded,
+                  onPressed: _busy
+                      ? null
+                      : () {
+                          final amt = int.tryParse(_amt.text.trim()) ?? 0;
+                          if (amt <= 0) {
+                            toast(context, tr('err_amount'));
+                            return;
+                          }
+                          _savePaid(amt, _mode, _note.text.trim());
+                        },
+                ),
+              ),
+            ]),
           ],
         ]),
       ),
@@ -745,9 +836,8 @@ class _PaySheetState extends State<_PaySheet> {
 }
 
 Future<void> sharePayslip(BuildContext context, String inst, Membership t, Txn pay, int classes, int days) async {
-  toast(context, tr('making_pdf'));
   try {
-    await shareReportPdf(TableReport(
+    final r = TableReport(
       title: 'Salary slip — ${monthLabel(pay.month)}',
       subtitle: t.name,
       institute: inst,
@@ -763,7 +853,8 @@ Future<void> sharePayslip(BuildContext context, String inst, Membership t, Txn p
         ['Amount', rupees(pay.amount)],
       ],
       footer: 'Generated by VidyaDesk',
-    ));
+    );
+    await showFileSheet(context, title: r.title, subtitle: t.name, files: [pdfOption(r)]);
   } catch (e) {
     if (context.mounted) toast(context, errorMessage(e));
   }
@@ -788,6 +879,8 @@ class MySalaryScreen extends StatelessWidget {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(18, 4, 18, 30),
           children: [
+            _MyUpiCard(m: m),
+            const SizedBox(height: 12),
             AppCard(
               child: Row(children: [
                 IconBox(Icons.how_to_reg_rounded, fg: p.success, bg: p.successTint),
@@ -824,6 +917,65 @@ class MySalaryScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Teacher sets the UPI ID where the salary should come.
+class _MyUpiCard extends StatefulWidget {
+  const _MyUpiCard({required this.m});
+  final Membership m;
+  @override
+  State<_MyUpiCard> createState() => _MyUpiCardState();
+}
+
+class _MyUpiCardState extends State<_MyUpiCard> {
+  late final _c = TextEditingController(text: widget.m.upiId);
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final v = _c.text.trim();
+    if (v.isNotEmpty && !RegExp(r'^[\w.\-]{2,}@[A-Za-z]{2,}$').hasMatch(v)) {
+      toast(context, tr('err_upi'));
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      await context.appRead.backend.setUpi(widget.m, v);
+      if (mounted) toast(context, tr('saved'));
+    } catch (e) {
+      if (mounted) toast(context, errorMessage(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pal;
+    return AppCard(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          IconBox(Icons.account_balance_wallet_outlined, fg: p.brand, bg: p.brandTint),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(tr('my_upi_title'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+              Text(tr('my_upi_sub'), style: TextStyle(color: p.muted, fontSize: 12.5, fontWeight: FontWeight.w600)),
+            ]),
+          ),
+        ]),
+        const SizedBox(height: 12),
+        TextField(controller: _c, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(hintText: 'name@okaxis')),
+        const SizedBox(height: 10),
+        PrimaryButton(label: tr('save_upi'), arrow: false, busy: _busy, onPressed: _save),
+      ]),
     );
   }
 }

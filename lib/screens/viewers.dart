@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -50,8 +52,36 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     params: const YoutubePlayerParams(showFullscreenButton: true, strictRelatedVideos: true, origin: 'https://com.vidyadesk.app'),
   );
 
+  StreamSubscription<YoutubePlayerValue>? _sub;
+  bool _full = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Full screen → turn the video sideways by itself; back → upright again.
+    _sub = _c.stream.listen((v) {
+      final f = v.fullScreenOption.enabled;
+      if (f == _full) return;
+      _full = f;
+      _orient(f);
+    });
+  }
+
+  static void _orient(bool landscape) {
+    if (landscape) {
+      SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    } else {
+      SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    }
+  }
+
   @override
   void dispose() {
+    _sub?.cancel();
+    if (_full) _orient(false);
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     _c.close();
     super.dispose();
   }

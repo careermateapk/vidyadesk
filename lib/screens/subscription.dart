@@ -721,7 +721,18 @@ class _PayPlanSheetState extends State<_PayPlanSheet> {
               height: 48,
               child: _cp != null
                   ? Center(child: Tag(tr('coupon_applied'), fg: p.success, bg: p.successTint, leading: Icon(Icons.check_rounded, size: 14, color: p.success)))
-                  : FilledButton.tonal(onPressed: _checking ? null : _apply, child: Text(tr('apply'))),
+                  : FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: p.brand,
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: p.brand.withValues(alpha: .5),
+                        disabledForegroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                      ),
+                      onPressed: _checking ? null : _apply,
+                      child: _checking ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white)) : Text(tr('apply')),
+                    ),
             ),
           ]),
           const SizedBox(height: 10),

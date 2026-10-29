@@ -214,6 +214,28 @@ class _PaySheetState extends State<_PaySheet> {
           ),
           const SizedBox(height: 6),
           PrimaryButton(label: trf('pay_amount_with', {'amt': rupees(widget.amount), 'app': upiApps[_app].name}), busy: _busy, arrow: false, onPressed: _pay),
+          if (context.app.demoFeeLeft) ...[
+            const SizedBox(height: 8),
+            SoftButton(
+              label: tr('demo_fee_pay'),
+              icon: Icons.science_outlined,
+              color: p.warnTint,
+              textColor: p.warn,
+              onPressed: _busy
+                  ? null
+                  : () async {
+                      setState(() => _busy = true);
+                      try {
+                        context.appRead.useDemoFee();
+                        await _claim('DEMO${DateTime.now().millisecondsSinceEpoch % 100000000}', 'Demo');
+                      } catch (e) {
+                        if (mounted) toast(context, errorMessage(e));
+                      } finally {
+                        if (mounted) setState(() => _busy = false);
+                      }
+                    },
+            ),
+          ],
           const SizedBox(height: 8),
           Text(tr('utr_auto_note'), textAlign: TextAlign.center, style: TextStyle(color: p.muted, fontSize: 12, fontWeight: FontWeight.w600)),
         ]),

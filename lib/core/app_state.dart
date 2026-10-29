@@ -71,6 +71,21 @@ class AppState extends ChangeNotifier {
   /// Parent: my children's profile photos (uid → photo).
   Map<String, String> childPhotos = {};
 
+  Future<void> loadChildPhotos() async {
+    final m = active;
+    if (m == null || m.role != Role.parent || m.childUids.isEmpty) return;
+    try {
+      childPhotos = await backend.childPhotos(m.instituteId, m.childUids);
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  /// Test: every student/parent account can make ONE demo fee payment (no money).
+  /// Turn off with [demoFeeOn] = false when testing is over.
+  static const demoFeeOn = true;
+  bool get demoFeeLeft => demoFeeOn && !isDemo && !(_prefs?.getBool('demoFee_${signedIn?.uid ?? ''}') ?? false);
+  void useDemoFee() => _prefs?.setBool('demoFee_${signedIn?.uid ?? ''}', true);
+
   /// Newest unseen items for "What's new" (section, title, time).
   List<(String, String, int)> newItems = [];
 
@@ -116,11 +131,7 @@ class AppState extends ChangeNotifier {
           } catch (_) {}
         }
       } else {
-        if (m.role == Role.parent && m.childUids.isNotEmpty) {
-          try {
-            childPhotos = await backend.childPhotos(inst, m.childUids);
-          } catch (_) {}
-        }
+        if (m.role == Role.parent) loadChildPhotos();
         final su = m.role == Role.student ? m.uid : (m.childUids.isEmpty ? '' : m.childUids[childIndex.clamp(0, m.childUids.length - 1)]);
         Set<String> myBatches = {...m.batchIds};
         if (m.role == Role.parent && su.isNotEmpty) {

@@ -1382,4 +1382,5 @@ const Map<String, List<String>> _t = {
   'child_already_title': ['This child is already added', 'यह बच्चा पहले से जुड़ा है', 'Ye bachcha pehle se juda hai'],
   'child_already_body': ['{name} is already active in your account. To add another child, pick their name.', '{name} आपके अकाउंट में पहले से है। दूसरे बच्चे को जोड़ना हो तो उसका नाम चुनें।', '{name} aapke account mein pehle se active hai. Dusre bachche ko jodna ho to uska naam chunein.'],
   'owner_login': ['VidyaDesk owner login', 'VidyaDesk ओनर लॉगिन', 'VidyaDesk owner login'],
+  'demo_fee_pay': ['Demo payment (test · only once, no money)', 'डेमो भुगतान (टेस्ट · सिर्फ़ एक बार, कोई पैसा नहीं)', 'Demo payment (test · sirf ek baar, koi paisa nahi)'],
 };

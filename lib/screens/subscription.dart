@@ -36,13 +36,45 @@ String _date(DateTime d) {
   return '${d.day} ${m[d.month - 1]} ${d.year}';
 }
 
+/// Admin's plan badge: FREE TRIAL / BASIC / STANDARD / PRO / NO PLAN.
+class PlanBadge extends StatelessWidget {
+  const PlanBadge({super.key, required this.st, this.small = false});
+  final PlanStatus st;
+  final bool small;
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pal;
+    final none = !st.active;
+    final c = none ? p.muted : planColor(p, st.plan);
+    final label = none ? tr('badge_no_plan') : tr('badge_${st.plan.name}');
+    if (small) {
+      return Container(
+        width: 24,
+        height: 24,
+        decoration: BoxDecoration(color: c, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 2.5)),
+        child: const Icon(Icons.star_rounded, size: 13, color: Colors.white),
+      );
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(9)),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        const Icon(Icons.star_rounded, size: 14, color: Colors.white),
+        const SizedBox(width: 4),
+        Text(label, style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w800, letterSpacing: .4)),
+      ]),
+    );
+  }
+}
+
 /// Does the coaching's plan include [f]? (true while the plan is unknown).
 bool planHas(BuildContext context, Feature f) => context.appRead.plan?.has(f) ?? true;
 
 /// Opens [go] only if the plan has [f]; otherwise shows what plan is needed.
 Future<void> gated(BuildContext context, Feature f, VoidCallback go) async {
   if (planHas(context, f)) return go();
-  await showUpgradeSheet(context, need: minPlan(f));
+  // Only the admin hears about plans; others simply can't open it.
+  if (context.appRead.active?.role == Role.admin) await showUpgradeSheet(context, need: minPlan(f));
 }
 
 /// Admin: "this needs Standard / Pro". Others: "ask your admin".
@@ -121,6 +153,10 @@ Future<bool> checkPlanLimit(BuildContext context, Membership r) async {
   final used = all.where((x) => x.role == r.role && x.approved).length;
   if (used < max) return true;
   if (!context.mounted) return false;
+  if (app.active?.role != Role.admin) {
+    toast(context, tr('limit_ask_admin'));
+    return false;
+  }
   final next = paidPlans.firstWhere((x) => (r.role == Role.student ? planLimit[x]!.$1 : planLimit[x]!.$2) < 0 || (r.role == Role.student ? planLimit[x]!.$1 : planLimit[x]!.$2) > max, orElse: () => Plan.pro);
   await showUpgradeSheet(
     context,
@@ -171,20 +207,7 @@ class PlanBanner extends StatelessWidget {
       );
     }
     if (!admin) {
-      // Teachers get a heads-up in the last 3 days.
-      if (m.role != Role.teacher || plan.daysLeft > 3) return const SizedBox.shrink();
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: AppCard(
-          color: p.warnTint,
-          padding: const EdgeInsets.all(14),
-          child: Row(children: [
-            Icon(Icons.schedule_rounded, color: p.warn),
-            const SizedBox(width: 10),
-            Expanded(child: Text(trf('plan_ends_teacher', {'n': '${plan.daysLeft}'}), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: p.ink2))),
-          ]),
-        ),
-      );
+      return const SizedBox.shrink();
     }
     if (!plan.warn) return const SizedBox.shrink();
     final total = plan.trial ? trialDays : 30;
@@ -1116,7 +1139,9 @@ class PlanLockedScreen extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class OwnerPanelScreen extends StatefulWidget {
-  const OwnerPanelScreen({super.key});
+  const OwnerPanelScreen({super.key, this.standalone = false});
+  /// Shown as the whole app (owner login): no back, with logout.
+  final bool standalone;
   @override
   State<OwnerPanelScreen> createState() => _OwnerPanelScreenState();
 }
@@ -1168,7 +1193,12 @@ class _OwnerPanelScreenState extends State<OwnerPanelScreen> {
   Widget build(BuildContext context) {
     final p = context.pal;
     return Scaffold(
-      appBar: InnerBar(title: tr('owner_panel'), subtitle: tr('owner_panel_sub')),
+      appBar: InnerBar(
+        title: tr('owner_panel'),
+        subtitle: tr('owner_panel_sub'),
+        showBack: !widget.standalone,
+        trailing: widget.standalone ? IconBtn(icon: Icons.logout_rounded, tooltip: tr('logout'), onTap: () => context.appRead.signOut()) : null,
+      ),
       body: Loader<OwnerStats>(
         key: ValueKey(_v),
         load: () => context.appRead.backend.ownerStats(),

@@ -686,6 +686,12 @@ class DemoBackend implements Backend {
     _syllabus['${instituteId}_${s.batchId}'] = s;
   }
 
+  @override
+  Future<Map<String, String>> childPhotos(String instituteId, List<String> uids) async => {
+        for (final u in uids)
+          if ((_members['${u}_$instituteId']?.photo ?? '').isNotEmpty) u: _members['${u}_$instituteId']!.photo,
+      };
+
   // ---------- batch rosters, removing people ----------
 
   @override

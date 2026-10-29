@@ -357,6 +357,25 @@ class _JoinWithCodeState extends State<_JoinWithCode> {
   String? _error;
   (String, String)? _child;
 
+  /// Children this parent already has in that coaching.
+  Set<String> _linked(JoinCode c) => {
+        for (final x in context.appRead.memberships)
+          if (x.role == Role.parent && x.instituteId == c.instituteId && x.status != MemberStatus.rejected) ...x.childUids,
+      };
+
+  Future<void> _alreadyLinked(String name) {
+    HapticFeedback.mediumImpact();
+    return showDialog<void>(
+      context: context,
+      builder: (d) => AlertDialog(
+        icon: Icon(Icons.warning_amber_rounded, color: d.pal.warn, size: 40),
+        title: Text(tr('child_already_title')),
+        content: Text(trf('child_already_body', {'name': name}), textAlign: TextAlign.center),
+        actions: [FilledButton(onPressed: () => Navigator.pop(d), child: Text(tr('ok')))],
+      ),
+    );
+  }
+
   // Teachers: institute code. Students and parents: batch code (parents may still use an old student code).
   CodeType get _want => widget.role == Role.teacher ? CodeType.institute : CodeType.batch;
 
@@ -383,6 +402,8 @@ class _JoinWithCodeState extends State<_JoinWithCode> {
       if (c == null) {
         setState(() => _error = tr('err_code_not_found'));
         HapticFeedback.mediumImpact();
+      } else if (widget.role == Role.parent && c.type == CodeType.student && _linked(c).contains(c.studentUid)) {
+        _alreadyLinked(c.studentName);
       } else if (c.type != _want && !(widget.role == Role.parent && c.type == CodeType.student)) {
         setState(() => _error = trf('err_code_wrong_type', {'type': tr('codetype_${c.type.name}')}));
         HapticFeedback.mediumImpact();
@@ -547,7 +568,7 @@ class _JoinWithCodeState extends State<_JoinWithCode> {
                 padding: const EdgeInsets.only(bottom: 6),
                 child: InkWell(
                   borderRadius: BorderRadius.circular(14),
-                  onTap: () => setState(() => _child = c.roster[i]),
+                  onTap: () => _linked(c).contains(c.roster[i].$1) ? _alreadyLinked(c.roster[i].$2) : setState(() => _child = c.roster[i]),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -560,6 +581,7 @@ class _JoinWithCodeState extends State<_JoinWithCode> {
                       Avatar(c.roster[i].$2, size: 34, index: i),
                       const SizedBox(width: 10),
                       Expanded(child: Text(c.roster[i].$2, style: const TextStyle(fontWeight: FontWeight.w800))),
+                      if (_linked(c).contains(c.roster[i].$1)) Tag(tr('already_linked'), fg: p.success, bg: p.successTint),
                       if (_child == c.roster[i]) Icon(Icons.check_rounded, color: p.brand),
                     ]),
                   ),

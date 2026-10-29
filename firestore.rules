@@ -46,7 +46,9 @@ service cloud.firestore {
       function own() { return signedIn() && memId.matches(request.auth.uid + '_.+'); }
       function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
 
-      allow get: if own() || isStaff(resource.data.instituteId);
+      // a parent can see their own child's profile (for the photo)
+      allow get: if own() || isStaff(resource.data.instituteId)
+        || (isMember(resource.data.instituteId) && resource.data.uid in mem(resource.data.instituteId).childUids);
       allow list: if signedIn() && (resource.data.uid == request.auth.uid || isStaff(resource.data.instituteId));
 
       allow create: if own()

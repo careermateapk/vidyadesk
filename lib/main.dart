@@ -72,6 +72,10 @@ class Gate extends StatelessWidget {
         page = const LoginScreen();
         key = 'login';
       }
+    } else if (app.isOwner) {
+      // VidyaDesk owner: straight to the owner panel — no role, profile or join code.
+      page = const OwnerPanelScreen(standalone: true);
+      key = 'owner';
     } else if (app.loadingAccount && app.profile == null) {
       page = const Scaffold(body: LoadingView());
       key = 'loading';

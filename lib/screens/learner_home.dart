@@ -152,7 +152,7 @@ class _KidsRow extends StatelessWidget {
         ),
         for (var k = 0; k < m.childUids.length; k++)
           kid(
-            ClipOval(child: Avatar(m.childNames.length > k ? m.childNames[k] : '?', size: 58, index: k)),
+            ClipOval(child: Avatar(m.childNames.length > k ? m.childNames[k] : '?', size: 58, index: k, photo: context.app.childPhotos[m.childUids[k]] ?? '')),
             m.childNames.length > k ? firstName(m.childNames[k]) : '—',
             k == selected,
             () => onPick(k),

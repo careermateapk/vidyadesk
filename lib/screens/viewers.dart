@@ -49,8 +49,24 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   late final YoutubePlayerController _c = YoutubePlayerController.fromVideoId(
     videoId: widget.videoId,
     autoPlay: true,
-    params: const YoutubePlayerParams(showFullscreenButton: true, strictRelatedVideos: true, origin: 'https://com.vidyadesk.app'),
+    params: const YoutubePlayerParams(showFullscreenButton: false, strictRelatedVideos: true, origin: 'https://com.vidyadesk.app'),
   );
+
+  /// Our own full screen: a sideways page that continues from the same second.
+  Future<void> _fullScreen() async {
+    double at = 0;
+    try {
+      at = await _c.currentTime;
+    } catch (_) {}
+    _c.pauseVideo();
+    if (!mounted) return;
+    final back = await Navigator.of(context, rootNavigator: true).push<double>(
+      PageRouteBuilder(opaque: true, pageBuilder: (_, _, _) => _FullVideo(videoId: widget.videoId, start: at)),
+    );
+    if (!mounted) return;
+    if (back != null) _c.seekTo(seconds: back, allowSeekAhead: true);
+    _c.playVideo();
+  }
 
   StreamSubscription<YoutubePlayerValue>? _sub;
   bool _full = false;
@@ -92,7 +108,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     return Scaffold(
       appBar: InnerBar(title: widget.title, subtitle: widget.subtitle.isEmpty ? null : widget.subtitle),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 30), children: [
-        ClipRRect(borderRadius: BorderRadius.circular(18), child: YoutubePlayer(controller: _c, aspectRatio: 16 / 9)),
+        ClipRRect(borderRadius: BorderRadius.circular(18), child: YoutubePlayer(controller: _c, aspectRatio: 16 / 9, autoFullScreen: false)),
+        const SizedBox(height: 10),
+        SoftButton(label: tr('full_screen'), icon: Icons.fullscreen_rounded, onPressed: _fullScreen),
         const SizedBox(height: 16),
         Text(widget.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
         if (widget.desc.isNotEmpty) ...[
@@ -100,6 +118,75 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           Text(widget.desc, style: TextStyle(color: p.ink2, height: 1.45)),
         ],
       ]),
+    );
+  }
+}
+
+/// Sideways, edge-to-edge video. Pops with the second it reached.
+class _FullVideo extends StatefulWidget {
+  const _FullVideo({required this.videoId, required this.start});
+  final String videoId;
+  final double start;
+  @override
+  State<_FullVideo> createState() => _FullVideoState();
+}
+
+class _FullVideoState extends State<_FullVideo> {
+  late final YoutubePlayerController _c = YoutubePlayerController.fromVideoId(
+    videoId: widget.videoId,
+    autoPlay: true,
+    startSeconds: widget.start,
+    params: const YoutubePlayerParams(showFullscreenButton: false, strictRelatedVideos: true, origin: 'https://com.vidyadesk.app'),
+  );
+  bool _closing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  }
+
+  Future<void> _close() async {
+    if (_closing) return;
+    _closing = true;
+    double at = widget.start;
+    try {
+      at = await _c.currentTime;
+    } catch (_) {}
+    if (mounted) Navigator.of(context).pop(at);
+  }
+
+  @override
+  void dispose() {
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    _c.close();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _close();
+      },
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: Stack(children: [
+          Center(child: YoutubePlayer(controller: _c, aspectRatio: 16 / 9, autoFullScreen: false)),
+          Positioned(
+            right: 12,
+            top: 12,
+            child: Material(
+              color: Colors.black45,
+              shape: const CircleBorder(),
+              child: IconButton(icon: const Icon(Icons.fullscreen_exit_rounded, color: Colors.white), tooltip: tr('exit_full_screen'), onPressed: _close),
+            ),
+          ),
+        ]),
+      ),
     );
   }
 }

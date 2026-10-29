@@ -89,23 +89,28 @@ class ToolsRow extends StatelessWidget {
     }
 
     final b = app.badges;
-    final counts = m.isStaff ? [0, 0, b['doubts'] ?? 0, 0] : [0, b['results'] ?? 0, b['doubts'] ?? 0, b['notices'] ?? 0];
-    final items = <(IconData, String, Color, VoidCallback)>[
+    // Teachers, students, parents never see what the admin's plan does not have.
+    final hide = m.role != Role.admin;
+    final tests = !hide || planHas(context, Feature.tests);
+    final doubts = !hide || planHas(context, Feature.doubts);
+    final all = <((IconData, String, Color, VoidCallback), int)>[
       if (m.isStaff) ...[
-        (Icons.folder_copy_rounded, tr('nav_resources'), const Color(0xFF0EA5B7), () => go(ResourcesPage(m: m, back: true))),
-        (Icons.quiz_rounded, tr('tests'), p.success, () => gated(context, Feature.tests, () => go(TestsPage(m: m)))),
-        (Icons.forum_rounded, tr('doubts'), p.warn, () => gated(context, Feature.doubts, () => go(DoubtsPage(m: m), 'doubts'))),
-        (Icons.campaign_rounded, tr('nav_notices'), p.danger, () => go(NoticesPage(m: m, back: true))),
+        ((Icons.folder_copy_rounded, tr('nav_resources'), const Color(0xFF0EA5B7), () => go(ResourcesPage(m: m, back: true))), 0),
+        if (tests) ((Icons.quiz_rounded, tr('tests'), p.success, () => gated(context, Feature.tests, () => go(TestsPage(m: m)))), 0),
+        if (doubts) ((Icons.forum_rounded, tr('doubts'), p.warn, () => gated(context, Feature.doubts, () => go(DoubtsPage(m: m), 'doubts'))), b['doubts'] ?? 0),
+        ((Icons.campaign_rounded, tr('nav_notices'), p.danger, () => go(NoticesPage(m: m, back: true))), 0),
       ] else ...[
         if (m.role == Role.student)
-          (Icons.fact_check_rounded, tr('attendance'), p.success, () => go(MyAttendancePage(m: m, studentUid: studentUid, studentName: studentName, back: true)))
+          ((Icons.fact_check_rounded, tr('attendance'), p.success, () => go(MyAttendancePage(m: m, studentUid: studentUid, studentName: studentName, back: true))), 0)
         else
-          (Icons.calendar_month_rounded, tr('nav_schedule'), p.indigo, () => go(ScheduleScreen(m: m))),
-        (Icons.emoji_events_rounded, tr('results'), p.warn, () => gated(context, Feature.tests, () => go(TestsPage(m: m), 'results'))),
-        (Icons.forum_rounded, tr('doubts'), p.brand, () => gated(context, Feature.doubts, () => go(DoubtsPage(m: m), 'doubts'))),
-        (Icons.campaign_rounded, tr('nav_notices'), p.danger, () => go(NoticesPage(m: m, back: true), 'notices')),
+          ((Icons.calendar_month_rounded, tr('nav_schedule'), p.indigo, () => go(ScheduleScreen(m: m))), 0),
+        if (tests) ((Icons.emoji_events_rounded, tr('results'), p.warn, () => go(TestsPage(m: m), 'results')), b['results'] ?? 0),
+        if (doubts) ((Icons.forum_rounded, tr('doubts'), p.brand, () => go(DoubtsPage(m: m), 'doubts')), b['doubts'] ?? 0),
+        ((Icons.campaign_rounded, tr('nav_notices'), p.danger, () => go(NoticesPage(m: m, back: true), 'notices')), b['notices'] ?? 0),
       ],
     ];
+    final items = [for (final x in all) x.$1];
+    final counts = [for (final x in all) x.$2];
     return _tiles(items, counts: counts);
   }
 }

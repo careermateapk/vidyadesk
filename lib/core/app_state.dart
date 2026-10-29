@@ -68,6 +68,9 @@ class AppState extends ChangeNotifier {
   /// doubts, results, notices, resources, admissions.
   Map<String, int> badges = {};
 
+  /// Parent: my children's profile photos (uid → photo).
+  Map<String, String> childPhotos = {};
+
   /// Newest unseen items for "What's new" (section, title, time).
   List<(String, String, int)> newItems = [];
 
@@ -113,6 +116,11 @@ class AppState extends ChangeNotifier {
           } catch (_) {}
         }
       } else {
+        if (m.role == Role.parent && m.childUids.isNotEmpty) {
+          try {
+            childPhotos = await backend.childPhotos(inst, m.childUids);
+          } catch (_) {}
+        }
         final su = m.role == Role.student ? m.uid : (m.childUids.isEmpty ? '' : m.childUids[childIndex.clamp(0, m.childUids.length - 1)]);
         Set<String> myBatches = {...m.batchIds};
         if (m.role == Role.parent && su.isNotEmpty) {

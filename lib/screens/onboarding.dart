@@ -329,6 +329,16 @@ class _RoleScreenState extends State<RoleScreen> {
               ]),
             ),
           ),
+          if (app.signedIn == null) ...[
+            const SizedBox(height: 10),
+            Center(
+              child: TextButton.icon(
+                onPressed: () => app.chooseRole(Role.admin),
+                icon: Icon(Icons.verified_user_outlined, size: 18, color: p.brand),
+                label: Text(tr('owner_login'), style: TextStyle(color: p.brand, fontWeight: FontWeight.w800)),
+              ),
+            ),
+          ],
         ],
       ),
     );

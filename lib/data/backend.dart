@@ -63,6 +63,8 @@ abstract class Backend {
   Future<JoinCode?> lookupCode(String code);
   /// [role]: who is joining. Students may join with a batch code or the institute code.
   Future<Membership> requestJoin({required AppUser user, required JoinCode code, String relation = '', List<String> subjects = const [], Role? role, String childUid = '', String childName = ''});
+  /// Parent: profile photos of my children (uid → base64 photo).
+  Future<Map<String, String>> childPhotos(String instituteId, List<String> uids);
   /// Staff: writes each batch's student list into its batch code (parents pick their child from it).
   Future<void> syncRoster(String instituteId);
   /// Admin: removes a person from the coaching completely (and tells them).

@@ -54,6 +54,7 @@ class SettingsPage extends StatelessWidget {
                     decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color(0x66FFFFFF), width: 2)),
                     child: ClipOval(child: Avatar(name, size: 60, photo: u?.photo ?? '')),
                   ),
+                  if (m.role == Role.admin && app.plan != null) Positioned(left: -2, bottom: -2, child: PlanBadge(st: app.plan!, small: true)),
                   Positioned(
                     right: -2,
                     bottom: -2,
@@ -74,6 +75,7 @@ class SettingsPage extends StatelessWidget {
                   const SizedBox(height: 8),
                   Wrap(spacing: 6, runSpacing: 6, children: [
                     Tag(roleName(m.role), fg: const Color(0xFF4B3FC4), bg: Colors.white),
+                    if (m.role == Role.admin && app.plan != null) PlanBadge(st: app.plan!),
                     ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 220),
                       child: Container(
@@ -149,7 +151,7 @@ class SettingsPage extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       child: Row(children: [
-                        Avatar(m.childNames.length > k ? m.childNames[k] : '?', size: 42, index: k),
+                        Avatar(m.childNames.length > k ? m.childNames[k] : '?', size: 42, index: k, photo: k < m.childUids.length ? (app.childPhotos[m.childUids[k]] ?? '') : ''),
                         const SizedBox(width: 10),
                         Expanded(child: Text(m.childNames.length > k ? m.childNames[k] : '—', style: const TextStyle(fontWeight: FontWeight.w800))),
                       ]),
@@ -182,10 +184,10 @@ class SettingsPage extends StatelessWidget {
                 ],
                 if (m.role == Role.admin) _Tile(icon: Icons.how_to_reg_outlined, color: p.success, label: tr('teacher_checkins'), onTap: () => gated(context, Feature.checkin, () => push(context, CheckInsScreen(m: m)))),
                 if (m.role == Role.admin) _Tile(icon: Icons.location_on_outlined, color: p.brand, label: tr('checkin_rules'), onTap: () => gated(context, Feature.checkin, () => push(context, CheckInRulesScreen(m: m)))),
-                _Tile(icon: Icons.person_search_rounded, color: p.warn, label: tr('admissions'), onTap: () => gated(context, Feature.admissions, () => push(context, AdmissionsScreen(m: m)))),
-                _Tile(icon: Icons.warning_amber_rounded, color: p.danger, label: tr('risk_alert'), onTap: () => gated(context, Feature.risk, () => push(context, RiskScreen(m: m)))),
-                _Tile(icon: Icons.leaderboard_rounded, color: p.warn, label: tr('leaderboard'), onTap: () => gated(context, Feature.doubts, () => push(context, LeaderboardScreen(m: m)))),
-                _Tile(icon: Icons.description_outlined, color: p.indigo, label: tr('report_cards'), onTap: () => gated(context, Feature.tests, () => pickReportCard(context, m))),
+                if (m.role == Role.admin || planHas(context, Feature.admissions)) _Tile(icon: Icons.person_search_rounded, color: p.warn, label: tr('admissions'), onTap: () => gated(context, Feature.admissions, () => push(context, AdmissionsScreen(m: m)))),
+                if (m.role == Role.admin || planHas(context, Feature.risk)) _Tile(icon: Icons.warning_amber_rounded, color: p.danger, label: tr('risk_alert'), onTap: () => gated(context, Feature.risk, () => push(context, RiskScreen(m: m)))),
+                if (m.role == Role.admin || planHas(context, Feature.doubts)) _Tile(icon: Icons.leaderboard_rounded, color: p.warn, label: tr('leaderboard'), onTap: () => gated(context, Feature.doubts, () => push(context, LeaderboardScreen(m: m)))),
+                if (m.role == Role.admin || planHas(context, Feature.tests)) _Tile(icon: Icons.description_outlined, color: p.indigo, label: tr('report_cards'), onTap: () => gated(context, Feature.tests, () => pickReportCard(context, m))),
                 _Tile(icon: Icons.checklist_rounded, color: p.success, label: tr('syllabus_tracker'), onTap: () => push(context, SyllabusScreen(m: m))),
                 if (m.role == Role.teacher) _Tile(icon: Icons.payments_outlined, color: p.success, label: tr('my_salary'), onTap: () => push(context, MySalaryScreen(m: m))),
                 _Tile(icon: Icons.how_to_reg_rounded, color: p.danger, label: tr('requests'), onTap: () => push(context, RequestsScreen(m: m))),

@@ -43,6 +43,7 @@ class HomeShell extends StatefulWidget {
 class HomeShellState extends State<HomeShell> {
   int _i = 0;
   int _child = 0;
+  DateTime? _lastBack;
   int _refresh = 0;
 
   @override
@@ -130,9 +131,21 @@ class HomeShellState extends State<HomeShell> {
     final i = _i.clamp(0, tabs.length - 1);
     final staff = widget.m.isStaff;
     return PopScope(
-      canPop: i == 0,
+      canPop: false,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) setState(() => _i = 0);
+        if (didPop) return;
+        if (i != 0) {
+          setState(() => _i = 0);
+          return;
+        }
+        // On the home tab: press Back twice (within 2 seconds) to leave the app.
+        final now = DateTime.now();
+        if (_lastBack != null && now.difference(_lastBack!) < const Duration(seconds: 2)) {
+          SystemNavigator.pop();
+          return;
+        }
+        _lastBack = now;
+        showTopToast(context, tr('back_again_exit'), duration: const Duration(seconds: 2));
       },
       child: Scaffold(
         body: AnimatedSwitcher(

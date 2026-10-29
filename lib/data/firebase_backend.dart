@@ -657,6 +657,19 @@ class FirebaseBackend implements Backend {
   @override
   Future<void> saveSyllabus(String instituteId, Syllabus s) => _inst(instituteId).collection('syllabus').doc(s.batchId).set(s.toMap());
 
+  @override
+  Future<Map<String, String>> childPhotos(String instituteId, List<String> uids) async {
+    final out = <String, String>{};
+    for (final u in uids) {
+      try {
+        final d = await _mem.doc('${u}_$instituteId').get();
+        final ph = (d.data()?['photo'] ?? '').toString();
+        if (ph.isNotEmpty) out[u] = ph;
+      } catch (_) {}
+    }
+    return out;
+  }
+
   // ---------- batch rosters, removing people ----------
 
   @override

@@ -9,6 +9,7 @@ import '../data/models.dart';
 import '../services/push.dart';
 import '../ui/widgets.dart';
 import 'common.dart';
+import 'file_sheet.dart';
 import 'notices.dart' show ago;
 import 'syllabus.dart';
 import 'viewers.dart';
@@ -496,6 +497,8 @@ class ResourceDetailScreen extends StatelessWidget {
         if (r.url.isNotEmpty) ...[
           const SizedBox(height: 14),
           PrimaryButton(label: tr('open_link'), icon: Icons.open_in_new_rounded, arrow: false, onPressed: () => push(context, WebPageScreen(url: r.url, title: r.title))),
+          const SizedBox(height: 10),
+          SoftButton(label: tr('download_file'), icon: Icons.download_rounded, onPressed: () => downloadLink(context, r.url, r.title)),
         ],
       ]),
     );
@@ -758,6 +761,8 @@ class HomeworkScreen extends StatelessWidget {
         if (r.url.isNotEmpty) ...[
           const SizedBox(height: 12),
           SoftButton(label: tr('open_link'), icon: Icons.open_in_new_rounded, onPressed: () => push(context, WebPageScreen(url: r.url, title: r.title))),
+          const SizedBox(height: 8),
+          SoftButton(label: tr('download_file'), icon: Icons.download_rounded, onPressed: () => downloadLink(context, r.url, r.title)),
         ],
         const SizedBox(height: 6),
         Text('${r.byName} · ${ago(r.createdAt)}', style: TextStyle(color: p.muted, fontSize: 12)),

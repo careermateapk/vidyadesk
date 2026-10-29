@@ -5,3 +5,7 @@ workers_dev = true
 
 [vars]
 PROJECT_ID = "vidyadesk-589be"
+
+# Every morning 9:00 India time: plan expiry reminders
+[triggers]
+crons = ["30 3 * * *"]

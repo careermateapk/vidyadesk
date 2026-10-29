@@ -385,7 +385,7 @@ class _JoinWithCodeState extends State<_JoinWithCode> {
       if (c == null) {
         setState(() => _error = tr('err_code_not_found'));
         HapticFeedback.mediumImpact();
-      } else if (c.type != _want) {
+      } else if (c.type != _want && !(widget.role == Role.student && c.type == CodeType.institute)) {
         setState(() => _error = trf('err_code_wrong_type', {'type': tr('codetype_${c.type.name}')}));
         HapticFeedback.mediumImpact();
       } else {
@@ -408,7 +408,7 @@ class _JoinWithCodeState extends State<_JoinWithCode> {
       _error = null;
     });
     try {
-      final m = await app.backend.requestJoin(user: app.profile!, code: c, relation: widget.role == Role.parent ? _relation : '', subjects: _subjects);
+      final m = await app.backend.requestJoin(user: app.profile!, code: c, relation: widget.role == Role.parent ? _relation : '', subjects: _subjects, role: widget.role);
       Push.send(
         inst: m.instituteId,
         kind: 'join',
@@ -534,6 +534,11 @@ class _JoinWithCodeState extends State<_JoinWithCode> {
             const SizedBox(height: 6),
             SubjectPicker(selected: _subjects, onChanged: () => setState(() {})),
           ],
+          if (widget.role == Role.student && c.type == CodeType.institute)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(tr('inst_code_student_note'), style: TextStyle(color: p.muted, fontSize: 12.5, height: 1.35)),
+            ),
           if (widget.role == Role.parent) ...[
             const SizedBox(height: 6),
             FieldLabel(tr('relation')),

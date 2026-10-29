@@ -609,7 +609,7 @@ class EmptyState extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 24),
       child: Column(children: [
-        const Floaty(child: Mascot(size: 110, book: false, cap: false)),
+        const Floaty(child: Mascot(size: 110, book: false)),
         const SizedBox(height: 14),
         Text(text, textAlign: TextAlign.center, style: TextStyle(color: p.muted, fontSize: 14.5, height: 1.45, fontWeight: FontWeight.w600)),
       ]),

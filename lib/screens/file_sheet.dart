@@ -2,10 +2,12 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../core/strings.dart';
 import '../core/theme.dart';
 import '../services/files.dart';
+import '../services/link_download.dart';
 import '../services/reports.dart';
 import '../ui/widgets.dart';
 import 'common.dart';
@@ -124,4 +126,68 @@ Future<void> showFileSheet(BuildContext context, {required String title, String 
       ),
     ),
   );
+}
+
+/// Downloads a link (Google Drive, PDF, Excel, any format) into Download/VidyaDesk.
+/// Private files or web pages open in the browser instead.
+Future<void> downloadLink(BuildContext context, String url, String title) async {
+  final messenger = ScaffoldMessenger.of(context);
+  final nav = Navigator.of(context, rootNavigator: true);
+  final progress = ValueNotifier<double>(-1);
+  var open = true;
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (c) {
+      final p = c.pal;
+      return AlertDialog(
+        content: ValueListenableBuilder<double>(
+          valueListenable: progress,
+          builder: (_, v, __) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(tr('downloading'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+            const SizedBox(height: 14),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: LinearProgressIndicator(value: v < 0 ? null : v, minHeight: 8, color: p.brand, backgroundColor: p.brandTint),
+            ),
+            if (v >= 0) ...[const SizedBox(height: 8), Text('${(v * 100).round()}%', style: TextStyle(color: p.muted))],
+          ]),
+        ),
+      );
+    },
+  ).then((_) => open = false);
+  void close() {
+    if (open) {
+      open = false;
+      nav.pop();
+    }
+  }
+
+  try {
+    final f = await fetchLinkFile(url, title, (v) => progress.value = v);
+    final uri = await saveToDownloads(f.bytes, f.name, f.mime);
+    close();
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        duration: const Duration(seconds: 6),
+        content: Text('${tr('saved_to_downloads')}\n${f.name}'),
+        action: uri == null ? null : SnackBarAction(label: tr('open_caps'), onPressed: () => openSaved(uri, f.mime)),
+      ));
+  } on NotAFile {
+    close();
+    if (context.mounted) {
+      toast(context, tr('dl_open_browser'));
+      final u = Uri.tryParse(url.trim().startsWith('http') ? url.trim() : 'https://${url.trim()}');
+      if (u != null) launchUrl(u, mode: LaunchMode.externalApplication).catchError((_) => false);
+    }
+  } on PlatformException catch (e) {
+    close();
+    if (context.mounted) toast(context, e.code == 'need_permission' ? tr('allow_storage') : tr('err_save_file'));
+  } catch (_) {
+    close();
+    if (context.mounted) toast(context, tr('err_download'));
+  } finally {
+    progress.dispose();
+  }
 }

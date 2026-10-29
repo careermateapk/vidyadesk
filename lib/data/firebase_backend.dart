@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import '../core/config.dart';
+import '../core/plan.dart';
 import 'backend.dart';
 import 'models.dart';
 
@@ -176,12 +177,16 @@ class FirebaseBackend implements Backend {
   }
 
   @override
-  Future<void> decide(Membership m, bool approve) async {
+  Future<void> decide(Membership m, bool approve, {List<String>? batchIds}) async {
     if (!approve) {
       await _mem.doc(m.id).update({'status': MemberStatus.rejected.name});
       return;
     }
     final update = <String, dynamic>{'status': MemberStatus.approved.name};
+    if (batchIds != null) {
+      update['batchIds'] = batchIds;
+      m.batchIds = batchIds;
+    }
     if (m.role == Role.student && m.studentCode.isEmpty) {
       final code = studentCodeFor(m.name);
       await _db.collection('codes').doc(code).set(JoinCode(
@@ -281,7 +286,19 @@ class FirebaseBackend implements Backend {
       if (!taken.exists) break;
       code = instituteCodeFor(name);
     }
-    final inst = Institute(id: ref.id, name: name, city: city, code: code, ownerUid: owner.uid);
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final inst = Institute(
+      id: ref.id,
+      name: name,
+      city: city,
+      code: code,
+      ownerUid: owner.uid,
+      plan: 'trial',
+      planUntil: now + trialDays * 86400000,
+      ownerName: owner.name,
+      ownerPhone: owner.fullPhone,
+      createdAt: now,
+    );
     await ref.set(inst.toMap());
     final m = Membership(
       uid: owner.uid,
@@ -333,7 +350,7 @@ class FirebaseBackend implements Backend {
   }
 
   @override
-  Future<Membership> requestJoin({required AppUser user, required JoinCode code, String relation = '', List<String> subjects = const []}) async {
+  Future<Membership> requestJoin({required AppUser user, required JoinCode code, String relation = '', List<String> subjects = const [], Role? role}) async {
     final id = '${user.uid}_${code.instituteId}';
     final existing = await _mem.doc(id).get();
     if (existing.exists && existing.data() != null) {
@@ -350,7 +367,7 @@ class FirebaseBackend implements Backend {
       }
       return m;
     }
-    final role = switch (code.type) { CodeType.institute => Role.teacher, CodeType.batch => Role.student, CodeType.student => Role.parent };
+    role ??= switch (code.type) { CodeType.institute => Role.teacher, CodeType.batch => Role.student, CodeType.student => Role.parent };
     final m = Membership(
       uid: user.uid,
       instituteId: code.instituteId,
@@ -630,4 +647,53 @@ class FirebaseBackend implements Backend {
 
   @override
   Future<void> saveSyllabus(String instituteId, Syllabus s) => _inst(instituteId).collection('syllabus').doc(s.batchId).set(s.toMap());
+
+  // ---------- VidyaDesk subscription ----------
+
+  CollectionReference<Map<String, dynamic>> get _subs => _db.collection('subPayments');
+
+  @override
+  Future<void> claimSubscription(SubPayment p) => _subs.doc(p.id).set(p.toMap());
+
+  @override
+  Future<List<SubPayment>> mySubPayments(String instituteId) async {
+    final uid = _auth.currentUser?.uid ?? '';
+    final q = await _subs.where('adminUid', isEqualTo: uid).get();
+    final list = q.docs.map((d) => SubPayment.fromMap(d.data())).where((p) => p.instituteId == instituteId).toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return list;
+  }
+
+  @override
+  Future<OwnerStats> ownerStats() async {
+    final now = DateTime.now();
+    final monthStart = DateTime(now.year, now.month).millisecondsSinceEpoch;
+    final insts = (await _db.collection('institutes').get()).docs.map((d) => Institute.fromMap({...d.data(), 'id': d.id})).toList();
+    final pend = (await _subs.where('status', isEqualTo: 'pending').get()).docs.map((d) => SubPayment.fromMap(d.data())).toList()
+      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    final month = (await _subs.where('decidedAt', isGreaterThanOrEqualTo: monthStart).get()).docs.map((d) => SubPayment.fromMap(d.data()));
+    final income = month.where((p) => p.status == 'confirmed').fold<int>(0, (a, p) => a + p.amount);
+    var students = 0;
+    try {
+      students = (await _mem.where('role', isEqualTo: 'student').where('status', isEqualTo: 'approved').count().get()).count ?? 0;
+    } catch (_) {}
+    return OwnerStats(institutes: insts, pending: pend, monthIncome: income, students: students);
+  }
+
+  @override
+  Future<void> decideSubPayment(SubPayment p, bool ok) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final batch = _db.batch();
+    if (ok) {
+      final d = await _inst(p.instituteId).get();
+      final inst = Institute.fromMap({...?d.data(), 'id': p.instituteId});
+      final current = inst.plan == 'trial' ? now : inst.planUntil;
+      batch.update(_inst(p.instituteId), {'plan': p.plan, 'planUntil': extendUntil(current, p.yearly)});
+    }
+    batch.update(_subs.doc(p.id), {'status': ok ? 'confirmed' : 'rejected', 'decidedAt': now});
+    await batch.commit();
+    p
+      ..status = ok ? 'confirmed' : 'rejected'
+      ..decidedAt = now;
+  }
 }

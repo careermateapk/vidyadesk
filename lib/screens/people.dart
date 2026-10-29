@@ -9,9 +9,11 @@ import '../core/theme.dart';
 import '../data/models.dart';
 import '../services/push.dart';
 import '../ui/widgets.dart';
+import 'batches.dart' show batchShareText;
 import 'common.dart';
 import 'join.dart';
 import 'onboarding.dart';
+import 'subscription.dart';
 
 // ---------------------------------------------------------------------------
 // Join requests
@@ -43,7 +45,7 @@ class RequestsScreen extends StatelessWidget {
                   delay: stagger(i),
                   child: Padding(
                     padding: const EdgeInsets.only(bottom: 12),
-                    child: _RequestCard(r: list[i], index: i, batches: batches, onDone: reload),
+                    child: _RequestCard(r: list[i], index: i, batches: batches, pickable: [for (final b in d.$2) if (m.role == Role.admin || b.teacherUid == m.uid) b], onDone: reload),
                   ),
                 ),
             ],
@@ -55,10 +57,11 @@ class RequestsScreen extends StatelessWidget {
 }
 
 class _RequestCard extends StatefulWidget {
-  const _RequestCard({required this.r, required this.index, required this.batches, required this.onDone});
+  const _RequestCard({required this.r, required this.index, required this.batches, required this.pickable, required this.onDone});
   final Membership r;
   final int index;
   final Map<String, Batch> batches;
+  final List<Batch> pickable;
   final Future<void> Function() onDone;
   @override
   State<_RequestCard> createState() => _RequestCardState();
@@ -67,11 +70,23 @@ class _RequestCard extends StatefulWidget {
 class _RequestCardState extends State<_RequestCard> {
   bool _busy = false;
   bool? _result;
+  late final Set<String> _picked = {...widget.r.batchIds};
+
+  bool get _student => widget.r.role == Role.student;
 
   Future<void> _decide(bool ok) async {
+    if (ok && _student && _picked.isEmpty) {
+      toast(context, tr('pick_batch_first'));
+      HapticFeedback.mediumImpact();
+      return;
+    }
+    if (ok && !await checkPlanLimit(context, widget.r)) return;
+    if (!mounted) return;
     setState(() => _busy = true);
     try {
-      await context.appRead.backend.decide(widget.r, ok);
+      final changed = _student && (_picked.length != widget.r.batchIds.length || !_picked.containsAll(widget.r.batchIds));
+      await context.appRead.backend.decide(widget.r, ok, batchIds: ok && changed ? _picked.toList() : null);
+
       if (ok) {
         Push.send(inst: widget.r.instituteId, kind: 'approved', title: '🎉 ${tr('push_approved')}', body: widget.r.instituteName, topics: [Push.person(widget.r.instituteId, widget.r.uid)]);
       }
@@ -125,6 +140,19 @@ class _RequestCardState extends State<_RequestCard> {
           if (r.joinedVia.isNotEmpty) ...[
             const SizedBox(height: 6),
             Text('${tr('via_code')} ${r.joinedVia}', style: TextStyle(color: p.muted, fontSize: 12)),
+          ],
+          if (_student && _result == null && widget.pickable.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(r.batchIds.isEmpty ? tr('pick_batch_join') : tr('batches'), style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: r.batchIds.isEmpty && _picked.isEmpty ? p.warn : p.ink)),
+            const SizedBox(height: 8),
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              for (final b in widget.pickable)
+                ChoicePill(
+                  label: b.title,
+                  selected: _picked.contains(b.id),
+                  onTap: () => setState(() => _picked.contains(b.id) ? _picked.remove(b.id) : _picked.add(b.id)),
+                ),
+            ]),
           ],
           const SizedBox(height: 12),
           if (_result != null)
@@ -394,10 +422,15 @@ class _InstituteCodeScreenState extends State<InstituteCodeScreen> {
     final p = context.pal;
     return Scaffold(
       appBar: InnerBar(title: tr('institute_code')),
-      body: Loader<Institute?>(
+      body: Loader<(Institute?, List<Batch>)>(
         key: ValueKey(_v),
-        load: () => context.appRead.backend.institute(widget.m.instituteId),
-        builder: (context, inst, reload) {
+        load: () async {
+          final b = context.appRead.backend;
+          return (await b.institute(widget.m.instituteId), await b.batches(widget.m.instituteId));
+        },
+        builder: (context, d, reload) {
+          final inst = d.$1;
+          final batches = d.$2;
           if (inst == null) return EmptyState(icon: Icons.error_outline_rounded, text: tr('err_load'));
           return ListView(
             padding: const EdgeInsets.fromLTRB(18, 6, 18, 30),
@@ -448,6 +481,31 @@ class _InstituteCodeScreenState extends State<InstituteCodeScreen> {
                   _line(p, Icons.family_restroom_rounded, tr('codes_parent')),
                 ]),
               ),
+              if (batches.isNotEmpty) ...[
+                const SizedBox(height: 18),
+                SectionTitle(tr('batch_codes')),
+                const SizedBox(height: 4),
+                for (final b in batches)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: AppCard(
+                      child: Row(children: [
+                        IconBox(Icons.class_rounded, fg: p.indigo, bg: p.indigoTint),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text(b.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800)),
+                            const SizedBox(height: 2),
+                            SelectableText(b.code, style: TextStyle(color: p.brand, fontWeight: FontWeight.w800, letterSpacing: .5)),
+                          ]),
+                        ),
+                        IconBtn(icon: Icons.copy_rounded, tooltip: tr('copy'), onTap: () => copyText(context, b.code)),
+                        const SizedBox(width: 6),
+                        IconBtn(icon: Icons.share_rounded, tooltip: tr('share'), onTap: () => SharePlus.instance.share(ShareParams(text: batchShareText(b, inst.name)))),
+                      ]),
+                    ),
+                  ),
+              ],
             ],
           );
         },

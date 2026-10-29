@@ -41,7 +41,8 @@ abstract class Backend {
   // ---- memberships ----
   Future<List<Membership>> myMemberships();
   Future<List<Membership>> members(String instituteId);
-  Future<void> decide(Membership m, bool approve);
+  /// [batchIds]: batches picked by staff while approving (students who joined with the institute code).
+  Future<void> decide(Membership m, bool approve, {List<String>? batchIds});
   Future<void> setMonthlyFee(Membership m, int fee);
   /// Admin: a student's fee plan. [monthlyFee] is the final amount after [discount].
   Future<void> setFeePlan(Membership m, {required int monthlyFee, required int discount, required String note});
@@ -60,7 +61,8 @@ abstract class Backend {
   Future<void> updateInstitute(Institute inst);
   Future<String> newInstituteCode(Institute inst);
   Future<JoinCode?> lookupCode(String code);
-  Future<Membership> requestJoin({required AppUser user, required JoinCode code, String relation = '', List<String> subjects = const []});
+  /// [role]: who is joining. Students may join with a batch code or the institute code.
+  Future<Membership> requestJoin({required AppUser user, required JoinCode code, String relation = '', List<String> subjects = const [], Role? role});
 
   // ---- batches ----
   Future<List<Batch>> batches(String instituteId);
@@ -131,6 +133,16 @@ abstract class Backend {
   // ---- syllabus ----
   Future<Syllabus?> syllabus(String instituteId, String batchId);
   Future<void> saveSyllabus(String instituteId, Syllabus s);
+
+  // ---- VidyaDesk subscription ----
+  /// Admin: "I paid for this plan, here is the UTR". The owner confirms it.
+  Future<void> claimSubscription(SubPayment p);
+  /// Admin: own payments for this coaching (newest first).
+  Future<List<SubPayment>> mySubPayments(String instituteId);
+  /// Owner only: all coachings, payments waiting for a check, income this month.
+  Future<OwnerStats> ownerStats();
+  /// Owner only: payment received (plan starts / extends) or not received.
+  Future<void> decideSubPayment(SubPayment p, bool ok);
 
   // ---- notices ----
   Future<List<Notice>> notices(String instituteId);

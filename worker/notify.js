@@ -114,7 +114,72 @@ export function allowed(m, kind, topics) {
   return false;
 }
 
+
+// ---- daily plan reminders (runs every morning) ----
+const DAY = 86400e3;
+// [from, to) window relative to now, who gets it, and the message
+export const PLAN_STEPS = [
+  { lo: 6 * DAY, hi: 7 * DAY, to: ['a'], title: '⏳ VidyaDesk plan 7 din mein khatam', body: '{name}: renew kar lijiye taaki teachers, students aur parents ka app chalta rahe.' },
+  { lo: 2 * DAY, hi: 3 * DAY, to: ['a', 's'], title: '⏳ VidyaDesk plan 3 din mein khatam', body: '{name}: plan renew karein. Admin app → Plan chuno.' },
+  { lo: -1 * DAY, hi: 0, to: ['a', 's'], title: '⚠️ VidyaDesk plan khatam ho gaya', body: '{name}: 3 din tak app sirf dekh sakte hain. Admin abhi renew karein.' },
+  { lo: -4 * DAY, hi: -3 * DAY, to: ['a', 's', 'l'], title: '🔒 VidyaDesk app band ho gaya', body: '{name}: plan renew hote hi sab wapas chalu. Aapka data safe hai.' },
+];
+
+async function institutesEnding(token, projectId, lo, hi) {
+  const r = await fetch(`https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:runQuery`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId: 'institutes' }],
+        where: {
+          compositeFilter: {
+            op: 'AND',
+            filters: [
+              { fieldFilter: { field: { fieldPath: 'planUntil' }, op: 'GREATER_THAN_OR_EQUAL', value: { integerValue: String(Math.floor(lo)) } } },
+              { fieldFilter: { field: { fieldPath: 'planUntil' }, op: 'LESS_THAN', value: { integerValue: String(Math.floor(hi)) } } },
+            ],
+          },
+        },
+        limit: 500,
+      },
+    }),
+  });
+  if (!r.ok) throw new Error('query_' + r.status);
+  const rows = await r.json();
+  return rows
+    .filter((x) => x.document)
+    .map((x) => ({ id: x.document.name.split('/').pop(), name: x.document.fields?.name?.stringValue || 'VidyaDesk' }));
+}
+
+async function sendFcm(token, projectId, topics, title, body, inst, kind) {
+  const target = topics.length === 1 ? { topic: topics[0] } : { condition: topics.map((t) => `'${t}' in topics`).join(' || ') };
+  const r = await fetch(`https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      message: { ...target, notification: { title, body }, android: { priority: 'HIGH', notification: { sound: 'default' } }, data: { kind, inst } },
+    }),
+  });
+  return r.ok;
+}
+
+export async function planReminders(env, now = Date.now()) {
+  const token = await accessToken(JSON.parse(env.SA_JSON));
+  let sent = 0;
+  for (const st of PLAN_STEPS) {
+    for (const inst of await institutesEnding(token, env.PROJECT_ID, now + st.lo, now + st.hi)) {
+      const topics = st.to.map((t) => `${t}_${inst.id}`);
+      if (await sendFcm(token, env.PROJECT_ID, topics, st.title, st.body.replace('{name}', inst.name), inst.id, 'plan')) sent++;
+    }
+  }
+  return sent;
+}
+
 export default {
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(planReminders(env).catch((e) => console.log('plan reminders failed', e)));
+  },
   async fetch(req, env) {
     if (req.method !== 'POST') return json({ ok: true, service: 'vidyadesk-notify' });
     let uid;

@@ -4,7 +4,7 @@ publish_to: "none"
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.8.0
+  sdk: ^3.10.0
 
 dependencies:
   flutter:
@@ -28,8 +28,8 @@ dependencies:
   pdf: ^3.11.1
   path_provider: ^2.1.4
   image_picker: ^1.1.2
-  youtube_player_iframe: ^5.2.1
-  webview_flutter: ^4.10.0
+  youtube_player_iframe: ^6.0.2
+  webview_flutter: ^4.13.0
   geolocator: ^14.0.0
   firebase_messaging: any
 

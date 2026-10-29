@@ -17,6 +17,8 @@ import 'tools.dart';
 import 'onboarding.dart';
 import 'schedule.dart';
 import '../ui/mascot.dart';
+import 'subscription.dart';
+import '../core/plan.dart';
 
 class _LearnerData {
   _LearnerData(this.batches, this.att, this.fees, this.notices);
@@ -248,6 +250,7 @@ class _LearnerBody extends StatelessWidget {
               ])),
               if (childSwitcher != null) ...[const SizedBox(height: 14), childSwitcher!],
               const SizedBox(height: 16),
+              PlanBanner(m: m),
               item(FeatureCard(
                 onTap: () => push(context, ScheduleScreen(m: m)),
                 padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
@@ -340,7 +343,7 @@ class _LearnerBody extends StatelessWidget {
               const SizedBox(height: 12),
               item(ToolsRow(m: m, studentUid: studentUid, studentName: name)),
               const SizedBox(height: 12),
-              BadgesCard(m: m),
+              if (planHas(context, Feature.doubts)) BadgesCard(m: m),
               const DemoBanner(),
               const SizedBox(height: 16),
               item(SectionTitle(isParent ? tr('child_timetable') : tr('my_timetable'))),

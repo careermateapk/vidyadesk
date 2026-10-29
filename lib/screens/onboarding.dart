@@ -327,7 +327,7 @@ class _RoleScreenState extends State<RoleScreen> {
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(color: p.brandTint, borderRadius: BorderRadius.circular(Gap.rCard)),
               child: Row(children: [
-                const Mascot(size: 48, book: false, cap: false),
+                const Mascot(size: 48, book: false),
                 const SizedBox(width: 8),
                 Expanded(child: Text(tr('role_tip'), style: TextStyle(fontSize: 12.5, color: p.ink2, height: 1.45, fontWeight: FontWeight.w600))),
               ]),

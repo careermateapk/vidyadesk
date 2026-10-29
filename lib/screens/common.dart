@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../core/plan.dart';
 import '../core/strings.dart';
 import '../data/backend.dart';
 import '../data/models.dart';
@@ -88,6 +89,9 @@ String nextClassText(Batch b) {
 }
 
 String errorMessage(Object e) {
+  final denied = (e is BackendError && e.code == 'permission') || e.toString().contains('permission-denied');
+  if (denied && planReadOnly) return tr('err_plan_readonly');
+  if (denied) return tr('err_permission');
   if (e is BackendError) {
     final k = 'err_${e.code}';
     final t = tr(k);

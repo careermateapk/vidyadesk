@@ -10,6 +10,7 @@ import '../core/strings.dart';
 import '../core/theme.dart';
 import '../ui/widgets.dart';
 import 'common.dart';
+import 'file_sheet.dart';
 
 // ---------------------------------------------------------------------------
 // YouTube helpers
@@ -45,7 +46,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   late final YoutubePlayerController _c = YoutubePlayerController.fromVideoId(
     videoId: widget.videoId,
     autoPlay: true,
-    params: const YoutubePlayerParams(showFullscreenButton: true),
+    params: const YoutubePlayerParams(showFullscreenButton: true, origin: 'https://com.vidyadesk.app'),
   );
 
   @override
@@ -57,27 +58,23 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   @override
   Widget build(BuildContext context) {
     final p = context.pal;
-    return YoutubePlayerScaffold(
-      controller: _c,
-      aspectRatio: 16 / 9,
-      builder: (context, player) => Scaffold(
-        appBar: InnerBar(title: widget.title, subtitle: widget.subtitle.isEmpty ? null : widget.subtitle),
-        body: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 30), children: [
-          ClipRRect(borderRadius: BorderRadius.circular(18), child: player),
-          const SizedBox(height: 16),
-          Text(widget.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-          if (widget.desc.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(widget.desc, style: TextStyle(color: p.ink2, height: 1.45)),
-          ],
-          const SizedBox(height: 16),
-          SoftButton(
-            label: tr('open_in_youtube'),
-            icon: Icons.open_in_new_rounded,
-            onPressed: () => openExternal(context, 'https://www.youtube.com/watch?v=${widget.videoId}'),
-          ),
-        ]),
-      ),
+    return Scaffold(
+      appBar: InnerBar(title: widget.title, subtitle: widget.subtitle.isEmpty ? null : widget.subtitle),
+      body: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 30), children: [
+        ClipRRect(borderRadius: BorderRadius.circular(18), child: YoutubePlayer(controller: _c, aspectRatio: 16 / 9)),
+        const SizedBox(height: 16),
+        Text(widget.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+        if (widget.desc.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text(widget.desc, style: TextStyle(color: p.ink2, height: 1.45)),
+        ],
+        const SizedBox(height: 16),
+        SoftButton(
+          label: tr('open_in_youtube'),
+          icon: Icons.open_in_new_rounded,
+          onPressed: () => openExternal(context, 'https://www.youtube.com/watch?v=${widget.videoId}'),
+        ),
+      ]),
     );
   }
 }
@@ -145,7 +142,11 @@ class _WebPageScreenState extends State<WebPageScreen> {
       appBar: InnerBar(
         title: widget.title,
         subtitle: Uri.tryParse(_fixUrl(widget.url))?.host,
-        trailing: IconBtn(icon: Icons.open_in_new_rounded, tooltip: tr('open_in_browser'), onTap: () => openExternal(context, widget.url)),
+        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+          IconBtn(icon: Icons.download_rounded, tooltip: tr('download_file'), onTap: () => downloadLink(context, widget.url, widget.title)),
+          const SizedBox(width: 8),
+          IconBtn(icon: Icons.open_in_new_rounded, tooltip: tr('open_in_browser'), onTap: () => openExternal(context, widget.url)),
+        ]),
       ),
       body: Column(children: [
         if (_progress < 100) LinearProgressIndicator(value: _progress / 100, minHeight: 3, color: p.brand, backgroundColor: p.brandTint),

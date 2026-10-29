@@ -76,8 +76,20 @@ class Institute {
     this.geoAddress = '',
     this.onlineCheckin = false,
     this.onlineUids = const [],
+    this.plan = 'trial',
+    this.planUntil = 0,
+    this.ownerName = '',
+    this.ownerPhone = '',
+    this.createdAt = 0,
   });
   final String id, name, city, code, ownerUid;
+
+  /// Subscription: trial / basic / standard / pro, and when it ends (ms).
+  /// Only the VidyaDesk owner can change these.
+  final String plan;
+  final int planUntil;
+  final String ownerName, ownerPhone;
+  final int createdAt;
   final String address, phone, upiId, upiName;
   /// Fees are due by this day of the month; after it [lateFee] is added.
   final int dueDay, lateFee;
@@ -131,10 +143,15 @@ class Institute {
         geoAddress: geoAddress ?? this.geoAddress,
         onlineCheckin: onlineCheckin ?? this.onlineCheckin,
         onlineUids: onlineUids ?? this.onlineUids,
+        plan: plan,
+        planUntil: planUntil,
+        ownerName: ownerName,
+        ownerPhone: ownerPhone,
+        createdAt: createdAt,
       );
 
   Map<String, dynamic> toMap() =>
-      {'id': id, 'name': name, 'city': city, 'code': code, 'ownerUid': ownerUid, 'address': address, 'phone': phone, 'upiId': upiId, 'upiName': upiName, 'dueDay': dueDay, 'lateFee': lateFee, ...geoMap};
+      {'id': id, 'name': name, 'city': city, 'code': code, 'ownerUid': ownerUid, 'address': address, 'phone': phone, 'upiId': upiId, 'upiName': upiName, 'dueDay': dueDay, 'lateFee': lateFee, ...geoMap, 'plan': plan, 'planUntil': planUntil, 'ownerName': ownerName, 'ownerPhone': ownerPhone, 'createdAt': createdAt};
 
   Map<String, dynamic> get geoMap => {
         'geoCheckin': geoCheckin,
@@ -164,7 +181,75 @@ class Institute {
         geoAddress: _s(m['geoAddress']),
         onlineCheckin: _b(m['onlineCheckin']),
         onlineUids: _ls(m['onlineUids']),
+        plan: _s(m['plan']).isEmpty ? 'trial' : _s(m['plan']),
+        planUntil: _i(m['planUntil']),
+        ownerName: _s(m['ownerName']),
+        ownerPhone: _s(m['ownerPhone']),
+        createdAt: _i(m['createdAt']),
       );
+}
+
+/// A coaching's payment for VidyaDesk (checked by the owner using the UTR).
+class SubPayment {
+  SubPayment({
+    required this.id,
+    required this.instituteId,
+    required this.instituteName,
+    required this.adminUid,
+    required this.adminName,
+    required this.phone,
+    required this.plan,
+    required this.yearly,
+    required this.amount,
+    required this.utr,
+    this.status = 'pending',
+    this.createdAt = 0,
+    this.decidedAt = 0,
+  });
+  final String id, instituteId, instituteName, adminUid, adminName, phone, plan, utr;
+  final bool yearly;
+  final int amount, createdAt;
+  String status; // pending / confirmed / rejected
+  int decidedAt;
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'instituteId': instituteId,
+        'instituteName': instituteName,
+        'adminUid': adminUid,
+        'adminName': adminName,
+        'phone': phone,
+        'plan': plan,
+        'yearly': yearly,
+        'amount': amount,
+        'utr': utr,
+        'status': status,
+        'createdAt': createdAt,
+        'decidedAt': decidedAt,
+      };
+  factory SubPayment.fromMap(Map<String, dynamic> m) => SubPayment(
+        id: _s(m['id']),
+        instituteId: _s(m['instituteId']),
+        instituteName: _s(m['instituteName']),
+        adminUid: _s(m['adminUid']),
+        adminName: _s(m['adminName']),
+        phone: _s(m['phone']),
+        plan: _s(m['plan']),
+        yearly: _b(m['yearly']),
+        amount: _i(m['amount']),
+        utr: _s(m['utr']),
+        status: _s(m['status']).isEmpty ? 'pending' : _s(m['status']),
+        createdAt: _i(m['createdAt']),
+        decidedAt: _i(m['decidedAt']),
+      );
+}
+
+/// Numbers for the owner panel.
+class OwnerStats {
+  const OwnerStats({required this.institutes, required this.pending, required this.monthIncome, required this.students});
+  final List<Institute> institutes;
+  final List<SubPayment> pending;
+  final int monthIncome, students;
 }
 
 enum MemberStatus { pending, approved, rejected }

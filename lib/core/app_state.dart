@@ -7,6 +7,7 @@ import '../data/firebase_backend.dart';
 import '../data/models.dart';
 import '../services/push.dart';
 import 'config.dart';
+import 'plan.dart';
 import 'strings.dart';
 
 /// Holds who is logged in, their roles, and the phone settings
@@ -34,6 +35,28 @@ class AppState extends ChangeNotifier {
   Membership? active;
   bool loadingAccount = false;
 
+  /// The active role's coaching and its VidyaDesk plan.
+  Institute? inst;
+  PlanStatus? get plan => inst == null || inst!.id != active?.instituteId ? null : PlanStatus(planFrom(inst!.plan), inst!.planUntil);
+
+  /// The VidyaDesk owner (sees the owner panel).
+  bool get isOwner => ownerEmails.contains((profile?.email ?? signedIn?.email ?? '').toLowerCase());
+
+  /// Reads the active coaching (plan, owner phone) again.
+  Future<void> loadInstitute() async {
+    final m = active;
+    if (m == null || !m.approved) {
+      inst = null;
+      planReadOnly = false;
+      return;
+    }
+    try {
+      inst = await backend.institute(m.instituteId);
+    } catch (_) {}
+    planReadOnly = plan?.grace ?? false;
+    notifyListeners();
+  }
+
   bool get isDemo => backend.isDemo;
 
   /// Parent: which child is selected (shared by every screen).
@@ -48,7 +71,13 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  AppLifecycleListener? _life;
+
   Future<void> start() async {
+    // Coming back to the app: read the plan again (it may have been renewed).
+    _life ??= AppLifecycleListener(onResume: () {
+      if (active != null) loadInstitute();
+    });
     try {
       _prefs = await SharedPreferences.getInstance();
     } catch (_) {}
@@ -123,6 +152,7 @@ class AppState extends ChangeNotifier {
         memberships = profile == null ? [] : await backend.myMemberships();
         _pickActive();
         Push.sync(backend, memberships);
+        await loadInstitute();
       }
     } finally {
       loadingAccount = false;
@@ -151,8 +181,10 @@ class AppState extends ChangeNotifier {
 
   void switchTo(Membership m) {
     active = m;
+    if (inst?.id != m.instituteId) inst = null;
     chooseRole(m.role);
     notifyListeners();
+    loadInstitute();
   }
 
   /// After joining or creating something, re-read the roles and show [m].
@@ -162,6 +194,7 @@ class AppState extends ChangeNotifier {
     active = memberships.where((x) => x.id == m.id).firstOrNull ?? m;
     Push.sync(backend, memberships);
     notifyListeners();
+    await loadInstitute();
   }
 
   Future<void> refreshMemberships() async {
@@ -172,6 +205,7 @@ class AppState extends ChangeNotifier {
     if (active == null) _pickActive();
     Push.sync(backend, memberships);
     notifyListeners();
+    await loadInstitute();
   }
 
   /// Leave a role, or (owner) delete the whole institute. Then show another role.

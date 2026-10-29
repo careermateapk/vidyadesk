@@ -120,7 +120,7 @@ class _FaqScreenState extends State<FaqScreen> {
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(color: p.brandTint, borderRadius: BorderRadius.circular(Gap.rCard)),
               child: Row(children: [
-                const Mascot(size: 46, book: false, cap: false),
+                const Mascot(size: 46, book: false),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

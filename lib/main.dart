@@ -8,6 +8,7 @@ import 'screens/auth.dart';
 import 'screens/home_shell.dart';
 import 'screens/join.dart';
 import 'screens/onboarding.dart';
+import 'screens/subscription.dart';
 import 'services/push.dart';
 import 'ui/widgets.dart';
 
@@ -85,6 +86,9 @@ class Gate extends StatelessWidget {
     } else if (!app.active!.approved) {
       page = PendingScreen(m: app.active!);
       key = 'pending-${app.active!.id}';
+    } else if (app.plan?.locked ?? false) {
+      page = PlanLockedScreen(m: app.active!);
+      key = 'locked-${app.active!.id}';
     } else {
       page = HomeShell(m: app.active!);
       key = 'home-${app.active!.id}';

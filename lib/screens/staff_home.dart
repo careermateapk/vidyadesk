@@ -16,6 +16,8 @@ import 'onboarding.dart';
 import 'people.dart';
 import 'schedule.dart';
 import 'tools.dart';
+import 'subscription.dart';
+import '../core/plan.dart';
 
 class _StaffData {
   _StaffData(this.members, this.batches, this.today, this.fees, this.lastFees, this.notices, this.week);
@@ -141,6 +143,7 @@ class _StaffHomeState extends State<StaffHome> {
           ),
         ])),
         const SizedBox(height: 16),
+        PlanBanner(m: m),
         if (admin)
           item(FeatureCard(
             onTap: () => shell?.goToNamed('fees'),
@@ -197,11 +200,11 @@ class _StaffHomeState extends State<StaffHome> {
           Expanded(child: StatTile(icon: Icons.fact_check_outlined, value: pct(present, marked), suffix: '%', label: tr('today_present'), fg: p.success, bg: p.successTint, empty: marked == 0)),
         ])),
         const SizedBox(height: 12),
-        if (m.role == Role.teacher) ...[item(CheckInCard(m: m)), const SizedBox(height: 12)],
+        if (m.role == Role.teacher && planHas(context, Feature.checkin)) ...[item(CheckInCard(m: m)), const SizedBox(height: 12)],
         item(ToolsRow(m: m, onBack: reload)),
         if (admin) ...[const SizedBox(height: 10), item(AdminToolsRow(m: m, onBack: reload))],
         const SizedBox(height: 12),
-        RiskCard(m: m),
+        if (planHas(context, Feature.risk)) RiskCard(m: m),
         const DemoBanner(),
         if (pending.isNotEmpty)
           item(Padding(

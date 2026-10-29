@@ -43,6 +43,7 @@ jobs:
           ci/run_and_report.sh flutter create . --platforms android --org com.vidyadesk --project-name vidyadesk
           rm -f test/widget_test.dart
           sed -i 's/android:label="vidyadesk"/android:label="VidyaDesk"/' android/app/src/main/AndroidManifest.xml
+          sed -i 's/android:label="VidyaDesk"/android:label="VidyaDesk" android:allowBackup="false" android:fullBackupContent="false"/' android/app/src/main/AndroidManifest.xml
           sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <application#' android/app/src/main/AndroidManifest.xml
           sed -i 's#<application#<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28"/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>\n    <application#' android/app/src/main/AndroidManifest.xml
           python3 ci/patch_signing.py

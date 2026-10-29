@@ -18,6 +18,8 @@ import 'schedule.dart';
 import 'settings.dart';
 import 'staff_home.dart';
 import 'tests.dart';
+import 'subscription.dart';
+import '../core/plan.dart';
 
 class _Tab {
   const _Tab(this.icon, this.activeIcon, this.label, this.page);
@@ -322,7 +324,7 @@ Future<void> showQuickAdd(BuildContext context, Membership m, {HomeShellState? s
       final batches = myBatches(m, await b.batches(m.instituteId));
       if (context.mounted) await push(context, AddResourceScreen(m: m, batches: batches, kind: pick == 'hw' ? 'homework' : null));
     case 'test':
-      await push(context, TestsPage(m: m));
+      await gated(context, Feature.tests, () => push(context, TestsPage(m: m)));
     case 'invite':
       if (admin) {
         await push(context, InstituteCodeScreen(m: m));

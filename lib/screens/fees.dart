@@ -10,6 +10,8 @@ import '../ui/widgets.dart';
 import 'common.dart';
 import 'payments.dart';
 import 'reports.dart';
+import 'subscription.dart';
+import '../core/plan.dart';
 
 // ---------------------------------------------------------------------------
 // Fee rules: due date, late fee
@@ -88,7 +90,7 @@ class _FeesPageState extends State<FeesPage> {
         subtitle: tr('collection'),
         showBack: false,
         trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-          IconBtn(icon: Icons.bar_chart_rounded, tooltip: tr('reports'), onTap: () => push(context, ReportsScreen(m: widget.m))),
+          IconBtn(icon: Icons.bar_chart_rounded, tooltip: tr('reports'), onTap: () => gated(context, Feature.reports, () => push(context, ReportsScreen(m: widget.m)))),
           const SizedBox(width: 10),
           IconBtn(
             icon: Icons.tune_rounded,
@@ -222,11 +224,15 @@ class _FeesPageState extends State<FeesPage> {
                             icon: Icons.notifications_active_rounded,
                             color: p.successTint,
                             textColor: p.success,
-                            onPressed: () => showModalBottomSheet(
-                              context: context,
-                              isScrollControlled: true,
-                              showDragHandle: true,
-                              builder: (_) => _ReminderRun(rows: pend, message: _reminder),
+                            onPressed: () => gated(
+                              context,
+                              Feature.feePlan,
+                              () => showModalBottomSheet(
+                                context: context,
+                                isScrollControlled: true,
+                                showDragHandle: true,
+                                builder: (_) => _ReminderRun(rows: pend, message: _reminder),
+                              ),
                             ),
                           ),
                         ),
@@ -514,7 +520,8 @@ class _FeeSheetState extends State<_FeeSheet> {
     return _run(() => context.appRead.backend.saveFee(widget.m.instituteId, rec), tr('late_fee_waived'));
   }
 
-  Future<void> _savePlan() {
+  Future<void> _savePlan() async {
+    if (!planHas(context, Feature.feePlan)) return showUpgradeSheet(context, need: minPlan(Feature.feePlan));
     final base = int.tryParse(_base.text.trim()) ?? 0;
     var disc = int.tryParse(_disc.text.trim()) ?? 0;
     if (disc > base) disc = base;
@@ -780,7 +787,7 @@ class _MyFeesPageState extends State<MyFeesPage> {
           final paidThis = rec.paid;
           final waiting = rec.waiting;
           final dueDate = feeDueDate(cur, inst);
-          final canPay = !paidThis && !waiting && amount > 0 && (inst?.upiId ?? '').isNotEmpty;
+          final canPay = !paidThis && !waiting && amount > 0 && (inst?.upiId ?? '').isNotEmpty && planHas(context, Feature.upiFees);
           final total = fees.fold<int>(0, (a, f) => a + f.paidSoFar);
           Future<void> pay() async {
             final done = await showPayFee(context,

@@ -14,6 +14,16 @@ service cloud.firestore {
     function isOwner(inst) {
       return signedIn() && get(/databases/$(database)/documents/institutes/$(inst)).data.ownerUid == request.auth.uid;
     }
+    // VidyaDesk owner (owner panel): confirms plan payments
+    function appOwner() {
+      return signedIn() && request.auth.token.email in ['support.sangam360@gmail.com'];
+    }
+    // Plan still running? After it ends the app is view-only (no changes saved).
+    function live(inst) {
+      let d = get(/databases/$(database)/documents/institutes/$(inst)).data;
+      return !('planUntil' in d) || d.planUntil > request.time.toMillis();
+    }
+    function planKeys() { return ['plan', 'planUntil', 'ownerUid', 'createdAt']; }
 
     // Each person's own profile
     match /users/{uid} {
@@ -45,75 +55,82 @@ service cloud.firestore {
           || (request.resource.data.status == 'approved' && request.resource.data.role == 'admin' && isOwner(request.resource.data.instituteId))
         );
 
+      allow list: if appOwner();
       allow update: if (own() && changed().hasOnly(['batchIds', 'childUids', 'childNames', 'photo', 'upiId']))
-        || (isStaff(resource.data.instituteId)
-            && changed().hasOnly(['status', 'studentCode', 'monthlyFee'])
+        || (isStaff(resource.data.instituteId) && live(resource.data.instituteId)
+            && changed().hasOnly(['status', 'studentCode', 'monthlyFee', 'batchIds'])
             && (resource.data.role in ['student', 'parent'] || isAdmin(resource.data.instituteId)))
-        || (isAdmin(resource.data.instituteId)
+        || (isAdmin(resource.data.instituteId) && live(resource.data.instituteId)
             && changed().hasOnly(['monthlyFee', 'discount', 'feeNote', 'salary', 'payType', 'upiId']));
 
       allow delete: if own() || isAdmin(resource.data.instituteId);
     }
 
     match /institutes/{inst} {
-      allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid;
-      allow get: if isMember(inst) || isOwner(inst);
-      allow update: if isAdmin(inst);
+      // a new coaching starts with a 30-day free trial
+      allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.plan == 'trial'
+        && request.resource.data.planUntil <= request.time.toMillis() + 31 * 86400000;
+      allow get: if isMember(inst) || isOwner(inst) || appOwner();
+      allow list: if appOwner();
+      // the admin cannot change the plan; only the VidyaDesk owner can
+      allow update: if (isAdmin(inst) && live(inst) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(planKeys()))
+        || (appOwner() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['plan', 'planUntil']));
       allow delete: if isOwner(inst);
 
       match /batches/{id} {
         allow read: if isMember(inst);
-        allow write: if isStaff(inst);
+        allow write: if live(inst) && (isStaff(inst));
       }
       match /attendance/{id} {
         allow read: if isMember(inst);
-        allow write: if isStaff(inst);
+        allow write: if live(inst) && (isStaff(inst));
       }
       match /notices/{id} {
         allow read: if isMember(inst);
-        allow write: if isStaff(inst);
+        allow write: if live(inst) && (isStaff(inst));
       }
       match /resources/{id} {
         allow read: if isMember(inst);
-        allow write: if isStaff(inst);
+        allow write: if live(inst) && (isStaff(inst));
       }
       match /tests/{id} {
         allow read: if isStaff(inst) || (isMember(inst) && resource.data.published == true);
-        allow write: if isStaff(inst);
+        allow write: if live(inst) && (isStaff(inst));
       }
       match /submissions/{id} {
         // id is "<resourceId>_<studentUid>", so a missing answer can be checked too
         allow get: if isMember(inst) && id.matches('.*_' + request.auth.uid);
         allow read: if isStaff(inst) || (isMember(inst) && (resource.data.studentUid == request.auth.uid || resource.data.studentUid in mem(inst).childUids));
-        allow create, update: if isStaff(inst)
-          || (isMember(inst) && request.resource.data.studentUid == request.auth.uid && request.resource.data.checked == false);
+        allow create, update: if live(inst) && (isStaff(inst)
+          || (isMember(inst) && request.resource.data.studentUid == request.auth.uid && request.resource.data.checked == false));
       }
       // Money: only the admin. A teacher can read their own salary entries.
       match /ledger/{id} {
         allow read: if isAdmin(inst) || (isMember(inst) && resource.data.refUid == request.auth.uid);
-        allow write: if isAdmin(inst);
+        allow write: if live(inst) && (isAdmin(inst));
       }
       match /leads/{id} {
         allow read, write: if isStaff(inst);
       }
       match /checkins/{id} {
         allow read: if isAdmin(inst) || (isStaff(inst) && resource.data.uid == request.auth.uid);
-        allow create, update: if isStaff(inst) && request.resource.data.uid == request.auth.uid && id == request.auth.uid + '_' + request.resource.data.dateKey;
-        allow delete: if isAdmin(inst);
+        allow create, update: if live(inst) && (isStaff(inst) && request.resource.data.uid == request.auth.uid && id == request.auth.uid + '_' + request.resource.data.dateKey);
+        allow delete: if live(inst) && (isAdmin(inst));
       }
       match /syllabus/{id} {
         allow read: if isMember(inst);
-        allow write: if isStaff(inst);
+        allow write: if live(inst) && (isStaff(inst));
       }
       match /doubts/{id} {
         allow read: if isStaff(inst) || (isMember(inst) && (resource.data.studentUid == request.auth.uid || resource.data.studentUid in mem(inst).childUids));
-        allow create: if isMember(inst) && request.resource.data.studentUid == request.auth.uid;
-        allow update: if isStaff(inst) || (isMember(inst) && resource.data.studentUid == request.auth.uid);
+        allow create: if live(inst) && (isMember(inst) && request.resource.data.studentUid == request.auth.uid);
+        allow update: if live(inst) && (isStaff(inst) || (isMember(inst) && resource.data.studentUid == request.auth.uid));
       }
       match /fees/{id} {
         allow read: if isStaff(inst)
           || (isMember(inst) && (resource.data.studentUid == request.auth.uid || resource.data.studentUid in mem(inst).childUids));
-        allow write: if isAdmin(inst);
+        allow write: if live(inst) && (isAdmin(inst));
         // a student or parent reports a UPI payment; the admin confirms it later
         function claimOk() {
           return request.resource.data.paid == false
@@ -121,10 +138,19 @@ service cloud.firestore {
             && request.resource.data.claimByUid == request.auth.uid
             && (request.resource.data.studentUid == request.auth.uid || request.resource.data.studentUid in mem(inst).childUids);
         }
-        allow create: if isMember(inst) && claimOk();
-        allow update: if isMember(inst) && claimOk() && resource.data.paid == false
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['claimed', 'claimUtr', 'claimBy', 'claimByUid', 'claimVia', 'claimAt']);
+        allow create: if live(inst) && (isMember(inst) && claimOk());
+        allow update: if live(inst) && (isMember(inst) && claimOk() && resource.data.paid == false
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['claimed', 'claimUtr', 'claimBy', 'claimByUid', 'claimVia', 'claimAt']));
       }
+    }
+
+    // Coachings pay VidyaDesk by UPI; the owner checks the UTR and starts the plan.
+    match /subPayments/{id} {
+      allow create: if isAdmin(request.resource.data.instituteId)
+        && request.resource.data.adminUid == request.auth.uid
+        && request.resource.data.status == 'pending';
+      allow read: if appOwner() || (signedIn() && resource.data.adminUid == request.auth.uid);
+      allow update: if appOwner();
     }
   }
 }

@@ -1,3 +1,4 @@
+import '../core/plan.dart';
 import 'backend.dart';
 import 'models.dart';
 
@@ -24,6 +25,7 @@ class DemoBackend implements Backend {
   final Map<String, Lead> _leads = {};
   final Map<String, CheckIn> _checkins = {};
   final Map<String, Syllabus> _syllabus = {};
+  final List<SubPayment> _subs = [];
 
   static const demoInstituteCode = 'SHRM-4821';
   static const demoBatchCode = 'ECO-TTS-5PM-38';
@@ -45,7 +47,7 @@ class DemoBackend implements Backend {
   void _seed() {
     const instId = 'demo-inst';
     const owner = 'demo-owner';
-    _institutes[instId] = const Institute(id: instId, name: 'Sharma Classes', city: 'Darbhanga', code: demoInstituteCode, ownerUid: owner, address: 'Laheriasarai Road, Darbhanga', phone: '+91 98765 43210', upiId: 'sharmaclasses@ybl', upiName: 'Sharma Classes', dueDay: 10, lateFee: 100, geoCheckin: true, geoLat: 26.1542, geoLng: 85.8963, geoRadius: 100, geoAddress: 'Laheriasarai Road, Darbhanga');
+    _institutes[instId] = Institute(id: instId, plan: 'trial', planUntil: DateTime.now().millisecondsSinceEpoch + 12 * 86400000, ownerName: 'Rakesh Sharma', ownerPhone: '+919876543210', name: 'Sharma Classes', city: 'Darbhanga', code: demoInstituteCode, ownerUid: owner, address: 'Laheriasarai Road, Darbhanga', phone: '+91 98765 43210', upiId: 'sharmaclasses@ybl', upiName: 'Sharma Classes', dueDay: 10, lateFee: 100, geoCheckin: true, geoLat: 26.1542, geoLng: 85.8963, geoRadius: 100, geoAddress: 'Laheriasarai Road, Darbhanga');
     _codes[demoInstituteCode] = const JoinCode(code: demoInstituteCode, type: CodeType.institute, instituteId: instId, instituteName: 'Sharma Classes');
     final now = DateTime.now().millisecondsSinceEpoch;
     _members['${owner}_$instId'] = Membership(
@@ -272,10 +274,14 @@ class DemoBackend implements Backend {
       _members.values.where((m) => m.instituteId == instituteId).toList()..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
   @override
-  Future<void> decide(Membership m, bool approve) async {
+  Future<void> decide(Membership m, bool approve, {List<String>? batchIds}) async {
     await _wait();
     final real = _members[m.id] ?? m;
     real.status = approve ? MemberStatus.approved : MemberStatus.rejected;
+    if (approve && batchIds != null) {
+      real.batchIds = batchIds;
+      m.batchIds = batchIds;
+    }
     if (approve && real.role == Role.student && real.studentCode.isEmpty) {
       real.studentCode = studentCodeFor(real.name);
       _codes[real.studentCode] = JoinCode(
@@ -345,7 +351,7 @@ class DemoBackend implements Backend {
     await _wait();
     final id = 'inst${_institutes.length + 1}';
     final code = instituteCodeFor(name);
-    _institutes[id] = Institute(id: id, name: name, city: city, code: code, ownerUid: owner.uid);
+    _institutes[id] = Institute(id: id, name: name, city: city, code: code, ownerUid: owner.uid, plan: 'trial', planUntil: DateTime.now().millisecondsSinceEpoch + trialDays * 86400000, ownerName: owner.name, ownerPhone: owner.fullPhone, createdAt: DateTime.now().millisecondsSinceEpoch);
     _codes[code] = JoinCode(code: code, type: CodeType.institute, instituteId: id, instituteName: name);
     final m = Membership(
       uid: owner.uid,
@@ -397,7 +403,7 @@ class DemoBackend implements Backend {
   }
 
   @override
-  Future<Membership> requestJoin({required AppUser user, required JoinCode code, String relation = '', List<String> subjects = const []}) async {
+  Future<Membership> requestJoin({required AppUser user, required JoinCode code, String relation = '', List<String> subjects = const [], Role? role}) async {
     await _wait();
     final id = '${user.uid}_${code.instituteId}';
     final existing = _members[id];
@@ -405,7 +411,7 @@ class DemoBackend implements Backend {
       if (code.type == CodeType.batch && !existing.batchIds.contains(code.batchId)) existing.batchIds = [...existing.batchIds, code.batchId];
       return existing;
     }
-    final role = switch (code.type) { CodeType.institute => Role.teacher, CodeType.batch => Role.student, CodeType.student => Role.parent };
+    role ??= switch (code.type) { CodeType.institute => Role.teacher, CodeType.batch => Role.student, CodeType.student => Role.parent };
     final m = Membership(
       uid: user.uid,
       instituteId: code.instituteId,
@@ -667,5 +673,57 @@ class DemoBackend implements Backend {
   Future<void> saveSyllabus(String instituteId, Syllabus s) async {
     await _wait();
     _syllabus['${instituteId}_${s.batchId}'] = s;
+  }
+
+  // ---------- VidyaDesk subscription ----------
+
+  @override
+  Future<void> claimSubscription(SubPayment p) async {
+    await _wait();
+    _subs.add(p);
+  }
+
+  @override
+  Future<List<SubPayment>> mySubPayments(String instituteId) async {
+    await _wait();
+    return _subs.where((p) => p.instituteId == instituteId).toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  }
+
+  @override
+  Future<OwnerStats> ownerStats() async {
+    await _wait();
+    final now = DateTime.now();
+    final day = 86400000;
+    final ms = now.millisecondsSinceEpoch;
+    final monthStart = DateTime(now.year, now.month).millisecondsSinceEpoch;
+    final others = [
+      Institute(id: 'x1', name: 'Jha Tutorials', city: 'Madhubani', code: 'JHA-1', ownerUid: 'o2', plan: 'basic', planUntil: ms + 5 * day, ownerName: 'Sunil Jha', ownerPhone: '+919800000001'),
+      Institute(id: 'x2', name: 'Mishra Academy', city: 'Patna', code: 'MIS-1', ownerUid: 'o3', plan: 'trial', planUntil: ms + 2 * day, ownerName: 'Ravi Mishra', ownerPhone: '+919800000002'),
+      Institute(id: 'x3', name: 'Bright Future', city: 'Samastipur', code: 'BRI-1', ownerUid: 'o4', plan: 'pro', planUntil: ms + 200 * day, ownerName: 'Neha Singh', ownerPhone: '+919800000003'),
+    ];
+    final demoPend = [
+      SubPayment(id: 'sp1', instituteId: 'x1', instituteName: 'Jha Tutorials', adminUid: 'o2', adminName: 'Sunil Jha', phone: '+919800000001', plan: 'standard', yearly: false, amount: 599, utr: '551028731104', createdAt: ms - 3600000),
+    ];
+    final pend = [..._subs.where((p) => p.status == 'pending'), ...demoPend.where((d) => !_subs.any((x) => x.id == d.id))];
+    final income = 9990 + _subs.where((p) => p.status == 'confirmed' && p.decidedAt >= monthStart).fold<int>(0, (a, p) => a + p.amount);
+    final students = _members.values.where((m) => m.role == Role.student && m.approved).length + 180;
+    return OwnerStats(institutes: [..._institutes.values, ...others], pending: pend, monthIncome: income, students: students);
+  }
+
+  @override
+  Future<void> decideSubPayment(SubPayment p, bool ok) async {
+    await _wait();
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (!_subs.any((x) => x.id == p.id)) _subs.add(p);
+    p
+      ..status = ok ? 'confirmed' : 'rejected'
+      ..decidedAt = now;
+    final inst = _institutes[p.instituteId];
+    if (ok && inst != null) {
+      final m = inst.toMap()
+        ..['plan'] = p.plan
+        ..['planUntil'] = extendUntil(inst.plan == 'trial' ? now : inst.planUntil, p.yearly);
+      _institutes[p.instituteId] = Institute.fromMap(m);
+    }
   }
 }

@@ -46,7 +46,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   late final YoutubePlayerController _c = YoutubePlayerController.fromVideoId(
     videoId: widget.videoId,
     autoPlay: true,
-    params: const YoutubePlayerParams(showFullscreenButton: true, origin: 'https://com.vidyadesk.app'),
+    params: const YoutubePlayerParams(showFullscreenButton: true, strictRelatedVideos: true, origin: 'https://com.vidyadesk.app'),
   );
 
   @override
@@ -68,12 +68,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           const SizedBox(height: 8),
           Text(widget.desc, style: TextStyle(color: p.ink2, height: 1.45)),
         ],
-        const SizedBox(height: 16),
-        SoftButton(
-          label: tr('open_in_youtube'),
-          icon: Icons.open_in_new_rounded,
-          onPressed: () => openExternal(context, 'https://www.youtube.com/watch?v=${widget.videoId}'),
-        ),
       ]),
     );
   }

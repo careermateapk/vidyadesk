@@ -355,14 +355,12 @@ class _JoinWithCodeState extends State<_JoinWithCode> {
   JoinCode? _found;
   bool _busy = false;
   String? _error;
+  (String, String)? _child;
 
-  CodeType get _want => switch (widget.role) { Role.teacher => CodeType.institute, Role.parent => CodeType.student, _ => CodeType.batch };
+  // Teachers: institute code. Students and parents: batch code (parents may still use an old student code).
+  CodeType get _want => widget.role == Role.teacher ? CodeType.institute : CodeType.batch;
 
-  String get _demoCode => switch (widget.role) {
-        Role.teacher => DemoBackend.demoInstituteCode,
-        Role.parent => DemoBackend.demoStudentCode,
-        _ => DemoBackend.demoBatchCode,
-      };
+  String get _demoCode => widget.role == Role.teacher ? DemoBackend.demoInstituteCode : DemoBackend.demoBatchCode;
 
   @override
   void dispose() {
@@ -385,11 +383,16 @@ class _JoinWithCodeState extends State<_JoinWithCode> {
       if (c == null) {
         setState(() => _error = tr('err_code_not_found'));
         HapticFeedback.mediumImpact();
-      } else if (c.type != _want && !(widget.role == Role.student && c.type == CodeType.institute)) {
+      } else if (c.type != _want && !(widget.role == Role.parent && c.type == CodeType.student)) {
         setState(() => _error = trf('err_code_wrong_type', {'type': tr('codetype_${c.type.name}')}));
         HapticFeedback.mediumImpact();
       } else {
-        setState(() => _found = c);
+        if (widget.role == Role.parent && c.type == CodeType.batch && c.roster.isEmpty) await app.backend.syncRoster(c.instituteId).catchError((_) {});
+        final fresh = widget.role == Role.parent && c.type == CodeType.batch && c.roster.isEmpty ? (await app.backend.lookupCode(code) ?? c) : c;
+        setState(() {
+          _found = fresh;
+          _child = null;
+        });
         HapticFeedback.lightImpact();
       }
     } catch (e) {
@@ -403,12 +406,13 @@ class _JoinWithCodeState extends State<_JoinWithCode> {
     final app = context.appRead;
     final c = _found!;
     if (widget.role == Role.teacher && _subjects.isEmpty) return setState(() => _error = tr('err_subjects'));
+    if (widget.role == Role.parent && c.type == CodeType.batch && _child == null) return setState(() => _error = tr('err_pick_child'));
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
-      final m = await app.backend.requestJoin(user: app.profile!, code: c, relation: widget.role == Role.parent ? _relation : '', subjects: _subjects, role: widget.role);
+      final m = await app.backend.requestJoin(user: app.profile!, code: c, relation: widget.role == Role.parent ? _relation : '', subjects: _subjects, role: widget.role, childUid: _child?.$1 ?? '', childName: _child?.$2 ?? '');
       Push.send(
         inst: m.instituteId,
         kind: 'join',
@@ -534,11 +538,35 @@ class _JoinWithCodeState extends State<_JoinWithCode> {
             const SizedBox(height: 6),
             SubjectPicker(selected: _subjects, onChanged: () => setState(() {})),
           ],
-          if (widget.role == Role.student && c.type == CodeType.institute)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Text(tr('inst_code_student_note'), style: TextStyle(color: p.muted, fontSize: 12.5, height: 1.35)),
-            ),
+          if (widget.role == Role.parent && c.type == CodeType.batch) ...[
+            const SizedBox(height: 6),
+            FieldLabel(tr('who_is_your_child')),
+            if (c.roster.isEmpty) Text(tr('no_students_in_batch'), style: TextStyle(color: p.muted, fontSize: 13, height: 1.4)),
+            for (var i = 0; i < c.roster.length; i++)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: () => setState(() => _child = c.roster[i]),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: _child == c.roster[i] ? p.brandTint : Colors.transparent,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: _child == c.roster[i] ? p.brand : p.border),
+                    ),
+                    child: Row(children: [
+                      Avatar(c.roster[i].$2, size: 34, index: i),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text(c.roster[i].$2, style: const TextStyle(fontWeight: FontWeight.w800))),
+                      if (_child == c.roster[i]) Icon(Icons.check_rounded, color: p.brand),
+                    ]),
+                  ),
+                ),
+              ),
+            Text(tr('child_not_listed'), style: TextStyle(color: p.muted, fontSize: 12)),
+          ],
           if (widget.role == Role.parent) ...[
             const SizedBox(height: 6),
             FieldLabel(tr('relation')),

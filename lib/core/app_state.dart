@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -6,6 +8,7 @@ import '../data/demo_backend.dart';
 import '../data/firebase_backend.dart';
 import '../data/models.dart';
 import '../services/push.dart';
+import '../services/upi.dart';
 import 'config.dart';
 import 'plan.dart';
 import 'strings.dart';
@@ -34,6 +37,43 @@ class AppState extends ChangeNotifier {
   List<Membership> memberships = [];
   Membership? active;
   bool loadingAccount = false;
+
+  /// Set when the admin removed me from a coaching (its name). Shows the "removed" screen.
+  String? removedFrom;
+
+  /// Remembers my approved roles, and finds ones that disappeared (removed by the admin).
+  void _checkRemoved({required bool detect}) {
+    final key = 'knownMems_${signedIn?.uid ?? ''}';
+    Map<String, dynamic> known = {};
+    try {
+      known = jsonDecode(_prefs?.getString(key) ?? '{}') as Map<String, dynamic>;
+    } catch (_) {}
+    final now = {for (final m in memberships) if (m.approved) m.id: m.instituteName};
+    // Waiting requests that are now approved → show the welcome (congratulations) screen once.
+    final pkey = 'pendingMems_${signedIn?.uid ?? ''}';
+    final wasPending = _prefs?.getStringList(pkey) ?? const <String>[];
+    final ok = memberships.where((m) => m.approved && wasPending.contains(m.id) && m.role != Role.admin).firstOrNull;
+    if (ok != null) welcome = ok;
+    _prefs?.setStringList(pkey, [for (final m in memberships) if (m.status == MemberStatus.pending) m.id]);
+    if (detect) {
+      final gone = known.keys.where((id) => !memberships.any((m) => m.id == id)).toList();
+      if (gone.isNotEmpty) removedFrom = '${known[gone.first]}';
+    }
+    _prefs?.setString(key, jsonEncode(now));
+  }
+
+  /// A request of mine that just got approved (shows "Congratulations" once).
+  Membership? welcome;
+
+  void dismissWelcome() {
+    welcome = null;
+    notifyListeners();
+  }
+
+  void dismissRemoved() {
+    removedFrom = null;
+    notifyListeners();
+  }
 
   /// The active role's coaching and its VidyaDesk plan.
   Institute? inst;
@@ -74,10 +114,14 @@ class AppState extends ChangeNotifier {
   AppLifecycleListener? _life;
 
   Future<void> start() async {
+    loadUpiApps();
     // Coming back to the app: read the plan again (it may have been renewed).
     _life ??= AppLifecycleListener(onResume: () {
-      if (active != null) loadInstitute();
+      if (signedIn != null) refreshMemberships(check: true);
     });
+    Push.onChange = () {
+      if (signedIn != null) refreshMemberships(check: true);
+    };
     try {
       _prefs = await SharedPreferences.getInstance();
     } catch (_) {}
@@ -150,6 +194,7 @@ class AppState extends ChangeNotifier {
       } else {
         profile = await backend.profile(signedIn!.uid);
         memberships = profile == null ? [] : await backend.myMemberships();
+        _checkRemoved(detect: true);
         _pickActive();
         Push.sync(backend, memberships);
         await loadInstitute();
@@ -191,15 +236,21 @@ class AppState extends ChangeNotifier {
   Future<void> refreshAndShow(Membership m) async {
     joining = false;
     memberships = await backend.myMemberships();
+    _checkRemoved(detect: false);
     active = memberships.where((x) => x.id == m.id).firstOrNull ?? m;
     Push.sync(backend, memberships);
     notifyListeners();
     await loadInstitute();
   }
 
-  Future<void> refreshMemberships() async {
+  Future<void> refreshMemberships({bool check = false}) async {
     if (signedIn == null) return;
-    memberships = await backend.myMemberships();
+    try {
+      memberships = await backend.myMemberships();
+    } catch (_) {
+      return;
+    }
+    _checkRemoved(detect: check);
     final id = active?.id;
     active = memberships.where((m) => m.id == id).firstOrNull;
     if (active == null) _pickActive();
@@ -216,6 +267,7 @@ class AppState extends ChangeNotifier {
       await backend.leave(m);
     }
     memberships = await backend.myMemberships();
+    _checkRemoved(detect: false);
     if (active?.id == m.id || (deleteInstitute && active?.instituteId == m.instituteId)) {
       final live = memberships.where((x) => x.status != MemberStatus.rejected).toList();
       active = live.where((x) => x.approved).firstOrNull ?? live.firstOrNull;
@@ -269,6 +321,8 @@ class AppState extends ChangeNotifier {
     memberships = [];
     active = null;
     joining = false;
+    removedFrom = null;
+    welcome = null;
     notifyListeners();
   }
 }

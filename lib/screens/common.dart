@@ -5,6 +5,7 @@ import '../core/plan.dart';
 import '../core/strings.dart';
 import '../data/backend.dart';
 import '../data/models.dart';
+import '../services/upi.dart';
 import '../ui/widgets.dart';
 
 /// Batches this person looks after: admin sees all, teacher sees own.
@@ -110,3 +111,24 @@ Future<T?> push<T>(BuildContext context, Widget page) => Navigator.of(context).p
         return FadeTransition(opacity: c, child: SlideTransition(position: Tween(begin: const Offset(.08, 0), end: Offset.zero).animate(c), child: child));
       },
     ));
+
+
+/// A UPI app's own icon from the phone (or its first letter when the phone gives none).
+class UpiIcon extends StatelessWidget {
+  const UpiIcon(this.app, {super.key, this.size = 38});
+  final UpiApp app;
+  final double size;
+  @override
+  Widget build(BuildContext context) {
+    if (app.icon != null) {
+      return ClipRRect(borderRadius: BorderRadius.circular(size * .28), child: Image.memory(app.icon!, width: size, height: size, fit: BoxFit.cover, gaplessPlayback: true));
+    }
+    return Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(color: Color(app.color), borderRadius: BorderRadius.circular(size * .28)),
+      child: Text(app.letter, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: size * .34)),
+    );
+  }
+}

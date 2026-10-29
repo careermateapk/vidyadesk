@@ -4,6 +4,9 @@ import android.Manifest
 import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import java.io.ByteArrayOutputStream
 import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
@@ -56,6 +59,38 @@ class MainActivity : FlutterActivity() {
             }
         }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "vidyadesk/upi").setMethodCallHandler { call, result ->
+            if (call.method == "apps") {
+                // UPI apps really installed on this phone, with their own name and icon
+                try {
+                    val q = Intent(Intent.ACTION_VIEW, Uri.parse("upi://pay"))
+                    val seen = HashSet<String>()
+                    val out = ArrayList<HashMap<String, Any>>()
+                    for (ri in packageManager.queryIntentActivities(q, 0)) {
+                        val pkgName = ri.activityInfo.packageName
+                        if (!seen.add(pkgName)) continue
+                        val m = HashMap<String, Any>()
+                        m["package"] = pkgName
+                        m["activity"] = ri.activityInfo.name
+                        m["label"] = ri.loadLabel(packageManager).toString()
+                        try {
+                            val d = ri.loadIcon(packageManager)
+                            val size = 144
+                            val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+                            val c = Canvas(bmp)
+                            d.setBounds(0, 0, size, size)
+                            d.draw(c)
+                            val bos = ByteArrayOutputStream()
+                            bmp.compress(Bitmap.CompressFormat.PNG, 100, bos)
+                            m["icon"] = bos.toByteArray()
+                        } catch (e: Exception) {}
+                        out.add(m)
+                    }
+                    result.success(out)
+                } catch (e: Exception) {
+                    result.success(ArrayList<HashMap<String, Any>>())
+                }
+                return@setMethodCallHandler
+            }
             if (call.method != "pay") {
                 result.notImplemented()
                 return@setMethodCallHandler
@@ -66,9 +101,11 @@ class MainActivity : FlutterActivity() {
                 return@setMethodCallHandler
             }
             val pkg = call.argument<String>("package")
+            val act = call.argument<String>("activity")
             try {
                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                if (!pkg.isNullOrEmpty()) intent.setPackage(pkg)
+                if (!pkg.isNullOrEmpty() && !act.isNullOrEmpty()) intent.setClassName(pkg, act)
+                else if (!pkg.isNullOrEmpty()) intent.setPackage(pkg)
                 pending?.success(null)
                 pending = result
                 val launch = if (pkg.isNullOrEmpty()) Intent.createChooser(intent, "Pay with") else intent

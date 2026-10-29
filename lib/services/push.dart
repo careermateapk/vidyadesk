@@ -23,6 +23,9 @@ class Push {
   static bool get enabled => firebaseConfigured;
   static bool _listening = false;
 
+  /// Called when a notification may have changed my roles or plan (removed, approved, plan).
+  static void Function()? onChange;
+
   static String learners(String inst) => 'l_$inst';
   static String staff(String inst) => 's_$inst';
   static String admins(String inst) => 'a_$inst';
@@ -37,7 +40,14 @@ class Push {
       await fm.requestPermission();
       if (!_listening) {
         _listening = true;
+        FirebaseMessaging.onMessageOpenedApp.listen((_) => onChange?.call());
+        fm.getInitialMessage().then((m) {
+          if (m != null) onChange?.call();
+        });
         FirebaseMessaging.onMessage.listen((m) {
+          if (const {'removed', 'approved', 'plan'}.contains(m.data['kind'])) onChange?.call();
+          // My own message (e.g. admin approving someone) — no pop-up for me.
+          if (m.data['from'] != null && m.data['from'] == FirebaseAuth.instance.currentUser?.uid) return;
           final n = m.notification;
           if (n == null) return;
           messengerKey.currentState?.showSnackBar(SnackBar(

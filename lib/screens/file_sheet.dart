@@ -25,24 +25,17 @@ FileOption excelOption(TableReport r) => FileOption(label: 'Excel', name: '${r.f
 
 /// Save to Download/VidyaDesk and show a message with OPEN.
 Future<void> downloadFile(BuildContext context, FileOption f) async {
-  final messenger = ScaffoldMessenger.of(context);
+  final overlay = Overlay.of(context, rootOverlay: true).context;
   toast(context, tr('making_report'));
   try {
     final bytes = await f.make();
     final uri = await saveToDownloads(bytes, f.name, f.mime);
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        duration: const Duration(seconds: 6),
-        content: Text('${tr('saved_to_downloads')}\n${f.name}'),
-        action: uri == null ? null : SnackBarAction(label: tr('open_caps'), onPressed: () => openSaved(uri, f.mime)),
-      ));
+    if (!overlay.mounted) return;
+    showTopToast(overlay, tr('saved_to_downloads'), sub: f.name, action: uri == null ? null : tr('open_caps'), onAction: uri == null ? null : () => openSaved(uri, f.mime), duration: const Duration(seconds: 6));
   } on PlatformException catch (e) {
-    messenger.hideCurrentSnackBar();
-    if (context.mounted) toast(context, e.code == 'need_permission' ? tr('allow_storage') : tr('err_save_file'));
+    if (overlay.mounted) toast(overlay, e.code == 'need_permission' ? tr('allow_storage') : tr('err_save_file'));
   } catch (_) {
-    messenger.hideCurrentSnackBar();
-    if (context.mounted) toast(context, tr('err_save_file'));
+    if (overlay.mounted) toast(overlay, tr('err_save_file'));
   }
 }
 
@@ -131,7 +124,7 @@ Future<void> showFileSheet(BuildContext context, {required String title, String 
 /// Downloads a link (Google Drive, PDF, Excel, any format) into Download/VidyaDesk.
 /// Private files or web pages open in the browser instead.
 Future<void> downloadLink(BuildContext context, String url, String title) async {
-  final messenger = ScaffoldMessenger.of(context);
+  final overlay = Overlay.of(context, rootOverlay: true).context;
   final nav = Navigator.of(context, rootNavigator: true);
   final progress = ValueNotifier<double>(-1);
   var open = true;
@@ -167,13 +160,9 @@ Future<void> downloadLink(BuildContext context, String url, String title) async 
     final f = await fetchLinkFile(url, title, (v) => progress.value = v);
     final uri = await saveToDownloads(f.bytes, f.name, f.mime);
     close();
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        duration: const Duration(seconds: 6),
-        content: Text('${tr('saved_to_downloads')}\n${f.name}'),
-        action: uri == null ? null : SnackBarAction(label: tr('open_caps'), onPressed: () => openSaved(uri, f.mime)),
-      ));
+    if (overlay.mounted) {
+      showTopToast(overlay, tr('saved_to_downloads'), sub: f.name, action: uri == null ? null : tr('open_caps'), onAction: uri == null ? null : () => openSaved(uri, f.mime), duration: const Duration(seconds: 6));
+    }
   } on NotAFile {
     close();
     if (context.mounted) {

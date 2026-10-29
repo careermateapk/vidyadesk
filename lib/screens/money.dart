@@ -564,7 +564,7 @@ class _PaySheetState extends State<_PaySheet> {
   late String _type = widget.r.t.payType;
   late final _upi = TextEditingController(text: widget.r.t.upiId);
   String _mode = 'Bank';
-  int _app = 1;
+  int _app = 0;
   bool _busy = false;
 
   @override
@@ -635,6 +635,7 @@ class _PaySheetState extends State<_PaySheet> {
           note: 'Salary ${monthLabel(widget.month)}',
           ref: 'VDS${DateTime.now().millisecondsSinceEpoch}',
           package: upiApp.package,
+          activity: upiApp.activity,
         );
       }
       if (!mounted) return;
@@ -774,10 +775,13 @@ class _PaySheetState extends State<_PaySheet> {
             TextField(controller: _note, decoration: InputDecoration(hintText: tr('salary_note_hint'))),
             const SizedBox(height: 12),
             FieldLabel(tr('pay_with')),
-            Row(children: [
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(children: [
               for (var i = 0; i < upiApps.length; i++) ...[
                 if (i > 0) const SizedBox(width: 8),
-                Expanded(
+                SizedBox(
+                  width: 84,
                   child: GestureDetector(
                     onTap: () => setState(() => _app = i),
                     child: AnimatedContainer(
@@ -789,21 +793,16 @@ class _PaySheetState extends State<_PaySheet> {
                         border: Border.all(color: _app == i ? p.brand : p.border, width: _app == i ? 2 : 1),
                       ),
                       child: Column(children: [
-                        Container(
-                          width: 32,
-                          height: 32,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(color: Color(upiApps[i].color), borderRadius: BorderRadius.circular(10)),
-                          child: Text(upiApps[i].letter, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12)),
-                        ),
+                        UpiIcon(upiApps[i], size: 34),
                         const SizedBox(height: 5),
-                        Text(upiApps[i].name.split(' ').first, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11.5)),
+                        Text(upiApps[i].name.split(' ').first, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11.5)),
                       ]),
                     ),
                   ),
                 ),
               ],
             ]),
+            ),
             const SizedBox(height: 14),
             PrimaryButton(
               label: trf('pay_amount_with', {'amt': rupees(int.tryParse(_amt.text.trim()) ?? 0), 'app': upiApps[_app].name.split(' ').first}),

@@ -62,7 +62,11 @@ abstract class Backend {
   Future<String> newInstituteCode(Institute inst);
   Future<JoinCode?> lookupCode(String code);
   /// [role]: who is joining. Students may join with a batch code or the institute code.
-  Future<Membership> requestJoin({required AppUser user, required JoinCode code, String relation = '', List<String> subjects = const [], Role? role});
+  Future<Membership> requestJoin({required AppUser user, required JoinCode code, String relation = '', List<String> subjects = const [], Role? role, String childUid = '', String childName = ''});
+  /// Staff: writes each batch's student list into its batch code (parents pick their child from it).
+  Future<void> syncRoster(String instituteId);
+  /// Admin: removes a person from the coaching completely (and tells them).
+  Future<void> removeMember(Membership m, {bool deleteFees = false});
 
   // ---- batches ----
   Future<List<Batch>> batches(String instituteId);
@@ -137,6 +141,9 @@ abstract class Backend {
   // ---- VidyaDesk subscription ----
   /// Admin: "I paid for this plan, here is the UTR". The owner confirms it.
   Future<void> claimSubscription(SubPayment p);
+  /// Admin paid in a UPI app. [paidOk]: the UPI app said success → the plan starts now;
+  /// otherwise it waits for the owner. Returns the saved payment.
+  Future<SubPayment> startPlan({required Membership admin, required String plan, required bool yearly, required bool paidOk, String ref = '', String via = ''});
   /// Admin: own payments for this coaching (newest first).
   Future<List<SubPayment>> mySubPayments(String instituteId);
   /// Owner only: all coachings, payments waiting for a check, income this month.

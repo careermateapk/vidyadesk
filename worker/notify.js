@@ -41,6 +41,13 @@ export async function verifyIdToken(idToken, projectId, now = Date.now(), fetchK
   if (!ok) throw new Error('bad_signature');
   return payload.sub;
 }
+
+// Same check, but gives back the whole login (uid + email).
+export async function verifyLogin(idToken, projectId, now = Date.now(), fetchKeys = defaultKeys) {
+  await verifyIdToken(idToken, projectId, now, fetchKeys);
+  const payload = JSON.parse(b64urlDecodeStr(idToken.split('.')[1]));
+  return { uid: payload.sub, email: String(payload.email || '').toLowerCase() };
+}
 async function defaultKeys(now) {
   if (!jwks || now - jwksAt > 3600e3) {
     const r = await fetch('https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com');
@@ -176,20 +183,113 @@ export async function planReminders(env, now = Date.now()) {
   return sent;
 }
 
+// ---- VidyaDesk plans: the admin pays by UPI, the plan starts at once ----
+export const OWNER_EMAILS = ['support.sangam360@gmail.com'];
+export const DEMO_EMAILS = ['ksuraj.th@gmail.com'];
+export const PRICES = { basic: [299, 2990], standard: [599, 5990], pro: [999, 9990] };
+
+export function extendUntil(current, yearly, now = Date.now()) {
+  const d = new Date(Math.max(current || 0, now));
+  const day = d.getUTCDate();
+  if (yearly) d.setUTCFullYear(d.getUTCFullYear() + 1);
+  else d.setUTCMonth(d.getUTCMonth() + 1);
+  if (d.getUTCDate() !== day) d.setUTCDate(0); // 31 Jan + 1 month = 28/29 Feb
+  return d.getTime();
+}
+
+const fsBase = (pid) => `https://firestore.googleapis.com/v1/projects/${pid}/databases/(default)/documents`;
+const fv = (v) =>
+  typeof v === 'boolean' ? { booleanValue: v } : typeof v === 'number' ? { integerValue: String(Math.round(v)) } : { stringValue: String(v ?? '') };
+
+async function fsGet(token, pid, path) {
+  const r = await fetch(`${fsBase(pid)}/${path}`, { headers: { Authorization: `Bearer ${token}` } });
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error('firestore_' + r.status);
+  const f = (await r.json()).fields || {};
+  const o = {};
+  for (const [k, v] of Object.entries(f)) o[k] = v.stringValue ?? (v.integerValue !== undefined ? Number(v.integerValue) : v.doubleValue ?? v.booleanValue ?? null);
+  return o;
+}
+
+async function fsPatch(token, pid, path, obj, mask) {
+  const q = mask ? '?' + mask.map((m) => `updateMask.fieldPaths=${m}`).join('&') : '';
+  const fields = {};
+  for (const [k, v] of Object.entries(obj)) fields[k] = fv(v);
+  const r = await fetch(`${fsBase(pid)}/${path}${q}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields }),
+  });
+  if (!r.ok) throw new Error('firestore_write_' + r.status);
+}
+
+export function checkPlanRequest(b) {
+  const inst = String(b.inst || '');
+  if (!/^[A-Za-z0-9_-]{4,64}$/.test(inst) || inst.includes('_')) return 'bad_inst';
+  if (!PRICES[b.plan]) return 'bad_plan';
+  if (!['success', 'unsure'].includes(b.result)) return 'bad_result';
+  return null;
+}
+
+async function buyPlan(env, login, b) {
+  const bad = checkPlanRequest(b);
+  if (bad) return json({ error: bad }, 400);
+  const token = await accessToken(JSON.parse(env.SA_JSON));
+  const pid = env.PROJECT_ID;
+  const m = await membership(token, pid, login.uid, b.inst);
+  if (!m || m.role !== 'admin' || m.status !== 'approved') return json({ error: 'forbidden' }, 403);
+  const inst = await fsGet(token, pid, `institutes/${b.inst}`);
+  if (!inst) return json({ error: 'no_institute' }, 404);
+  const demo = DEMO_EMAILS.includes(login.email);
+  const yearly = b.yearly === true;
+  const amount = PRICES[b.plan][yearly ? 1 : 0];
+  const now = Date.now();
+  const start = demo || b.result === 'success';
+  const prevPlan = inst.plan || 'trial';
+  const prevUntil = Number(inst.planUntil || 0);
+  const newUntil = extendUntil(prevUntil, yearly, now);
+  const id = `${b.inst}_${now}`;
+  const pay = {
+    id,
+    instituteId: b.inst,
+    instituteName: String(inst.name || ''),
+    adminUid: login.uid,
+    adminName: String(b.adminName || '').slice(0, 80),
+    phone: String(b.phone || '').slice(0, 20),
+    plan: b.plan,
+    yearly,
+    amount,
+    utr: String(b.ref || '').slice(0, 40),
+    via: String(b.via || '').slice(0, 40),
+    status: start ? 'auto' : 'pending',
+    demo,
+    prevPlan,
+    prevUntil,
+    newUntil: start ? newUntil : 0,
+    createdAt: now,
+    decidedAt: 0,
+  };
+  await fsPatch(token, pid, `subPayments/${id}`, pay);
+  if (start) await fsPatch(token, pid, `institutes/${b.inst}`, { plan: b.plan, planUntil: newUntil }, ['plan', 'planUntil']);
+  return json({ ok: true, id, started: start, planUntil: start ? newUntil : prevUntil, amount, demo });
+}
+
 export default {
   async scheduled(event, env, ctx) {
     ctx.waitUntil(planReminders(env).catch((e) => console.log('plan reminders failed', e)));
   },
   async fetch(req, env) {
     if (req.method !== 'POST') return json({ ok: true, service: 'vidyadesk-notify' });
-    let uid;
+    let uid, login;
     try {
-      uid = await verifyIdToken((req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, ''), env.PROJECT_ID);
+      login = await verifyLogin((req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, ''), env.PROJECT_ID);
+      uid = login.uid;
     } catch (e) {
       return json({ error: String(e.message || e) }, 401);
     }
     try {
       const b = await req.json();
+      if (b.action === 'plan') return await buyPlan(env, login, b);
       const bad = checkRequest(b);
       if (bad) return json({ error: bad }, 400);
       const inst = String(b.inst);
@@ -200,7 +300,7 @@ export default {
       const sa = JSON.parse(env.SA_JSON);
       const token = await accessToken(sa);
       const m = await membership(token, env.PROJECT_ID, uid, inst);
-      if (!allowed(m, kind, topics)) return json({ error: 'forbidden' }, 403);
+      if (!OWNER_EMAILS.includes(login.email) && !allowed(m, kind, topics)) return json({ error: 'forbidden' }, 403);
       const target = topics.length === 1 ? { topic: topics[0] } : { condition: topics.map((t) => `'${t}' in topics`).join(' || ') };
       const r = await fetch(`https://fcm.googleapis.com/v1/projects/${env.PROJECT_ID}/messages:send`, {
         method: 'POST',
@@ -210,7 +310,7 @@ export default {
             ...target,
             notification: { title, body },
             android: { priority: 'HIGH', notification: { sound: 'default' } },
-            data: { kind, inst },
+            data: { kind, inst, from: uid },
           },
         }),
       });

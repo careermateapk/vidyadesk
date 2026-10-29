@@ -7,6 +7,9 @@ const ownerPayee = 'VidyaDesk';
 /// Accounts that see the owner panel (VidyaDesk owner).
 const ownerEmails = {'support.sangam360@gmail.com'};
 
+/// Test accounts: buying a plan takes no money (demo payment).
+const demoPayEmails = {'ksuraj.th@gmail.com'};
+
 /// True while the active coaching's plan has ended (3 days view-only).
 bool planReadOnly = false;
 

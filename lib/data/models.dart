@@ -81,8 +81,15 @@ class Institute {
     this.ownerName = '',
     this.ownerPhone = '',
     this.createdAt = 0,
+    this.logo = '',
+    this.gstin = '',
+    this.gstOn = false,
   });
   final String id, name, city, code, ownerUid;
+
+  /// Receipt details: logo (small base64 JPEG) and GST number (only when [gstOn]).
+  final String logo, gstin;
+  final bool gstOn;
 
   /// Subscription: trial / basic / standard / pro, and when it ends (ms).
   /// Only the VidyaDesk owner can change these.
@@ -123,6 +130,9 @@ class Institute {
     String? geoAddress,
     bool? onlineCheckin,
     List<String>? onlineUids,
+    String? logo,
+    String? gstin,
+    bool? gstOn,
   }) =>
       Institute(
         id: id,
@@ -148,10 +158,13 @@ class Institute {
         ownerName: ownerName,
         ownerPhone: ownerPhone,
         createdAt: createdAt,
+        logo: logo ?? this.logo,
+        gstin: gstin ?? this.gstin,
+        gstOn: gstOn ?? this.gstOn,
       );
 
   Map<String, dynamic> toMap() =>
-      {'id': id, 'name': name, 'city': city, 'code': code, 'ownerUid': ownerUid, 'address': address, 'phone': phone, 'upiId': upiId, 'upiName': upiName, 'dueDay': dueDay, 'lateFee': lateFee, ...geoMap, 'plan': plan, 'planUntil': planUntil, 'ownerName': ownerName, 'ownerPhone': ownerPhone, 'createdAt': createdAt};
+      {'id': id, 'name': name, 'city': city, 'code': code, 'ownerUid': ownerUid, 'address': address, 'phone': phone, 'upiId': upiId, 'upiName': upiName, 'dueDay': dueDay, 'lateFee': lateFee, ...geoMap, 'plan': plan, 'planUntil': planUntil, 'ownerName': ownerName, 'ownerPhone': ownerPhone, 'createdAt': createdAt, 'logo': logo, 'gstin': gstin, 'gstOn': gstOn};
 
   Map<String, dynamic> get geoMap => {
         'geoCheckin': geoCheckin,
@@ -186,7 +199,13 @@ class Institute {
         ownerName: _s(m['ownerName']),
         ownerPhone: _s(m['ownerPhone']),
         createdAt: _i(m['createdAt']),
+        logo: _s(m['logo']),
+        gstin: _s(m['gstin']),
+        gstOn: _b(m['gstOn']),
       );
+
+  /// What is still missing for proper fee receipts.
+  bool get receiptReady => address.trim().length >= 8;
 }
 
 /// A coaching's payment for VidyaDesk (checked by the owner using the UTR).
@@ -205,11 +224,22 @@ class SubPayment {
     this.status = 'pending',
     this.createdAt = 0,
     this.decidedAt = 0,
+    this.via = '',
+    this.demo = false,
+    this.prevPlan = '',
+    this.prevUntil = 0,
+    this.newUntil = 0,
   });
-  final String id, instituteId, instituteName, adminUid, adminName, phone, plan, utr;
+  final String id, instituteId, instituteName, adminUid, adminName, phone, plan, utr, via, prevPlan;
+  final bool demo;
+  final int prevUntil, newUntil;
   final bool yearly;
   final int amount, createdAt;
-  String status; // pending / confirmed / rejected
+  /// auto = paid in the UPI app, plan started, owner has not checked yet ·
+  /// pending = not sure it was paid, plan waits for the owner ·
+  /// confirmed · rejected (pending, money not found) · reversed (auto, money not found, plan stopped)
+  String status;
+  bool get started => status == 'auto' || status == 'confirmed';
   int decidedAt;
 
   Map<String, dynamic> toMap() => {
@@ -226,6 +256,11 @@ class SubPayment {
         'status': status,
         'createdAt': createdAt,
         'decidedAt': decidedAt,
+        'via': via,
+        'demo': demo,
+        'prevPlan': prevPlan,
+        'prevUntil': prevUntil,
+        'newUntil': newUntil,
       };
   factory SubPayment.fromMap(Map<String, dynamic> m) => SubPayment(
         id: _s(m['id']),
@@ -241,6 +276,11 @@ class SubPayment {
         status: _s(m['status']).isEmpty ? 'pending' : _s(m['status']),
         createdAt: _i(m['createdAt']),
         decidedAt: _i(m['decidedAt']),
+        via: _s(m['via']),
+        demo: _b(m['demo']),
+        prevPlan: _s(m['prevPlan']),
+        prevUntil: _i(m['prevUntil']),
+        newUntil: _i(m['newUntil']),
       );
 }
 
@@ -302,7 +342,7 @@ class Membership {
   final bool teaches;
   final List<String> subjects;
   List<String> batchIds;
-  final List<String> childUids, childNames;
+  List<String> childUids, childNames;
   final String relation;
   String studentCode;
   int monthlyFee;
@@ -436,11 +476,15 @@ class JoinCode {
     this.studentUid = '',
     this.studentName = '',
     this.createdBy = '',
+    this.roster = const [],
   });
 
   final String code;
   final CodeType type;
   final String instituteId, instituteName, batchId, batchTitle, teacherName, studentUid, studentName, createdBy;
+
+  /// Batch codes: the batch's students (uid, name) so a parent can pick their child.
+  final List<(String, String)> roster;
 
   Map<String, dynamic> toMap() => {
         'code': code,
@@ -453,6 +497,7 @@ class JoinCode {
         'studentUid': studentUid,
         'studentName': studentName,
         'createdBy': createdBy,
+        'roster': [for (final r in roster) {'u': r.$1, 'n': r.$2}],
       };
 
   factory JoinCode.fromMap(Map<String, dynamic> m) => JoinCode(
@@ -466,6 +511,11 @@ class JoinCode {
         studentUid: _s(m['studentUid']),
         studentName: _s(m['studentName']),
         createdBy: _s(m['createdBy']),
+        roster: [
+          if (m['roster'] is List)
+            for (final r in m['roster'] as List)
+              if (r is Map) (_s(r['u']), _s(r['n'])),
+        ],
       );
 }
 

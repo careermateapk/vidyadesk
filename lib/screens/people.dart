@@ -89,6 +89,8 @@ class _RequestCardState extends State<_RequestCard> {
 
       if (ok) {
         Push.send(inst: widget.r.instituteId, kind: 'approved', title: '🎉 ${tr('push_approved')}', body: widget.r.instituteName, topics: [Push.person(widget.r.instituteId, widget.r.uid)]);
+        if (_student) context.appRead.backend.syncRoster(widget.r.instituteId);
+        if (mounted) toast(context, trf('approved_toast', {'name': widget.r.name}));
       }
       HapticFeedback.mediumImpact();
       setState(() => _result = ok);
@@ -364,11 +366,97 @@ class PersonScreen extends StatelessWidget {
                   ],
                 ]),
               ],
+              if (m.role == Role.admin && x.role != Role.admin && x.uid != m.uid) ...[
+                const SizedBox(height: 20),
+                SoftButton(
+                  label: trf('remove_person', {'name': x.name.split(' ').first}),
+                  icon: Icons.person_remove_rounded,
+                  color: p.dangerTint,
+                  textColor: p.danger,
+                  onPressed: () => _remove(context),
+                ),
+              ],
             ],
           );
         },
       ),
     );
+  }
+
+  Future<void> _remove(BuildContext context) async {
+    final x = person;
+    var delFees = false;
+    final ok = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (c) {
+        final p = c.pal;
+        final first = x.name.split(' ').first;
+        return StatefulBuilder(
+          builder: (c, set) => SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Center(child: IconBox(Icons.delete_outline_rounded, fg: p.danger, bg: p.dangerTint, size: 60)),
+                const SizedBox(height: 12),
+                Text(trf('remove_q', {'name': first}), textAlign: TextAlign.center, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 6),
+                Text(trf('remove_sub', {'name': first, 'inst': x.instituteName}), textAlign: TextAlign.center, style: TextStyle(color: p.muted, height: 1.45)),
+                const SizedBox(height: 12),
+                AppCard(
+                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                  child: Column(children: [
+                    CheckboxListTile(dense: true, value: true, onChanged: null, title: Text(tr('remove_profile_items'), style: const TextStyle(fontWeight: FontWeight.w600))),
+                    if (x.role == Role.student) ...[
+                      CheckboxListTile(dense: true, value: true, onChanged: null, title: Text(tr('remove_parent_link'), style: const TextStyle(fontWeight: FontWeight.w600))),
+                      CheckboxListTile(
+                        dense: true,
+                        value: delFees,
+                        activeColor: p.danger,
+                        onChanged: (v) => set(() => delFees = v ?? false),
+                        title: Text(tr('remove_fees_too'), style: const TextStyle(fontWeight: FontWeight.w600)),
+                        subtitle: Text(tr('remove_fees_keep_hint')),
+                      ),
+                    ],
+                  ]),
+                ),
+                const SizedBox(height: 10),
+                Row(children: [
+                  Icon(Icons.notifications_active_outlined, size: 18, color: p.brand),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(trf('remove_notify', {'name': first}), style: TextStyle(fontWeight: FontWeight.w700, color: p.ink2, fontSize: 13))),
+                ]),
+                const SizedBox(height: 14),
+                FilledButton(
+                  style: FilledButton.styleFrom(backgroundColor: p.danger, minimumSize: const Size.fromHeight(52), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+                  onPressed: () => Navigator.pop(c, true),
+                  child: Text(tr('yes_remove'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                ),
+                TextButton(onPressed: () => Navigator.pop(c, false), child: Text(tr('cancel'))),
+              ]),
+            ),
+          ),
+        );
+      },
+    );
+    if (ok != true || !context.mounted) return;
+    final app = context.appRead;
+    try {
+      await Push.send(
+        inst: x.instituteId,
+        kind: 'removed',
+        title: trf('push_removed', {'inst': x.instituteName}),
+        body: tr('push_removed_body'),
+        topics: [Push.person(x.instituteId, x.uid)],
+      );
+      await app.backend.removeMember(x, deleteFees: delFees);
+      if (!context.mounted) return;
+      toast(context, trf('removed_done', {'name': x.name}));
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (context.mounted) toast(context, errorMessage(e));
+    }
   }
 
   Widget _kv(Palette p, IconData i, String k, String v) => Padding(
@@ -426,6 +514,7 @@ class _InstituteCodeScreenState extends State<InstituteCodeScreen> {
         key: ValueKey(_v),
         load: () async {
           final b = context.appRead.backend;
+          b.syncRoster(widget.m.instituteId);
           return (await b.institute(widget.m.instituteId), await b.batches(widget.m.instituteId));
         },
         builder: (context, d, reload) {

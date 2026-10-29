@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -6,12 +8,14 @@ import '../core/plan.dart';
 import '../core/strings.dart';
 import '../core/theme.dart';
 import '../data/models.dart';
+import '../services/push.dart';
+import '../services/receipt.dart' show buildPlanReceipt;
 import '../services/upi.dart';
 import '../ui/mascot.dart';
 import '../ui/widgets.dart';
 import 'common.dart';
 import 'onboarding.dart' show roleIcon, roleName;
-import 'payments.dart' show askUtr;
+import 'file_sheet.dart';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -260,7 +264,7 @@ class _PlansScreenState extends State<PlansScreen> {
         load: () => app.backend.mySubPayments(widget.m.instituteId),
         builder: (context, pays, reload) {
           final waiting = pays.where((x) => x.status == 'pending').toList();
-          final lastNo = pays.where((x) => x.status == 'rejected' && DateTime.now().millisecondsSinceEpoch - x.decidedAt < 7 * 86400000).firstOrNull;
+          final lastNo = pays.where((x) => (x.status == 'rejected' || x.status == 'reversed') && DateTime.now().millisecondsSinceEpoch - x.decidedAt < 15 * 86400000).firstOrNull;
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 6, 16, 30),
             children: [
@@ -288,7 +292,7 @@ class _PlansScreenState extends State<PlansScreen> {
                   child: AppCard(
                     color: p.dangerTint,
                     padding: const EdgeInsets.all(14),
-                    child: Text(trf('sub_not_found', {'utr': lastNo.utr}), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: p.danger, height: 1.4)),
+                    child: Text(trf('sub_not_found', {'plan': planName(planFrom(lastNo.plan)), 'amt': rupees(lastNo.amount)}), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: p.danger, height: 1.4)),
                   ),
                 ),
               _Segment(yearly: _yearly, onChanged: (v) => setState(() => _yearly = v)),
@@ -439,6 +443,110 @@ class _PlanCard extends StatelessWidget {
   }
 }
 
+/// The coaching's VidyaDesk plan and every payment (with receipts).
+class MyPlanScreen extends StatelessWidget {
+  const MyPlanScreen({super.key, required this.m});
+  final Membership m;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pal;
+    final app = context.app;
+    final st = app.plan;
+    return Scaffold(
+      appBar: InnerBar(title: tr('my_plan'), subtitle: m.instituteName),
+      body: Loader<List<SubPayment>>(
+        key: ValueKey(st?.until ?? 0),
+        load: () => app.backend.mySubPayments(m.instituteId),
+        builder: (context, pays, reload) => RefreshIndicator(
+          onRefresh: () async {
+            await app.loadInstitute();
+            await reload();
+          },
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 30),
+            children: [
+              if (st != null)
+                AppCard(
+                  gradient: const LinearGradient(colors: [Color(0xFF7A6AF0), Color(0xFF5545D6)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                  padding: const EdgeInsets.all(18),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    Row(children: [
+                      Expanded(
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text(tr('current_plan_caps'), style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: .6)),
+                          Text(planName(st.plan), style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800)),
+                          Text(
+                            st.active ? '${trf('till_date', {'date': _date(st.endDate)})} · ${trf('n_days_left', {'n': '${st.daysLeft}'})}' : tr('plan_ended'),
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
+                          ),
+                        ]),
+                      ),
+                      const Icon(Icons.workspace_premium_rounded, color: Colors.white, size: 42),
+                    ]),
+                    const SizedBox(height: 14),
+                    Row(children: [
+                      Expanded(
+                        child: SizedBox(
+                          height: 42,
+                          child: FilledButton(
+                            style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: p.brandDeep, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                            onPressed: () => push(context, PlansScreen(m: m, pick: st.plan == Plan.pro ? Plan.pro : (st.trial ? Plan.standard : paidPlans[(paidPlans.indexOf(st.plan) + 1).clamp(0, 2)]))),
+                            child: Text(st.trial ? tr('choose_plan') : (st.plan == Plan.pro ? tr('renew_now') : tr('upgrade_now')), style: const TextStyle(fontWeight: FontWeight.w800)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: SizedBox(
+                          height: 42,
+                          child: FilledButton(
+                            style: FilledButton.styleFrom(backgroundColor: Colors.white.withValues(alpha: .2), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                            onPressed: () => push(context, PlansScreen(m: m)),
+                            child: Text(tr('see_plans'), style: const TextStyle(fontWeight: FontWeight.w800)),
+                          ),
+                        ),
+                      ),
+                    ]),
+                  ]),
+                ),
+              const SizedBox(height: 18),
+              SectionTitle(tr('payment_history')),
+              if (pays.isEmpty) Text(tr('no_plan_payments'), style: TextStyle(color: p.muted)),
+              for (final x in pays)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: AppCard(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(children: [
+                      IconBox(Icons.receipt_long_rounded, fg: p.brand, bg: p.brandTint),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text('${planName(planFrom(x.plan))} · ${x.yearly ? tr('one_year') : tr('one_month')}', style: const TextStyle(fontWeight: FontWeight.w800)),
+                          Text('${_date(DateTime.fromMillisecondsSinceEpoch(x.createdAt))}${x.via.isEmpty ? '' : ' · ${x.via}'}', style: TextStyle(color: p.muted, fontSize: 12.5)),
+                        ]),
+                      ),
+                      Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                        Text(x.demo ? 'DEMO' : rupees(x.amount), style: const TextStyle(fontWeight: FontWeight.w800)),
+                        Text(tr('pay_status_${x.status}'), style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: x.started ? p.success : (x.status == 'pending' ? p.warn : p.danger))),
+                      ]),
+                      if (x.started) ...[
+                        const SizedBox(width: 6),
+                        IconBtn(icon: Icons.download_rounded, box: 38, size: 18, tooltip: tr('receipt'), onTap: () => planReceipt(context, x)),
+                      ],
+                    ]),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class ComparePlansScreen extends StatelessWidget {
   const ComparePlansScreen({super.key});
   @override
@@ -498,103 +606,293 @@ class ComparePlansScreen extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Paying for a plan (UPI to the VidyaDesk owner, then UTR)
+// Paying for a plan (UPI to the VidyaDesk owner — no UTR to type)
 // ---------------------------------------------------------------------------
 
-Future<UpiApp?> _pickApp(BuildContext context, int amount) => showModalBottomSheet<UpiApp>(
-      context: context,
-      builder: (c) {
-        final p = c.pal;
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
-            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Text(trf('pay_amt_upi', {'amt': rupees(amount)}), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 4),
-              Row(children: [
-                Expanded(child: Text('${tr('to')} $ownerUpi', style: TextStyle(color: p.muted, fontWeight: FontWeight.w600))),
-                TextButton.icon(onPressed: () => copyText(c, ownerUpi), icon: const Icon(Icons.copy_rounded, size: 16), label: Text(tr('copy'))),
-              ]),
-              const SizedBox(height: 6),
-              for (final a in upiApps)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Container(
-                    width: 40,
-                    height: 40,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(color: Color(a.color), borderRadius: BorderRadius.circular(12)),
-                    child: Text(a.letter, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-                  ),
-                  title: Text(a.name, style: const TextStyle(fontWeight: FontWeight.w700)),
-                  trailing: Icon(Icons.chevron_right_rounded, color: p.muted),
-                  onTap: () => Navigator.pop(c, a),
-                ),
+class _PayPlanSheet extends StatefulWidget {
+  const _PayPlanSheet({required this.plan, required this.yearly, required this.demo});
+  final Plan plan;
+  final bool yearly, demo;
+  @override
+  State<_PayPlanSheet> createState() => _PayPlanSheetState();
+}
+
+class _PayPlanSheetState extends State<_PayPlanSheet> {
+  int _app = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pal;
+    final lim = planLimit[widget.plan]!;
+    final amount = planAmount(widget.plan, widget.yearly);
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text('${planName(widget.plan)} · ${widget.yearly ? tr('one_year') : tr('one_month')}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 2),
+          Text(
+            '${lim.$1 < 0 ? tr('unlimited_students') : trf('n_students', {'n': '${lim.$1}'})} · ${lim.$2 < 0 ? tr('unlimited_teachers') : trf('n_teachers', {'n': '${lim.$2}'})}',
+            style: TextStyle(color: p.muted, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 12),
+          AppCard(
+            padding: const EdgeInsets.all(16),
+            child: Row(children: [
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(tr('total'), style: TextStyle(color: p.muted, fontWeight: FontWeight.w600)),
+                  Text(rupees(amount), style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800)),
+                ]),
+              ),
+              if (widget.yearly) Tag(tr('two_months_free'), fg: p.success, bg: p.successTint),
+              if (widget.demo) ...[const SizedBox(width: 6), Tag('DEMO', fg: p.warn, bg: p.warnTint)],
             ]),
           ),
-        );
-      },
+          if (!widget.demo) ...[
+            const SizedBox(height: 12),
+            FieldLabel(tr('pay_with')),
+            SizedBox(
+              height: 92,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: upiApps.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                itemBuilder: (_, i) => GestureDetector(
+                  onTap: () => setState(() => _app = i),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    width: 92,
+                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+                    decoration: BoxDecoration(
+                      color: _app == i ? p.brandTint : p.card,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: _app == i ? p.brand : p.border, width: _app == i ? 2 : 1),
+                    ),
+                    child: Column(children: [
+                      UpiIcon(upiApps[i], size: 40),
+                      const SizedBox(height: 6),
+                      Text(upiApps[i].name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                    ]),
+                  ),
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: 14),
+          PrimaryButton(
+            label: widget.demo ? tr('demo_pay') : trf('pay_amt_upi', {'amt': rupees(amount)}),
+            icon: Icons.bolt_rounded,
+            arrow: false,
+            onPressed: () => Navigator.pop(context, widget.demo ? _chooserApp : upiApps[_app.clamp(0, upiApps.length - 1)]),
+          ),
+          const SizedBox(height: 8),
+          Text(widget.demo ? tr('demo_pay_note') : tr('no_utr_note'), textAlign: TextAlign.center, style: TextStyle(color: p.muted, fontSize: 12.5)),
+        ]),
+      ),
     );
+  }
+}
 
-/// Returns true when a payment was sent for checking.
+const _chooserApp = UpiApp('Demo', '', 'D', 0xFF6C5CE7);
+
+/// Pays for [plan] and starts it. Returns true when the plan started (or is waiting for a check).
 Future<bool> payForPlan(BuildContext context, Membership m, Plan plan, bool yearly) async {
   final app = context.appRead;
+  final demo = app.isDemo || demoPayEmails.contains((app.profile?.email ?? app.signedIn?.email ?? '').toLowerCase());
   final amount = planAmount(plan, yearly);
-  final upiApp = await _pickApp(context, amount);
+  final upiApp = await showModalBottomSheet<UpiApp>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (_) => _PayPlanSheet(plan: plan, yearly: yearly, demo: demo),
+  );
   if (upiApp == null || !context.mounted) return false;
-  final ref = 'VDP${DateTime.now().millisecondsSinceEpoch}';
-  UpiResult res;
-  if (app.isDemo) {
-    await Future<void>.delayed(const Duration(milliseconds: 700));
-    res = UpiResult(UpiStatus.success, utr: '${DateTime.now().millisecondsSinceEpoch}'.substring(1, 13));
+  var paidOk = false;
+  var ref = '';
+  if (demo) {
+    paidOk = true;
+    ref = 'DEMO${DateTime.now().millisecondsSinceEpoch % 100000000}';
   } else {
-    res = await payByUpi(
+    final res = await payByUpi(
       vpa: ownerUpi,
       payee: ownerPayee,
       amount: amount,
       note: 'VidyaDesk ${plan.name} ${yearly ? 'year' : 'month'}',
-      ref: ref,
+      ref: 'VDP${DateTime.now().millisecondsSinceEpoch}',
       package: upiApp.package,
+      activity: upiApp.activity,
     );
+    if (!context.mounted) return false;
+    switch (res.status) {
+      case UpiStatus.noApp:
+        toast(context, trf('upi_no_app', {'app': upiApp.name}));
+        return false;
+      case UpiStatus.failed:
+        toast(context, tr('upi_failed'));
+        return false;
+      case UpiStatus.success:
+        paidOk = true;
+        ref = res.utr;
+      case UpiStatus.unknown:
+        // The UPI app did not say. Ask once (no UTR needed).
+        final cut = await showDialog<bool>(
+          context: context,
+          builder: (c) => AlertDialog(
+            title: Text(tr('was_money_cut')),
+            content: Text(tr('was_money_cut_sub')),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(c, false), child: Text(tr('no_not_paid'))),
+              FilledButton(onPressed: () => Navigator.pop(c, true), child: Text(tr('yes_paid'))),
+            ],
+          ),
+        );
+        if (cut != true || !context.mounted) return false;
+        ref = res.utr;
+    }
   }
   if (!context.mounted) return false;
-  if (res.status == UpiStatus.failed) {
-    toast(context, tr('upi_failed'));
-    return false;
-  }
-  if (res.status == UpiStatus.noApp) toast(context, trf('upi_no_app', {'app': upiApp.name}));
-  final utr = await askUtr(context, res.utr);
-  if (utr == null || !context.mounted) return false;
+  SubPayment pay;
   try {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    await app.backend.claimSubscription(SubPayment(
-      id: '${m.instituteId}_$now',
-      instituteId: m.instituteId,
-      instituteName: m.instituteName,
-      adminUid: m.uid,
-      adminName: m.name,
-      phone: m.phone,
-      plan: plan.name,
-      yearly: yearly,
-      amount: amount,
-      utr: utr,
-      createdAt: now,
-    ));
+    pay = await app.backend.startPlan(admin: m, plan: plan.name, yearly: yearly, paidOk: paidOk, ref: ref, via: demo ? 'Demo' : upiApp.name);
   } catch (e) {
-    if (context.mounted) toast(context, errorMessage(e));
+    if (context.mounted) toast(context, tr('err_plan_start'));
     return false;
   }
+  await app.loadInstitute();
   if (!context.mounted) return true;
-  await showDialog<void>(
-    context: context,
-    builder: (c) => AlertDialog(
-      icon: Icon(Icons.verified_rounded, color: c.pal.success, size: 40),
-      title: Text(tr('sub_sent_title')),
-      content: Text(trf('sub_sent_body', {'utr': utr}), textAlign: TextAlign.center),
-      actions: [FilledButton(onPressed: () => Navigator.pop(c), child: Text(tr('ok')))],
-    ),
-  );
+  if (pay.started) {
+    await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => PlanSuccessScreen(pay: pay)));
+  } else {
+    await showDialog<void>(
+      context: context,
+      builder: (c) => AlertDialog(
+        icon: Icon(Icons.hourglass_top_rounded, color: c.pal.warn, size: 40),
+        title: Text(tr('sub_sent_title')),
+        content: Text(tr('sub_wait_body'), textAlign: TextAlign.center),
+        actions: [FilledButton(onPressed: () => Navigator.pop(c), child: Text(tr('ok')))],
+      ),
+    );
+  }
   return true;
+}
+
+/// Opens the receipt of a plan payment (download / share).
+Future<void> planReceipt(BuildContext context, SubPayment p) => showFileSheet(context, title: tr('receipt'), files: [
+      FileOption(
+        label: 'PDF',
+        name: 'VidyaDesk_${planFrom(p.plan).name}_${DateTime.fromMillisecondsSinceEpoch(p.createdAt).toIso8601String().substring(0, 10)}.pdf',
+        mime: 'application/pdf',
+        make: () => buildPlanReceipt(p, planLabel: planName(planFrom(p.plan))),
+        text: 'VidyaDesk plan receipt',
+      ),
+    ]);
+
+/// Confetti + owl after a plan starts.
+class PlanSuccessScreen extends StatefulWidget {
+  const PlanSuccessScreen({super.key, required this.pay});
+  final SubPayment pay;
+  @override
+  State<PlanSuccessScreen> createState() => _PlanSuccessScreenState();
+}
+
+class _PlanSuccessScreenState extends State<PlanSuccessScreen> with SingleTickerProviderStateMixin {
+  late final AnimationController _a = AnimationController(vsync: this, duration: const Duration(milliseconds: 2600))..forward();
+
+  @override
+  void initState() {
+    super.initState();
+    HapticFeedback.heavyImpact();
+  }
+
+  @override
+  void dispose() {
+    _a.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pal;
+    final pay = widget.pay;
+    final plan = planFrom(pay.plan);
+    final until = DateTime.fromMillisecondsSinceEpoch(pay.newUntil);
+    final rows = [
+      (tr('plan'), '${planName(plan)} · ${pay.yearly ? tr('one_year') : tr('one_month')}'),
+      (tr('amount'), pay.demo ? '${rupees(0)} (DEMO)' : rupees(pay.amount)),
+      if (pay.via.isNotEmpty) (tr('paid_via'), pay.via),
+      if (pay.utr.isNotEmpty) (tr('upi_ref'), pay.utr),
+      (tr('valid_till'), _date(until)),
+    ];
+    return Scaffold(
+      body: Stack(children: [
+        Positioned.fill(child: IgnorePointer(child: Confetti(animation: _a))),
+        SafeArea(
+          child: ListView(padding: const EdgeInsets.fromLTRB(22, 30, 22, 30), children: [
+            ScaleTransition(
+              scale: CurvedAnimation(parent: _a, curve: const Interval(0, .35, curve: Curves.elasticOut)),
+              child: const Center(child: Mascot(size: 180, book: false, wave: true)),
+            ),
+            const SizedBox(height: 6),
+            FadeIn(child: Text(trf('plan_started_title', {'plan': planName(plan)}), textAlign: TextAlign.center, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800))),
+            const SizedBox(height: 6),
+            Text(trf('plan_started_sub', {'inst': pay.instituteName, 'date': _date(until)}), textAlign: TextAlign.center, style: TextStyle(color: p.muted, fontSize: 14, height: 1.5)),
+            const SizedBox(height: 20),
+            AppCard(
+              child: Column(children: [
+                for (final r in rows)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 5),
+                    child: Row(children: [
+                      Expanded(child: Text(r.$1, style: TextStyle(color: p.muted, fontWeight: FontWeight.w600))),
+                      Text(r.$2, style: const TextStyle(fontWeight: FontWeight.w800)),
+                    ]),
+                  ),
+              ]),
+            ),
+            const SizedBox(height: 14),
+            Row(children: [
+              Expanded(child: SoftButton(label: tr('receipt'), icon: Icons.download_rounded, onPressed: () => planReceipt(context, pay))),
+              const SizedBox(width: 10),
+              Expanded(child: PrimaryButton(label: tr('lets_start'), arrow: false, onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst))),
+            ]),
+          ]),
+        ),
+      ]),
+    );
+  }
+}
+
+/// Falling confetti pieces.
+class Confetti extends StatelessWidget {
+  const Confetti({super.key, required this.animation});
+  final Animation<double> animation;
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(animation: animation, builder: (_, _) => CustomPaint(painter: _ConfettiPainter(animation.value)));
+}
+
+class _ConfettiPainter extends CustomPainter {
+  _ConfettiPainter(this.t);
+  final double t;
+  static const _colors = [Color(0xFF6C5CE7), Color(0xFF12B886), Color(0xFFE8930C), Color(0xFFF0466E), Color(0xFF3B9EF5)];
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (var i = 0; i < 70; i++) {
+      final seed = (i * 9301 + 49297) % 233280 / 233280.0;
+      final x = ((i * 37) % 100) / 100 * size.width + 30 * math.sin(t * 6 + i);
+      final y = -40 + (t * (0.9 + seed)) * (size.height + 80) - (i % 7) * 30;
+      if (y < -30 || y > size.height + 20) continue;
+      canvas.save();
+      canvas.translate(x, y);
+      canvas.rotate(t * 8 * (seed - .5) + i);
+      final paint = Paint()..color = _colors[i % 5].withValues(alpha: (1.2 - t).clamp(0, 1));
+      canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromCenter(center: Offset.zero, width: 7 + (i % 3) * 3, height: 11 + (i % 4) * 2), const Radius.circular(2)), paint);
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ConfettiPainter old) => old.t != t;
 }
 
 // ---------------------------------------------------------------------------
@@ -733,11 +1031,11 @@ class _OwnerPanelScreenState extends State<OwnerPanelScreen> {
       final sure = await showDialog<bool>(
         context: context,
         builder: (c) => AlertDialog(
-          title: Text(tr('payment_not_found_q')),
-          content: Text(trf('payment_not_found_body', {'utr': s.utr})),
+          title: Text(s.status == 'auto' ? tr('stop_plan_q') : tr('payment_not_found_q')),
+          content: Text(trf(s.status == 'auto' ? 'stop_plan_body' : 'payment_not_found_body', {'inst': s.instituteName, 'amt': rupees(s.amount)})),
           actions: [
             TextButton(onPressed: () => Navigator.pop(c, false), child: Text(tr('cancel'))),
-            FilledButton(onPressed: () => Navigator.pop(c, true), child: Text(tr('not_received'))),
+            FilledButton(style: FilledButton.styleFrom(backgroundColor: c.pal.danger), onPressed: () => Navigator.pop(c, true), child: Text(s.status == 'auto' ? tr('stop_plan') : tr('not_received'))),
           ],
         ),
       );
@@ -746,8 +1044,18 @@ class _OwnerPanelScreenState extends State<OwnerPanelScreen> {
     if (!mounted) return;
     setState(() => _busy.add(s.id));
     try {
+      final wasAuto = s.status == 'auto';
       await context.appRead.backend.decideSubPayment(s, ok);
-      if (mounted) toast(context, ok ? trf('plan_started', {'inst': s.instituteName}) : tr('marked_not_received'));
+      if (!ok || !wasAuto) {
+        Push.send(
+          inst: s.instituteId,
+          kind: 'plan',
+          title: ok ? '✅ ${trf('push_plan_ok', {'plan': planName(planFrom(s.plan))})}' : '⚠️ ${tr('push_plan_no')}',
+          body: ok ? s.instituteName : trf('push_plan_no_body', {'amt': rupees(s.amount)}),
+          topics: [Push.admins(s.instituteId)],
+        );
+      }
+      if (mounted) toast(context, ok ? (wasAuto ? tr('marked_ok') : trf('plan_started', {'inst': s.instituteName})) : (wasAuto ? tr('plan_stopped') : tr('marked_not_received')));
       if (ok && context.appRead.active?.instituteId == s.instituteId && mounted) await context.appRead.loadInstitute();
       if (mounted) setState(() => _v++);
     } catch (e) {
@@ -822,7 +1130,7 @@ class _OwnerPanelScreenState extends State<OwnerPanelScreen> {
                   kpi(tr('locked'), '${locked.length}', p.danger),
                 ]),
                 const SizedBox(height: 18),
-                SectionTitle(tr('confirm_payments'), trailing: d.pending.isEmpty ? null : Tag(trf('n_new', {'n': '${d.pending.length}'}), fg: p.danger, bg: p.dangerTint)),
+                SectionTitle(tr('check_payments'), trailing: d.pending.isEmpty ? null : Tag(trf('n_new', {'n': '${d.pending.length}'}), fg: p.danger, bg: p.dangerTint)),
                 if (d.pending.isEmpty)
                   Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(tr('no_payments_waiting'), style: TextStyle(color: p.muted))),
                 for (final s in d.pending)
@@ -830,30 +1138,58 @@ class _OwnerPanelScreenState extends State<OwnerPanelScreen> {
                     padding: const EdgeInsets.only(bottom: 10),
                     child: AppCard(
                       padding: const EdgeInsets.all(14),
+                      border: s.status == 'pending' ? p.warn : null,
                       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                         Row(children: [
                           Expanded(
                             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              Text(s.instituteName, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                              Wrap(spacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                                Text(s.instituteName, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                                if (s.demo) Tag('DEMO', fg: p.warn, bg: p.warnTint),
+                              ]),
                               Text('${planName(planFrom(s.plan))} · ${s.yearly ? tr('one_year') : tr('one_month')} · ${s.adminName}', style: TextStyle(color: p.muted, fontSize: 12.5)),
+                              Text('${_date(DateTime.fromMillisecondsSinceEpoch(s.createdAt))} · ${TimeOfDay.fromDateTime(DateTime.fromMillisecondsSinceEpoch(s.createdAt)).format(context)}${s.via.isEmpty ? '' : ' · ${s.via}'}',
+                                  style: TextStyle(color: p.muted, fontSize: 12)),
                             ]),
                           ),
                           Text(rupees(s.amount), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
                         ]),
                         const SizedBox(height: 6),
-                        Row(children: [
-                          Expanded(child: SelectableText('UTR ${s.utr}', style: TextStyle(fontWeight: FontWeight.w700, color: p.ink2, letterSpacing: .4))),
-                          IconBtn(icon: Icons.copy_rounded, box: 36, size: 18, tooltip: tr('copy'), onTap: () => copyText(context, s.utr)),
-                          if (s.phone.isNotEmpty) ...[
-                            const SizedBox(width: 6),
-                            IconBtn(icon: Icons.call_rounded, box: 36, size: 18, tooltip: tr('call'), onTap: () => callPhone(context, s.phone)),
-                          ],
-                        ]),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(color: s.status == 'auto' ? p.successTint : p.warnTint, borderRadius: BorderRadius.circular(10)),
+                          child: Text(s.status == 'auto' ? tr('owner_auto_note') : tr('owner_pending_note'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: s.status == 'auto' ? p.success : p.warn)),
+                        ),
+                        if (s.utr.isNotEmpty || s.phone.isNotEmpty)
+                          Row(children: [
+                            Expanded(child: SelectableText(s.utr.isEmpty ? '' : '${tr('upi_ref')} ${s.utr}', style: TextStyle(fontWeight: FontWeight.w700, color: p.ink2, letterSpacing: .3))),
+                            if (s.utr.isNotEmpty) IconBtn(icon: Icons.copy_rounded, box: 36, size: 18, tooltip: tr('copy'), onTap: () => copyText(context, s.utr)),
+                            if (s.phone.isNotEmpty) ...[
+                              const SizedBox(width: 6),
+                              IconBtn(icon: Icons.call_rounded, box: 36, size: 18, tooltip: tr('call'), onTap: () => callPhone(context, s.phone)),
+                            ],
+                          ]),
                         const SizedBox(height: 10),
                         Row(children: [
-                          Expanded(child: SoftButton(label: tr('not_received'), height: 42, color: p.dangerTint, textColor: p.danger, onPressed: _busy.contains(s.id) ? null : () => _decide(s, false))),
+                          Expanded(
+                            child: SoftButton(
+                              label: s.status == 'auto' ? tr('stop_plan') : tr('not_received'),
+                              height: 44,
+                              color: p.dangerTint,
+                              textColor: p.danger,
+                              onPressed: _busy.contains(s.id) ? null : () => _decide(s, false),
+                            ),
+                          ),
                           const SizedBox(width: 8),
-                          Expanded(child: SoftButton(label: tr('confirm_start'), height: 42, color: p.successTint, textColor: p.success, onPressed: _busy.contains(s.id) ? null : () => _decide(s, true))),
+                          Expanded(
+                            child: SoftButton(
+                              label: s.status == 'auto' ? tr('money_ok') : tr('confirm_start'),
+                              height: 44,
+                              color: p.successTint,
+                              textColor: p.success,
+                              onPressed: _busy.contains(s.id) ? null : () => _decide(s, true),
+                            ),
+                          ),
                         ]),
                       ]),
                     ),

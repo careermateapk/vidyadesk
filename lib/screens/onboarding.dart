@@ -22,22 +22,13 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
   late final AnimationController _owl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100))..forward();
-  Timer? _t;
-
-  @override
-  void initState() {
-    super.initState();
-    _t = Timer(const Duration(milliseconds: 2600), _go);
-  }
-
+  // No timer: the app moves on only when "Get started" is tapped.
   void _go() {
-    _t?.cancel();
     if (mounted) context.appRead.finishSplash();
   }
 
   @override
   void dispose() {
-    _t?.cancel();
     _owl.dispose();
     super.dispose();
   }
@@ -86,7 +77,12 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               const SizedBox(height: 26),
               FadeIn(
                 delay: const Duration(milliseconds: 700),
-                child: Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: PrimaryButton(label: tr('get_started'), onPressed: _go)),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: context.app.ready && context.app.signedIn == null
+                      ? PrimaryButton(label: tr('get_started'), onPressed: _go)
+                      : const SizedBox(height: 56, child: Center(child: SizedBox(width: 26, height: 26, child: CircularProgressIndicator(strokeWidth: 3)))),
+                ),
               ),
               const SizedBox(height: 18),
               Text(tr('made_in_india'), style: TextStyle(color: p.muted, fontSize: 12, fontWeight: FontWeight.w600)),

@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/services.dart';
 
 import '../core/app_state.dart';
@@ -66,7 +69,7 @@ class _PaySheet extends StatefulWidget {
 }
 
 class _PaySheetState extends State<_PaySheet> {
-  int _app = 1;
+  int _app = 0;
   bool _busy = false;
 
   Future<void> _pay() async {
@@ -88,6 +91,7 @@ class _PaySheetState extends State<_PaySheet> {
           note: '${widget.studentName} ${monthLabel(widget.month)} fee',
           ref: ref,
           package: upi.package,
+          activity: upi.activity,
         );
       }
       if (!mounted) return;
@@ -192,13 +196,7 @@ class _PaySheetState extends State<_PaySheet> {
                     border: Border.all(color: _app == i ? p.brand : p.border, width: _app == i ? 2 : 1),
                   ),
                   child: Row(children: [
-                    Container(
-                      width: 38,
-                      height: 38,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(color: Color(upiApps[i].color), borderRadius: BorderRadius.circular(11)),
-                      child: Text(upiApps[i].letter, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-                    ),
+                    UpiIcon(upiApps[i], size: 40),
                     const SizedBox(width: 12),
                     Expanded(child: Text(upiApps[i].name, style: const TextStyle(fontWeight: FontWeight.w800))),
                     Icon(_app == i ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded, color: _app == i ? p.brand : p.border),
@@ -271,6 +269,8 @@ class _ConfirmPaymentsScreenState extends State<ConfirmPaymentsScreen> {
   final Map<String, bool> _done = {};
 
   Future<void> _decide(FeeRecord f, bool ok) async {
+    if (ok && !await ensureReceiptAddress(context, widget.m)) return;
+    if (!mounted) return;
     setState(() => _busy.add(f.id));
     try {
       final now = DateTime.now().millisecondsSinceEpoch;
@@ -412,10 +412,23 @@ class _InstituteSettingsScreenState extends State<InstituteSettingsScreen> {
   Institute? _inst;
   final _name = TextEditingController(), _city = TextEditingController(), _addr = TextEditingController();
   final _phone = TextEditingController(), _upi = TextEditingController(), _upiName = TextEditingController();
-  final _late = TextEditingController();
+  final _late = TextEditingController(), _gst = TextEditingController();
   int _dueDay = 10;
   bool _busy = false;
-  String? _upiErr;
+  String? _upiErr, _gstErr, _addrErr;
+  String _logo = '';
+  bool _gstOn = false;
+
+  Future<void> _pickLogo() async {
+    try {
+      final f = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 320, maxHeight: 320, imageQuality: 75);
+      if (f == null) return;
+      final b = await f.readAsBytes();
+      setState(() => _logo = base64Encode(b));
+    } catch (_) {
+      if (mounted) toast(context, tr('err_photo'));
+    }
+  }
 
   @override
   void initState() {
@@ -432,13 +445,16 @@ class _InstituteSettingsScreenState extends State<InstituteSettingsScreen> {
         _upiName.text = i.upiName;
         _dueDay = i.dueDay;
         _late.text = i.lateFee == 0 ? '' : '${i.lateFee}';
+        _logo = i.logo;
+        _gstOn = i.gstOn;
+        _gst.text = i.gstin;
       });
     });
   }
 
   @override
   void dispose() {
-    for (final c in [_name, _city, _addr, _phone, _upi, _upiName, _late]) {
+    for (final c in [_name, _city, _addr, _phone, _upi, _upiName, _late, _gst]) {
       c.dispose();
     }
     super.dispose();
@@ -450,9 +466,16 @@ class _InstituteSettingsScreenState extends State<InstituteSettingsScreen> {
       setState(() => _upiErr = tr('err_upi'));
       return;
     }
+    final gst = _gst.text.trim().toUpperCase();
+    if (_gstOn && !RegExp(r'^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$').hasMatch(gst)) {
+      setState(() => _gstErr = tr('err_gstin'));
+      return;
+    }
     setState(() {
       _busy = true;
       _upiErr = null;
+      _gstErr = null;
+      _addrErr = null;
     });
     try {
       final i = _inst!.copyWith(
@@ -464,6 +487,9 @@ class _InstituteSettingsScreenState extends State<InstituteSettingsScreen> {
         upiName: _upiName.text.trim(),
         dueDay: _dueDay,
         lateFee: int.tryParse(_late.text.trim()) ?? 0,
+        logo: _logo,
+        gstOn: _gstOn,
+        gstin: _gstOn ? gst : '',
       );
       await context.appRead.backend.updateInstitute(i);
       if (!mounted) return;
@@ -495,10 +521,67 @@ class _InstituteSettingsScreenState extends State<InstituteSettingsScreen> {
           : ListView(
               padding: const EdgeInsets.fromLTRB(18, 6, 18, 20),
               children: [
+                Text(tr('receipt_details_sub'), style: TextStyle(color: p.muted, fontSize: 12.5, fontWeight: FontWeight.w600, height: 1.4)),
+                const SizedBox(height: 12),
+                AppCard(
+                  padding: const EdgeInsets.all(14),
+                  onTap: _pickLogo,
+                  child: Row(children: [
+                    Container(
+                      width: 68,
+                      height: 68,
+                      decoration: BoxDecoration(color: p.brandTint, borderRadius: BorderRadius.circular(18), border: Border.all(color: p.brand, width: 1.5)),
+                      clipBehavior: Clip.antiAlias,
+                      child: Avatar.bytesOf(_logo) == null ? Icon(Icons.add_photo_alternate_outlined, color: p.brand, size: 28) : Image.memory(Avatar.bytesOf(_logo)!, fit: BoxFit.cover),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(tr('coaching_logo'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                        Text(tr('coaching_logo_sub'), style: TextStyle(color: p.muted, fontSize: 12.5)),
+                        const SizedBox(height: 6),
+                        Row(children: [
+                          Tag(_logo.isEmpty ? tr('add_logo') : tr('change_logo'), fg: Colors.white, bg: p.brand, leading: const Icon(Icons.photo_camera_outlined, size: 13, color: Colors.white)),
+                          if (_logo.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            GestureDetector(onTap: () => setState(() => _logo = ''), child: Text(tr('remove'), style: TextStyle(color: p.danger, fontWeight: FontWeight.w800, fontSize: 12.5))),
+                          ],
+                        ]),
+                      ]),
+                    ),
+                  ]),
+                ),
+                const SizedBox(height: 14),
                 _f(tr('inst_name'), _name, Icons.apartment_rounded),
                 _f(tr('city'), _city, Icons.location_city_rounded),
-                _f(tr('full_address'), _addr, Icons.place_outlined, hint: tr('street_hint')),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    FieldLabel('${tr('full_address')} *'),
+                    TextField(controller: _addr, minLines: 2, maxLines: 3, decoration: InputDecoration(hintText: tr('street_hint'), prefixIcon: const Icon(Icons.place_outlined), errorText: _addrErr, helperText: tr('address_on_receipt'))),
+                  ]),
+                ),
                 _f(tr('mobile'), _phone, Icons.call_outlined, type: TextInputType.phone),
+                AppCard(
+                  padding: const EdgeInsets.fromLTRB(14, 6, 8, 6),
+                  child: SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    value: _gstOn,
+                    onChanged: (v) => setState(() => _gstOn = v),
+                    title: Text(tr('gst_registered_q'), style: const TextStyle(fontWeight: FontWeight.w800)),
+                    subtitle: Text(tr('gst_not_needed_small')),
+                  ),
+                ),
+                if (_gstOn) ...[
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _gst,
+                    textCapitalization: TextCapitalization.characters,
+                    maxLength: 15,
+                    decoration: InputDecoration(hintText: '10ABCDE1234F1Z5', prefixIcon: const Icon(Icons.receipt_long_outlined), errorText: _gstErr, labelText: 'GSTIN', helperText: tr('gst_help')),
+                  ),
+                ],
+                const SizedBox(height: 14),
                 const SizedBox(height: 4),
                 SectionTitle(tr('upi_for_fees')),
                 const SizedBox(height: 4),
@@ -543,4 +626,76 @@ class _InstituteSettingsScreenState extends State<InstituteSettingsScreen> {
             ),
     );
   }
+}
+
+
+/// Admin: fees can be collected only after the coaching's address is set (it goes on every receipt).
+/// Asks for it once, saves it and returns true; false when the admin cancels.
+Future<bool> ensureReceiptAddress(BuildContext context, Membership m) async {
+  final app = context.appRead;
+  Institute? inst;
+  try {
+    inst = await app.backend.institute(m.instituteId);
+  } catch (_) {
+    return true;
+  }
+  if (inst == null || inst.receiptReady) return true;
+  if (!context.mounted) return false;
+  final c = TextEditingController(text: inst.address);
+  final saved = await showModalBottomSheet<bool>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (s) {
+      final p = s.pal;
+      String? err;
+      var busy = false;
+      return StatefulBuilder(
+        builder: (s, set) => Padding(
+          padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + MediaQuery.of(s).viewInsets.bottom),
+          child: SafeArea(
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Center(child: IconBox(Icons.place_rounded, fg: p.warn, bg: p.warnTint, size: 60)),
+              const SizedBox(height: 12),
+              Text(tr('need_address_title'), textAlign: TextAlign.center, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 6),
+              Text(tr('need_address_sub'), textAlign: TextAlign.center, style: TextStyle(color: p.muted, height: 1.45)),
+              const SizedBox(height: 14),
+              FieldLabel(tr('full_address')),
+              TextField(controller: c, autofocus: true, minLines: 2, maxLines: 3, decoration: InputDecoration(hintText: tr('street_hint'), errorText: err)),
+              const SizedBox(height: 10),
+              Row(children: [
+                Icon(Icons.image_outlined, size: 18, color: p.brand),
+                const SizedBox(width: 8),
+                Expanded(child: Text(tr('logo_gst_later'), style: TextStyle(color: p.ink2, fontWeight: FontWeight.w600, fontSize: 12.5))),
+              ]),
+              const SizedBox(height: 14),
+              PrimaryButton(
+                label: tr('save_and_collect'),
+                arrow: false,
+                busy: busy,
+                onPressed: () async {
+                  if (c.text.trim().length < 8) {
+                    set(() => err = tr('err_address'));
+                    return;
+                  }
+                  set(() => busy = true);
+                  try {
+                    await app.backend.updateInstitute(inst!.copyWith(address: c.text.trim()));
+                    if (s.mounted) Navigator.pop(s, true);
+                  } catch (e) {
+                    set(() {
+                      busy = false;
+                      err = errorMessage(e);
+                    });
+                  }
+                },
+              ),
+            ]),
+          ),
+        ),
+      );
+    },
+  );
+  return saved == true;
 }

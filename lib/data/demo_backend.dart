@@ -403,12 +403,17 @@ class DemoBackend implements Backend {
   }
 
   @override
-  Future<Membership> requestJoin({required AppUser user, required JoinCode code, String relation = '', List<String> subjects = const [], Role? role}) async {
+  Future<Membership> requestJoin({required AppUser user, required JoinCode code, String relation = '', List<String> subjects = const [], Role? role, String childUid = '', String childName = ''}) async {
     await _wait();
     final id = '${user.uid}_${code.instituteId}';
     final existing = _members[id];
     if (existing != null) {
-      if (code.type == CodeType.batch && !existing.batchIds.contains(code.batchId)) existing.batchIds = [...existing.batchIds, code.batchId];
+      if (code.type == CodeType.batch && existing.role == Role.student && !existing.batchIds.contains(code.batchId)) existing.batchIds = [...existing.batchIds, code.batchId];
+      if (code.type == CodeType.batch && existing.role == Role.parent && childUid.isNotEmpty && !existing.childUids.contains(childUid)) {
+        existing
+          ..childUids = [...existing.childUids, childUid]
+          ..childNames = [...existing.childNames, childName];
+      }
       return existing;
     }
     role ??= switch (code.type) { CodeType.institute => Role.teacher, CodeType.batch => Role.student, CodeType.student => Role.parent };
@@ -423,9 +428,9 @@ class DemoBackend implements Backend {
       email: user.email,
       city: user.address.city,
       subjects: subjects,
-      batchIds: code.type == CodeType.batch ? [code.batchId] : const [],
-      childUids: code.type == CodeType.student ? [code.studentUid] : const [],
-      childNames: code.type == CodeType.student ? [code.studentName] : const [],
+      batchIds: code.type == CodeType.batch && role == Role.student ? [code.batchId] : const [],
+      childUids: code.type == CodeType.student ? [code.studentUid] : (childUid.isNotEmpty ? [childUid] : const []),
+      childNames: code.type == CodeType.student ? [code.studentName] : (childUid.isNotEmpty ? [childName] : const []),
       relation: relation,
       joinedVia: code.code,
       monthlyFee: role == Role.student ? 1500 : 0,
@@ -675,12 +680,76 @@ class DemoBackend implements Backend {
     _syllabus['${instituteId}_${s.batchId}'] = s;
   }
 
+  // ---------- batch rosters, removing people ----------
+
+  @override
+  Future<void> syncRoster(String instituteId) async {
+    final studs = _members.values.where((x) => x.instituteId == instituteId && x.role == Role.student && x.approved).toList();
+    for (final e in _codes.entries.toList()) {
+      final c = e.value;
+      if (c.instituteId != instituteId || c.type != CodeType.batch) continue;
+      _codes[e.key] = JoinCode.fromMap(c.toMap()
+        ..['roster'] = [
+          for (final x in studs)
+            if (x.batchIds.contains(c.batchId)) {'u': x.uid, 'n': x.name},
+        ]);
+    }
+  }
+
+  @override
+  Future<void> removeMember(Membership m, {bool deleteFees = false}) async {
+    await _wait();
+    _members.remove(m.id);
+    for (final x in _members.values.where((x) => x.instituteId == m.instituteId && x.childUids.contains(m.uid)).toList()) {
+      final i = x.childUids.indexOf(m.uid);
+      x.childUids = [...x.childUids]..removeAt(i);
+      if (i < x.childNames.length) x.childNames = [...x.childNames]..removeAt(i);
+    }
+    await syncRoster(m.instituteId);
+  }
+
   // ---------- VidyaDesk subscription ----------
 
   @override
   Future<void> claimSubscription(SubPayment p) async {
     await _wait();
     _planPays.add(p);
+  }
+
+  @override
+  Future<SubPayment> startPlan({required Membership admin, required String plan, required bool yearly, required bool paidOk, String ref = '', String via = ''}) async {
+    await _wait();
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final inst = _institutes[admin.instituteId];
+    final prevUntil = inst?.planUntil ?? 0;
+    final until = extendUntil(prevUntil, yearly);
+    final amount = planAmount(planFrom(plan), yearly);
+    final p = SubPayment(
+      id: '${admin.instituteId}_$now',
+      instituteId: admin.instituteId,
+      instituteName: admin.instituteName,
+      adminUid: admin.uid,
+      adminName: admin.name,
+      phone: admin.phone,
+      plan: plan,
+      yearly: yearly,
+      amount: amount,
+      utr: ref,
+      via: via,
+      status: paidOk ? 'auto' : 'pending',
+      createdAt: now,
+      demo: true,
+      prevPlan: inst?.plan ?? 'trial',
+      prevUntil: prevUntil,
+      newUntil: paidOk ? until : 0,
+    );
+    _planPays.add(p);
+    if (paidOk && inst != null) {
+      _institutes[admin.instituteId] = Institute.fromMap(inst.toMap()
+        ..['plan'] = plan
+        ..['planUntil'] = until);
+    }
+    return p;
   }
 
   @override
@@ -704,8 +773,8 @@ class DemoBackend implements Backend {
     final demoPend = [
       SubPayment(id: 'sp1', instituteId: 'x1', instituteName: 'Jha Tutorials', adminUid: 'o2', adminName: 'Sunil Jha', phone: '+919800000001', plan: 'standard', yearly: false, amount: 599, utr: '551028731104', createdAt: ms - 3600000),
     ];
-    final pend = [..._planPays.where((p) => p.status == 'pending'), ...demoPend.where((d) => !_planPays.any((x) => x.id == d.id))];
-    final income = 9990 + _planPays.where((p) => p.status == 'confirmed' && p.decidedAt >= monthStart).fold<int>(0, (a, p) => a + p.amount);
+    final pend = [..._planPays.where((p) => p.status == 'pending' || p.status == 'auto'), ...demoPend.where((d) => !_planPays.any((x) => x.id == d.id))];
+    final income = 9990 + _planPays.where((p) => p.started && p.createdAt >= monthStart).fold<int>(0, (a, p) => a + p.amount);
     final students = _members.values.where((m) => m.role == Role.student && m.approved).length + 180;
     return OwnerStats(institutes: [..._institutes.values, ...others], pending: pend, monthIncome: income, students: students);
   }
@@ -715,15 +784,22 @@ class DemoBackend implements Backend {
     await _wait();
     final now = DateTime.now().millisecondsSinceEpoch;
     if (!_planPays.any((x) => x.id == p.id)) _planPays.add(p);
-    p
-      ..status = ok ? 'confirmed' : 'rejected'
-      ..decidedAt = now;
     final inst = _institutes[p.instituteId];
-    if (ok && inst != null) {
-      final m = inst.toMap()
+    var status = ok ? 'confirmed' : 'rejected';
+    if (p.status == 'auto' && !ok) {
+      status = 'reversed';
+      if (inst != null) {
+        _institutes[p.instituteId] = Institute.fromMap(inst.toMap()
+          ..['plan'] = p.prevPlan.isEmpty ? 'trial' : p.prevPlan
+          ..['planUntil'] = p.prevUntil > now ? p.prevUntil : now - (graceDays * 86400000 + 60000));
+      }
+    } else if (p.status == 'pending' && ok && inst != null) {
+      _institutes[p.instituteId] = Institute.fromMap(inst.toMap()
         ..['plan'] = p.plan
-        ..['planUntil'] = extendUntil(inst.plan == 'trial' ? now : inst.planUntil, p.yearly);
-      _institutes[p.instituteId] = Institute.fromMap(m);
+        ..['planUntil'] = extendUntil(inst.planUntil, p.yearly));
     }
+    p
+      ..status = status
+      ..decidedAt = now;
   }
 }

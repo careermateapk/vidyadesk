@@ -8,6 +8,7 @@ import 'screens/auth.dart';
 import 'screens/home_shell.dart';
 import 'screens/join.dart';
 import 'screens/onboarding.dart';
+import 'screens/status_screens.dart';
 import 'screens/subscription.dart';
 import 'services/push.dart';
 import 'ui/widgets.dart';
@@ -56,7 +57,8 @@ class Gate extends StatelessWidget {
     final app = context.app;
     final Widget page;
     final String key;
-    if (!app.ready || !app.splashDone) {
+    // Splash with "Get started" only before login; once logged in the app opens straight away.
+    if (!app.ready || (app.signedIn == null && !app.splashDone)) {
       page = const SplashScreen();
       key = 'splash';
     } else if (!app.languageChosen) {
@@ -76,6 +78,9 @@ class Gate extends StatelessWidget {
     } else if (app.profile == null) {
       page = const ProfileFormScreen(withEmail: false);
       key = 'profile';
+    } else if (app.removedFrom != null) {
+      page = RemovedScreen(institute: app.removedFrom!);
+      key = 'removed';
     } else if (app.chosenRole == null && app.memberships.isEmpty) {
       page = const RoleScreen();
       key = 'role2';
@@ -86,6 +91,9 @@ class Gate extends StatelessWidget {
     } else if (!app.active!.approved) {
       page = PendingScreen(m: app.active!);
       key = 'pending-${app.active!.id}';
+    } else if (app.welcome != null && app.welcome!.approved) {
+      page = WelcomeScreen(m: app.welcome!);
+      key = 'welcome';
     } else if (app.plan?.locked ?? false) {
       page = PlanLockedScreen(m: app.active!);
       key = 'locked-${app.active!.id}';

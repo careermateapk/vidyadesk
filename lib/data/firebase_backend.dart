@@ -1,7 +1,10 @@
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:http/http.dart' as http;
 
 import '../core/config.dart';
 import '../core/plan.dart';
@@ -329,7 +332,7 @@ class FirebaseBackend implements Backend {
 
   @override
   Future<void> updateInstitute(Institute inst) =>
-      _inst(inst.id).update({'name': inst.name, 'city': inst.city, 'address': inst.address, 'phone': inst.phone, 'upiId': inst.upiId, 'upiName': inst.upiName, 'dueDay': inst.dueDay, 'lateFee': inst.lateFee, ...inst.geoMap});
+      _inst(inst.id).update({'name': inst.name, 'city': inst.city, 'address': inst.address, 'phone': inst.phone, 'upiId': inst.upiId, 'upiName': inst.upiName, 'dueDay': inst.dueDay, 'lateFee': inst.lateFee, ...inst.geoMap, 'logo': inst.logo, 'gstin': inst.gstin, 'gstOn': inst.gstOn});
 
   @override
   Future<String> newInstituteCode(Institute inst) async {
@@ -350,7 +353,7 @@ class FirebaseBackend implements Backend {
   }
 
   @override
-  Future<Membership> requestJoin({required AppUser user, required JoinCode code, String relation = '', List<String> subjects = const [], Role? role}) async {
+  Future<Membership> requestJoin({required AppUser user, required JoinCode code, String relation = '', List<String> subjects = const [], Role? role, String childUid = '', String childName = ''}) async {
     final id = '${user.uid}_${code.instituteId}';
     final existing = await _mem.doc(id).get();
     if (existing.exists && existing.data() != null) {
@@ -359,6 +362,12 @@ class FirebaseBackend implements Backend {
       if (code.type == CodeType.batch && m.role == Role.student && !m.batchIds.contains(code.batchId)) {
         await _mem.doc(id).update({'batchIds': FieldValue.arrayUnion([code.batchId])});
         m.batchIds = [...m.batchIds, code.batchId];
+      } else if (code.type == CodeType.batch && m.role == Role.parent && childUid.isNotEmpty && !m.childUids.contains(childUid)) {
+        await _mem.doc(id).update({
+          'childUids': FieldValue.arrayUnion([childUid]),
+          'childNames': FieldValue.arrayUnion([childName]),
+        });
+        m.childUids = [...m.childUids, childUid];
       } else if (code.type == CodeType.student && m.role == Role.parent && !m.childUids.contains(code.studentUid)) {
         await _mem.doc(id).update({
           'childUids': FieldValue.arrayUnion([code.studentUid]),
@@ -379,9 +388,9 @@ class FirebaseBackend implements Backend {
       email: user.email,
       city: user.address.city,
       subjects: subjects,
-      batchIds: code.type == CodeType.batch ? [code.batchId] : const [],
-      childUids: code.type == CodeType.student ? [code.studentUid] : const [],
-      childNames: code.type == CodeType.student ? [code.studentName] : const [],
+      batchIds: code.type == CodeType.batch && role == Role.student ? [code.batchId] : const [],
+      childUids: code.type == CodeType.student ? [code.studentUid] : (childUid.isNotEmpty ? [childUid] : const []),
+      childNames: code.type == CodeType.student ? [code.studentName] : (childUid.isNotEmpty ? [childName] : const []),
       relation: relation,
       joinedVia: code.code,
       createdAt: DateTime.now().millisecondsSinceEpoch,
@@ -648,12 +657,84 @@ class FirebaseBackend implements Backend {
   @override
   Future<void> saveSyllabus(String instituteId, Syllabus s) => _inst(instituteId).collection('syllabus').doc(s.batchId).set(s.toMap());
 
+  // ---------- batch rosters, removing people ----------
+
+  @override
+  Future<void> syncRoster(String instituteId) async {
+    try {
+      final all = await members(instituteId);
+      final studs = all.where((x) => x.role == Role.student && x.approved).toList();
+      for (final b in await batches(instituteId)) {
+        if (b.code.isEmpty) continue;
+        final roster = [
+          for (final x in studs)
+            if (x.batchIds.contains(b.id)) {'u': x.uid, 'n': x.name},
+        ];
+        await _db.collection('codes').doc(b.code).update({'roster': roster});
+      }
+    } catch (_) {}
+  }
+
+  @override
+  Future<void> removeMember(Membership m, {bool deleteFees = false}) async {
+    if (m.role == Role.student) {
+      // unlink from parents
+      final parents = (await members(m.instituteId)).where((x) => x.childUids.contains(m.uid));
+      for (final x in parents) {
+        final i = x.childUids.indexOf(m.uid);
+        final names = [...x.childNames];
+        if (i >= 0 && i < names.length) names.removeAt(i);
+        await _mem.doc(x.id).update({'childUids': FieldValue.arrayRemove([m.uid]), 'childNames': names});
+      }
+      if (m.studentCode.isNotEmpty) {
+        try {
+          await _db.collection('codes').doc(m.studentCode).delete();
+        } catch (_) {}
+      }
+      if (deleteFees) {
+        final fees = await _inst(m.instituteId).collection('fees').where('studentUid', isEqualTo: m.uid).get();
+        for (final d in fees.docs) {
+          await d.reference.delete();
+        }
+      }
+    }
+    await _mem.doc(m.id).delete();
+    if (m.role == Role.student) await syncRoster(m.instituteId);
+  }
+
   // ---------- VidyaDesk subscription ----------
 
   CollectionReference<Map<String, dynamic>> get _subs => _db.collection('subPayments');
 
   @override
   Future<void> claimSubscription(SubPayment p) => _subs.doc(p.id).set(p.toMap());
+
+  @override
+  Future<SubPayment> startPlan({required Membership admin, required String plan, required bool yearly, required bool paidOk, String ref = '', String via = ''}) async {
+    final token = await _auth.currentUser?.getIdToken();
+    if (token == null || notifyUrl.isEmpty) throw BackendError('network');
+    final r = await http
+        .post(
+          Uri.parse(notifyUrl),
+          headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'action': 'plan',
+            'inst': admin.instituteId,
+            'plan': plan,
+            'yearly': yearly,
+            'result': paidOk ? 'success' : 'unsure',
+            'ref': ref,
+            'via': via,
+            'adminName': admin.name,
+            'phone': admin.phone,
+          }),
+        )
+        .timeout(const Duration(seconds: 30));
+    final j = jsonDecode(r.body) as Map<String, dynamic>;
+    if (r.statusCode != 200 || j['ok'] != true) throw BackendError(r.statusCode == 403 ? 'permission' : 'network');
+    final d = await _subs.doc('${j['id']}').get();
+    return SubPayment.fromMap(d.data() ?? {'id': j['id'], 'instituteId': admin.instituteId, 'plan': plan, 'yearly': yearly, 'amount': j['amount'], 'status': j['started'] == true ? 'auto' : 'pending', 'newUntil': j['planUntil'], 'demo': j['demo']});
+  }
 
   @override
   Future<List<SubPayment>> mySubPayments(String instituteId) async {
@@ -669,10 +750,10 @@ class FirebaseBackend implements Backend {
     final now = DateTime.now();
     final monthStart = DateTime(now.year, now.month).millisecondsSinceEpoch;
     final insts = (await _db.collection('institutes').get()).docs.map((d) => Institute.fromMap({...d.data(), 'id': d.id})).toList();
-    final pend = (await _subs.where('status', isEqualTo: 'pending').get()).docs.map((d) => SubPayment.fromMap(d.data())).toList()
+    final pend = (await _subs.where('status', whereIn: ['pending', 'auto']).get()).docs.map((d) => SubPayment.fromMap(d.data())).toList()
       ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
-    final month = (await _subs.where('decidedAt', isGreaterThanOrEqualTo: monthStart).get()).docs.map((d) => SubPayment.fromMap(d.data()));
-    final income = month.where((p) => p.status == 'confirmed').fold<int>(0, (a, p) => a + p.amount);
+    final month = (await _subs.where('createdAt', isGreaterThanOrEqualTo: monthStart).get()).docs.map((d) => SubPayment.fromMap(d.data()));
+    final income = month.where((p) => p.started && !p.demo).fold<int>(0, (a, p) => a + p.amount);
     var students = 0;
     try {
       students = (await _mem.where('role', isEqualTo: 'student').where('status', isEqualTo: 'approved').count().get()).count ?? 0;
@@ -684,16 +765,23 @@ class FirebaseBackend implements Backend {
   Future<void> decideSubPayment(SubPayment p, bool ok) async {
     final now = DateTime.now().millisecondsSinceEpoch;
     final batch = _db.batch();
-    if (ok) {
+    var status = ok ? 'confirmed' : 'rejected';
+    if (p.status == 'auto' && !ok) {
+      // Plan was started but the money never came: stop it.
+      status = 'reversed';
+      final back = p.prevUntil > now ? p.prevUntil : now - (graceDays * 86400000 + 60000);
+      batch.update(_inst(p.instituteId), {'plan': p.prevPlan.isEmpty ? 'trial' : p.prevPlan, 'planUntil': back});
+    } else if (p.status == 'pending' && ok) {
       final d = await _inst(p.instituteId).get();
       final inst = Institute.fromMap({...?d.data(), 'id': p.instituteId});
-      final current = inst.plan == 'trial' ? now : inst.planUntil;
-      batch.update(_inst(p.instituteId), {'plan': p.plan, 'planUntil': extendUntil(current, p.yearly)});
+      final until = extendUntil(inst.planUntil, p.yearly);
+      batch.update(_inst(p.instituteId), {'plan': p.plan, 'planUntil': until});
+      batch.update(_subs.doc(p.id), {'newUntil': until});
     }
-    batch.update(_subs.doc(p.id), {'status': ok ? 'confirmed' : 'rejected', 'decidedAt': now});
+    batch.update(_subs.doc(p.id), {'status': status, 'decidedAt': now});
     await batch.commit();
     p
-      ..status = ok ? 'confirmed' : 'rejected'
+      ..status = status
       ..decidedAt = now;
   }
 }

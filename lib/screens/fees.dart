@@ -482,6 +482,8 @@ class _FeeSheetState extends State<_FeeSheet> {
       toast(context, tr('err_amount'));
       return;
     }
+    if (!await ensureReceiptAddress(context, widget.m)) return;
+    if (!mounted) return;
     final now = DateTime.now().millisecondsSinceEpoch;
     final by = f.claimBy.isNotEmpty ? f.claimBy : f.studentName;
     final utr = _mode == 'UPI' ? f.claimUtr : '';

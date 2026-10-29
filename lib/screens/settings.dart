@@ -100,6 +100,7 @@ class SettingsPage extends StatelessWidget {
                 ),
             ]),
           )),
+          if (u != null) item(ProfileMeter(m: m, user: u)),
           item(const DemoBanner()),
 
           // ----- roles -----
@@ -170,7 +171,7 @@ class SettingsPage extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: Column(children: [
                 if (m.role == Role.admin) ...[
-                  _Tile(icon: Icons.workspace_premium_rounded, color: p.warn, label: app.plan == null ? tr('my_plan') : '${tr('my_plan')} · ${planName(app.plan!.plan)}', onTap: () => push(context, PlansScreen(m: m))),
+                  _Tile(icon: Icons.workspace_premium_rounded, color: p.warn, label: app.plan == null ? tr('my_plan') : '${tr('my_plan')} · ${planName(app.plan!.plan)}', onTap: () => push(context, MyPlanScreen(m: m))),
                   _Tile(icon: Icons.storefront_outlined, color: p.brand, label: tr('institute_details'), onTap: () => push(context, InstituteSettingsScreen(m: m))),
                   _Tile(icon: Icons.qr_code_2_rounded, color: p.success, label: tr('institute_code'), onTap: () => push(context, InstituteCodeScreen(m: m))),
                   _Tile(icon: Icons.currency_rupee_rounded, color: p.warn, label: tr('payments_confirm'), onTap: () => push(context, ConfirmPaymentsScreen(m: m))),
@@ -541,6 +542,74 @@ class ThemeSwitch extends StatelessWidget {
           ),
         ]),
       ),
+    );
+  }
+}
+
+
+/// How complete my profile is (and, for the admin, the coaching's receipt details).
+class ProfileMeter extends StatelessWidget {
+  const ProfileMeter({super.key, required this.m, required this.user});
+  final Membership m;
+  final AppUser user;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pal;
+    final app = context.app;
+    final inst = app.inst;
+    final admin = m.role == Role.admin;
+    final a = user.address;
+    void editProfile() => push(context, ProfileFormScreen(withEmail: false, existing: user));
+    void editInst() => push(context, InstituteSettingsScreen(m: m)).then((_) => app.loadInstitute());
+    final items = <(IconData, String, bool, VoidCallback)>[
+      (Icons.photo_camera_outlined, tr('pm_photo'), user.photo.isNotEmpty, () => changeProfilePhoto(context)),
+      (Icons.call_outlined, tr('pm_mobile'), user.phone.trim().isNotEmpty, editProfile),
+      (Icons.mail_outline_rounded, tr('pm_email'), user.email.trim().isNotEmpty, editProfile),
+      (Icons.place_outlined, tr('pm_address'), a.city.trim().isNotEmpty && (a.street.trim().isNotEmpty || a.block.trim().isNotEmpty) && a.pincode.trim().isNotEmpty, editProfile),
+      if (admin && inst != null) ...[
+        (Icons.image_outlined, tr('pm_logo'), inst.logo.isNotEmpty, editInst),
+        (Icons.storefront_outlined, tr('pm_inst_address'), inst.receiptReady, editInst),
+        (Icons.account_balance_outlined, tr('pm_upi'), inst.upiId.isNotEmpty, editInst),
+      ],
+    ];
+    final done = items.where((x) => x.$3).length;
+    final pct = (done * 100 / items.length).round();
+    final missing = items.where((x) => !x.$3).toList();
+    return AppCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          Ring(
+            value: done / items.length,
+            size: 64,
+            stroke: 7,
+            color: pct == 100 ? p.success : p.brand,
+            track: p.brandTint,
+            center: Text('$pct%', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(trf('profile_pct', {'n': '$pct'}), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+              Text(missing.isEmpty ? tr('profile_all_done') : trf('profile_left', {'n': '${missing.length}'}), style: TextStyle(color: p.muted, fontSize: 12.5)),
+            ]),
+          ),
+        ]),
+        if (missing.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            for (final x in missing)
+              ActionChip(
+                avatar: Icon(x.$1, size: 16, color: p.warn),
+                label: Text('${x.$2} +', style: const TextStyle(fontWeight: FontWeight.w700)),
+                onPressed: x.$4,
+                backgroundColor: p.warnTint,
+                side: BorderSide.none,
+              ),
+          ]),
+        ],
+      ]),
     );
   }
 }

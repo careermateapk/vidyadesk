@@ -682,10 +682,119 @@ class _LoaderState<T> extends State<Loader<T>> {
   }
 }
 
-void toast(BuildContext context, String msg) {
-  ScaffoldMessenger.of(context)
-    ..hideCurrentSnackBar()
-    ..showSnackBar(SnackBar(content: Text(msg)));
+/// Short message at the top of the screen — above bottom sheets and dialogs too.
+void toast(BuildContext context, String msg) => showTopToast(context, msg);
+
+OverlayEntry? _toastEntry;
+
+void showTopToast(BuildContext context, String title, {String? sub, String? action, VoidCallback? onAction, Duration duration = const Duration(milliseconds: 3200)}) {
+  final overlay = Overlay.maybeOf(context, rootOverlay: true);
+  if (overlay == null) {
+    ScaffoldMessenger.maybeOf(context)
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text([title, if (sub != null) sub].join('\n'))));
+    return;
+  }
+  _toastEntry?.remove();
+  _toastEntry = null;
+  late OverlayEntry entry;
+  entry = OverlayEntry(
+    builder: (_) => _TopToast(
+      title: title,
+      sub: sub,
+      action: action,
+      onAction: onAction,
+      duration: duration,
+      onDone: () {
+        if (_toastEntry == entry) _toastEntry = null;
+        if (entry.mounted) entry.remove();
+      },
+    ),
+  );
+  _toastEntry = entry;
+  overlay.insert(entry);
+}
+
+class _TopToast extends StatefulWidget {
+  const _TopToast({required this.title, this.sub, this.action, this.onAction, required this.duration, required this.onDone});
+  final String title;
+  final String? sub, action;
+  final VoidCallback? onAction;
+  final Duration duration;
+  final VoidCallback onDone;
+  @override
+  State<_TopToast> createState() => _TopToastState();
+}
+
+class _TopToastState extends State<_TopToast> with SingleTickerProviderStateMixin {
+  late final AnimationController _a = AnimationController(vsync: this, duration: const Duration(milliseconds: 260))..forward();
+  bool _closing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Future<void>.delayed(widget.duration, _close);
+  }
+
+  Future<void> _close() async {
+    if (_closing || !mounted) return;
+    _closing = true;
+    await _a.reverse();
+    widget.onDone();
+  }
+
+  @override
+  void dispose() {
+    _a.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final top = MediaQuery.of(context).padding.top + 10;
+    final c = CurvedAnimation(parent: _a, curve: Curves.easeOutCubic);
+    return Positioned(
+      left: 14,
+      right: 14,
+      top: top,
+      child: SlideTransition(
+        position: Tween(begin: const Offset(0, -1.2), end: Offset.zero).animate(c),
+        child: FadeTransition(
+          opacity: c,
+          child: Material(
+            color: const Color(0xFF1B1640),
+            elevation: 12,
+            shadowColor: Colors.black54,
+            borderRadius: BorderRadius.circular(18),
+            child: GestureDetector(
+              onTap: _close,
+              onVerticalDragEnd: (_) => _close(),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 10, 12),
+                child: Row(children: [
+                  Expanded(
+                    child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(widget.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14, height: 1.3)),
+                      if (widget.sub != null && widget.sub!.isNotEmpty)
+                        Text(widget.sub!, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 12.5)),
+                    ]),
+                  ),
+                  if (widget.action != null)
+                    TextButton(
+                      onPressed: () {
+                        widget.onAction?.call();
+                        _close();
+                      },
+                      child: Text(widget.action!, style: const TextStyle(color: Color(0xFFA79BFF), fontWeight: FontWeight.w800)),
+                    ),
+                ]),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 Future<void> copyText(BuildContext context, String text) async {

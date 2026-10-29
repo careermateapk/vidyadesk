@@ -295,7 +295,9 @@ class _PlansScreenState extends State<PlansScreen> {
         load: () => app.backend.mySubPayments(widget.m.instituteId),
         builder: (context, pays, reload) {
           final waiting = pays.where((x) => x.status == 'pending').toList();
-          final lastNo = pays.where((x) => (x.status == 'rejected' || x.status == 'reversed') && DateTime.now().millisecondsSinceEpoch - x.decidedAt < 15 * 86400000).firstOrNull;
+          final lastNoAny = pays.where((x) => (x.status == 'rejected' || x.status == 'reversed') && DateTime.now().millisecondsSinceEpoch - x.decidedAt < 15 * 86400000).firstOrNull;
+          // Hide the red note once a newer plan payment went through.
+          final lastNo = lastNoAny == null || pays.any((x) => x.started && x.createdAt > lastNoAny.createdAt) ? null : lastNoAny;
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 6, 16, 30),
             children: [

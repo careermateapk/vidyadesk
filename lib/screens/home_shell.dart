@@ -49,12 +49,16 @@ class HomeShellState extends State<HomeShell> {
   void initState() {
     super.initState();
     context.appRead.childIndex = 0;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.appRead.loadBadges();
+    });
   }
 
   int get childIndex => _child;
   void setChild(int i) {
     context.appRead.childIndex = i;
     setState(() => _child = i);
+    context.appRead.loadBadges();
   }
 
   /// Go to a tab by its index in the tab list.
@@ -143,7 +147,12 @@ class HomeShellState extends State<HomeShell> {
         bottomNavigationBar: _FloatingNav(
           tabs: tabs,
           index: i,
-          onTap: (v) => setState(() => _i = v),
+          counts: [for (final n in _names()) n == 'resources' ? (context.app.badges['resources'] ?? 0) : 0],
+          onTap: (v) {
+            final n = _names();
+            if (v < n.length && n[v] == 'resources') context.appRead.markSeen('resources');
+            setState(() => _i = v);
+          },
           onPlus: staff ? () => showQuickAdd(context, widget.m, shell: this) : null,
         ),
       ),
@@ -152,8 +161,9 @@ class HomeShellState extends State<HomeShell> {
 }
 
 class _FloatingNav extends StatelessWidget {
-  const _FloatingNav({required this.tabs, required this.index, required this.onTap, this.onPlus});
+  const _FloatingNav({required this.tabs, required this.index, required this.onTap, this.onPlus, this.counts = const []});
   final List<_Tab> tabs;
+  final List<int> counts;
   final int index;
   final ValueChanged<int> onTap;
   final VoidCallback? onPlus;
@@ -164,7 +174,7 @@ class _FloatingNav extends StatelessWidget {
     final items = <Widget>[];
     for (var k = 0; k < tabs.length; k++) {
       if (onPlus != null && k == tabs.length ~/ 2) items.add(_Plus(onTap: onPlus!));
-      items.add(Expanded(child: _NavItem(tab: tabs[k], on: k == index, onTap: () => onTap(k))));
+      items.add(Expanded(child: _NavItem(tab: tabs[k], on: k == index, count: k < counts.length ? counts[k] : 0, onTap: () => onTap(k))));
     }
     return SafeArea(
       top: false,
@@ -186,9 +196,10 @@ class _FloatingNav extends StatelessWidget {
 }
 
 class _NavItem extends StatelessWidget {
-  const _NavItem({required this.tab, required this.on, required this.onTap});
+  const _NavItem({required this.tab, required this.on, required this.onTap, this.count = 0});
   final _Tab tab;
   final bool on;
+  final int count;
   final VoidCallback onTap;
   @override
   Widget build(BuildContext context) {
@@ -205,7 +216,7 @@ class _NavItem extends StatelessWidget {
           curve: Curves.easeOutCubic,
           padding: EdgeInsets.symmetric(horizontal: on ? 16 : 6, vertical: 4),
           decoration: BoxDecoration(color: on ? p.brandTint : Colors.transparent, borderRadius: BorderRadius.circular(12)),
-          child: Icon(on ? tab.activeIcon : tab.icon, size: 23, color: on ? p.brand : p.muted),
+          child: CountBadge(count: count, top: -8, right: -12, child: Icon(on ? tab.activeIcon : tab.icon, size: 23, color: on ? p.brand : p.muted)),
         ),
         const SizedBox(height: 3),
         Text(tab.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, fontWeight: on ? FontWeight.w800 : FontWeight.w600, color: on ? p.brand : p.muted)),

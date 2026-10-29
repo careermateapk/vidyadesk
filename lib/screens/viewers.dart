@@ -10,6 +10,7 @@ import '../core/strings.dart';
 import '../core/theme.dart';
 import '../ui/widgets.dart';
 import 'common.dart';
+import 'crop.dart';
 import 'file_sheet.dart';
 
 // ---------------------------------------------------------------------------
@@ -255,7 +256,8 @@ class PhotoThumb extends StatelessWidget {
 }
 
 /// Ask camera or gallery, return small JPEG photos as base64 (max [max]).
-Future<List<String>> pickPhotos(BuildContext context, {int max = 4}) async {
+/// [crop]: let the person crop each photo (free, square, 4:3…, rotate).
+Future<List<String>> pickPhotos(BuildContext context, {int max = 4, bool crop = false}) async {
   final p = context.pal;
   final src = await showModalBottomSheet<String>(
     context: context,
@@ -280,12 +282,21 @@ Future<List<String>> pickPhotos(BuildContext context, {int max = 4}) async {
   if (src == null) return [];
   final picker = ImagePicker();
   try {
+    final size = crop ? 1800.0 : 1000.0;
+    final q = crop ? 85 : 50;
     final files = src == 'camera'
-        ? [await picker.pickImage(source: ImageSource.camera, maxWidth: 1000, maxHeight: 1000, imageQuality: 50)].whereType<XFile>().toList()
-        : await picker.pickMultiImage(maxWidth: 1000, maxHeight: 1000, imageQuality: 50);
+        ? [await picker.pickImage(source: ImageSource.camera, maxWidth: size, maxHeight: size, imageQuality: q)].whereType<XFile>().toList()
+        : await picker.pickMultiImage(maxWidth: size, maxHeight: size, imageQuality: q);
     final out = <String>[];
     for (final f in files.take(max)) {
-      out.add(base64Encode(await f.readAsBytes()));
+      var bytes = await f.readAsBytes();
+      if (crop) {
+        if (!context.mounted) break;
+        final c = await cropPhoto(context, bytes);
+        if (c == null) continue;
+        bytes = c;
+      }
+      out.add(base64Encode(bytes));
     }
     return out;
   } catch (e) {

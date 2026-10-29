@@ -156,7 +156,9 @@ class _PaySheetState extends State<_PaySheet> {
   Widget build(BuildContext context) {
     final p = context.pal;
     return SafeArea(
-      child: Padding(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * .88),
+        child: Padding(
         padding: EdgeInsets.fromLTRB(20, 0, 20, MediaQuery.of(context).viewInsets.bottom + 16),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Text(tr('pay_fees'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
@@ -182,33 +184,40 @@ class _PaySheetState extends State<_PaySheet> {
           ),
           const SizedBox(height: 14),
           FieldLabel(tr('pay_with')),
-          for (var i = 0; i < upiApps.length; i++)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: GestureDetector(
-                onTap: () => setState(() => _app = i),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: p.card,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: _app == i ? p.brand : p.border, width: _app == i ? 2 : 1),
+          Flexible(
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: upiApps.length,
+              itemBuilder: (_, i) =>
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: GestureDetector(
+                    onTap: () => setState(() => _app = i),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: p.card,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: _app == i ? p.brand : p.border, width: _app == i ? 2 : 1),
+                      ),
+                      child: Row(children: [
+                        UpiIcon(upiApps[i], size: 40),
+                        const SizedBox(width: 12),
+                        Expanded(child: Text(upiApps[i].name, style: const TextStyle(fontWeight: FontWeight.w800))),
+                        Icon(_app == i ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded, color: _app == i ? p.brand : p.border),
+                      ]),
+                    ),
                   ),
-                  child: Row(children: [
-                    UpiIcon(upiApps[i], size: 40),
-                    const SizedBox(width: 12),
-                    Expanded(child: Text(upiApps[i].name, style: const TextStyle(fontWeight: FontWeight.w800))),
-                    Icon(_app == i ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded, color: _app == i ? p.brand : p.border),
-                  ]),
                 ),
-              ),
             ),
+          ),
           const SizedBox(height: 6),
           PrimaryButton(label: trf('pay_amount_with', {'amt': rupees(widget.amount), 'app': upiApps[_app].name}), busy: _busy, arrow: false, onPressed: _pay),
           const SizedBox(height: 8),
           Text(tr('utr_auto_note'), textAlign: TextAlign.center, style: TextStyle(color: p.muted, fontSize: 12, fontWeight: FontWeight.w600)),
         ]),
+      ),
       ),
     );
   }

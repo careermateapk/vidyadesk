@@ -329,7 +329,10 @@ class _MarksEntryScreenState extends State<MarksEntryScreen> {
       t.names
         ..clear()
         ..addAll({for (final x in _students ?? <Membership>[]) if (marks.containsKey(x.uid)) x.uid: x.name});
-      if (publish != null) t.published = publish;
+      if (publish != null) {
+        t.published = publish;
+        if (publish) t.publishedAt = DateTime.now().millisecondsSinceEpoch;
+      }
       final wasPublished = _published;
       await context.appRead.backend.saveTest(widget.m.instituteId, t);
       if (publish == true && !wasPublished) {

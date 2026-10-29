@@ -5,6 +5,7 @@ import '../core/app_state.dart';
 import '../core/strings.dart';
 import '../core/theme.dart';
 import '../data/models.dart';
+import '../services/push.dart';
 import '../ui/widgets.dart';
 import 'common.dart';
 
@@ -21,6 +22,7 @@ class MarkAttendanceScreen extends StatefulWidget {
 class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
   late DateTime _date = widget.date ?? DateTime.now();
   List<Membership>? _students;
+  List<Membership> _all = [];
   final Set<String> _present = {};
   bool _existed = false;
   bool _loading = true;
@@ -43,7 +45,10 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
       final members = _students == null ? await b.members(widget.m.instituteId) : null;
       final day = await b.attendance(widget.m.instituteId, widget.batch.id, dateKey(_date));
       setState(() {
-        if (members != null) _students = approvedStudents(members, batchId: widget.batch.id);
+        if (members != null) {
+          _all = members;
+          _students = approvedStudents(members, batchId: widget.batch.id);
+        }
         _present.clear();
         _existed = day != null;
         if (day != null) {
@@ -66,6 +71,23 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
     _load();
   }
 
+  /// First time today's attendance is saved: tell absent students and their parents.
+  void _tellParents(List<Membership> studs) {
+    final today = dateKey(DateTime.now()) == dateKey(_date);
+    if (_existed || !today || !(context.appRead.inst?.notifOn('absent') ?? true)) return;
+    final i = widget.m.instituteId;
+    for (final s in studs.where((s) => !_present.contains(s.uid))) {
+      final parents = _all.where((x) => x.role == Role.parent && x.approved && x.childUids.contains(s.uid)).map((x) => Push.person(i, x.uid));
+      Push.send(
+        inst: i,
+        kind: 'absent',
+        title: '⚠️ ${trf('push_absent', {'name': s.name})}',
+        body: '${widget.batch.title} · ${timeLabel(widget.batch.startMin)}',
+        topics: [Push.person(i, s.uid), ...parents].take(5).toList(),
+      );
+    }
+  }
+
   Future<void> _save() async {
     final studs = _students ?? [];
     setState(() => _saving = true);
@@ -75,6 +97,7 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
         AttendanceDay(batchId: widget.batch.id, dateKey: dateKey(_date), marked: studs.map((s) => s.uid).toList(), present: studs.where((s) => _present.contains(s.uid)).map((s) => s.uid).toList()),
       );
       if (!mounted) return;
+      _tellParents(studs);
       HapticFeedback.heavyImpact();
       toast(context, trf('att_saved', {'p': '${_present.length}', 't': '${studs.length}'}));
       Navigator.of(context).pop(true);

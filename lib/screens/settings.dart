@@ -173,6 +173,7 @@ class SettingsPage extends StatelessWidget {
                 if (m.role == Role.admin) ...[
                   _Tile(icon: Icons.workspace_premium_rounded, color: p.warn, label: app.plan == null ? tr('my_plan') : '${tr('my_plan')} · ${planName(app.plan!.plan)}', onTap: () => push(context, MyPlanScreen(m: m))),
                   _Tile(icon: Icons.storefront_outlined, color: p.brand, label: tr('institute_details'), onTap: () => push(context, InstituteSettingsScreen(m: m))),
+                  _Tile(icon: Icons.notifications_active_outlined, color: p.danger, label: tr('auto_notifications'), onTap: () => push(context, NotifSettingsScreen(m: m))),
                   _Tile(icon: Icons.qr_code_2_rounded, color: p.success, label: tr('institute_code'), onTap: () => push(context, InstituteCodeScreen(m: m))),
                   _Tile(icon: Icons.currency_rupee_rounded, color: p.warn, label: tr('payments_confirm'), onTap: () => push(context, ConfirmPaymentsScreen(m: m))),
                   _Tile(icon: Icons.savings_outlined, color: p.success, label: tr('income_expenses'), onTap: () => gated(context, Feature.accounts, () => push(context, AccountsScreen(m: m)))),
@@ -610,6 +611,89 @@ class ProfileMeter extends StatelessWidget {
           ]),
         ],
       ]),
+    );
+  }
+}
+
+
+/// Admin: turn automatic notifications on or off.
+class NotifSettingsScreen extends StatefulWidget {
+  const NotifSettingsScreen({super.key, required this.m});
+  final Membership m;
+  @override
+  State<NotifSettingsScreen> createState() => _NotifSettingsScreenState();
+}
+
+class _NotifSettingsScreenState extends State<NotifSettingsScreen> {
+  Institute? _inst;
+  Map<String, bool> _on = {};
+
+  static const _keys = [
+    ('absent', Icons.person_off_outlined),
+    ('feeDue', Icons.currency_rupee_rounded),
+    ('checkin', Icons.how_to_reg_outlined),
+    ('leads', Icons.person_search_rounded),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    context.appRead.backend.institute(widget.m.instituteId).then((i) {
+      if (!mounted || i == null) return;
+      setState(() {
+        _inst = i;
+        _on = {for (final k in _keys) k.$1: i.notifOn(k.$1)};
+      });
+    });
+  }
+
+  Future<void> _set(String k, bool v) async {
+    final app = context.appRead;
+    setState(() => _on = {..._on, k: v});
+    try {
+      final i = _inst!.copyWith(notif: _on);
+      await app.backend.updateInstitute(i);
+      _inst = i;
+      app.loadInstitute();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _on = {..._on, k: !v});
+        toast(context, errorMessage(e));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pal;
+    return Scaffold(
+      appBar: InnerBar(title: tr('auto_notifications')),
+      body: _inst == null
+          ? const LoadingView()
+          : ListView(padding: const EdgeInsets.fromLTRB(16, 6, 16, 30), children: [
+              Text(tr('auto_notifications_sub'), style: TextStyle(color: p.muted, height: 1.4)),
+              const SizedBox(height: 12),
+              for (final k in _keys)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: AppCard(
+                    padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
+                    child: SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      secondary: IconBox(k.$2, fg: p.brand, bg: p.brandTint),
+                      value: _on[k.$1] ?? true,
+                      onChanged: (v) => _set(k.$1, v),
+                      title: Text(tr('nt_${k.$1}'), style: const TextStyle(fontWeight: FontWeight.w800)),
+                      subtitle: Text(tr('nt_${k.$1}_sub')),
+                    ),
+                  ),
+                ),
+              AppCard(
+                color: p.cardAlt,
+                padding: const EdgeInsets.all(14),
+                child: Text(tr('always_sent_note'), style: TextStyle(color: p.ink2, fontSize: 12.5, height: 1.45)),
+              ),
+            ]),
     );
   }
 }

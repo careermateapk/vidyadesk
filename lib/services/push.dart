@@ -26,6 +26,9 @@ class Push {
   /// Called when a notification may have changed my roles or plan (removed, approved, plan).
   static void Function()? onChange;
 
+  /// Called on any message while the app is open (to refresh the "new" numbers).
+  static void Function()? onNew;
+
   static String learners(String inst) => 'l_$inst';
   static String staff(String inst) => 's_$inst';
   static String admins(String inst) => 'a_$inst';
@@ -46,6 +49,7 @@ class Push {
         });
         FirebaseMessaging.onMessage.listen((m) {
           if (const {'removed', 'approved', 'plan'}.contains(m.data['kind'])) onChange?.call();
+          onNew?.call();
           // My own message (e.g. admin approving someone) — no pop-up for me.
           if (m.data['from'] != null && m.data['from'] == FirebaseAuth.instance.currentUser?.uid) return;
           final n = m.notification;
@@ -56,7 +60,7 @@ class Push {
           ));
         });
       }
-      final want = <String>{};
+      final want = <String>{'all'};
       for (final m in mine) {
         if (m.status == MemberStatus.rejected) continue;
         final i = m.instituteId;
@@ -96,6 +100,21 @@ class Push {
   }
 
   /// On logout: stop all notifications for this phone.
+  /// Owner: one notification to every VidyaDesk user.
+  static Future<bool> broadcast(String title, String body) async {
+    if (notifyUrl.isEmpty) return false;
+    try {
+      final token = await FirebaseAuth.instance.currentUser?.getIdToken();
+      if (token == null) return false;
+      final r = await http
+          .post(Uri.parse(notifyUrl), headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'}, body: jsonEncode({'action': 'broadcast', 'title': title, 'body': body}))
+          .timeout(const Duration(seconds: 20));
+      return r.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
   static Future<void> clear() async {
     if (!enabled) return;
     try {

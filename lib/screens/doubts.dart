@@ -224,7 +224,7 @@ class _AskDoubtScreenState extends State<AskDoubtScreen> {
               else
                 GestureDetector(
                   onTap: () async {
-                    final got = await pickPhotos(context, max: 1);
+                    final got = await pickPhotos(context, max: 1, crop: true);
                     if (got.isNotEmpty) setState(() => _photo = got.first);
                   },
                   child: Container(
@@ -270,7 +270,8 @@ class _DoubtThreadScreenState extends State<DoubtThreadScreen> {
   bool _busy = false;
 
   Doubt get d => widget.doubt;
-  bool get _canWrite => widget.m.isStaff || (widget.m.role == Role.student && d.studentUid == widget.m.uid);
+  // A closed (solved) doubt: only staff can reopen or write; the student asks a new one.
+  bool get _canWrite => widget.m.isStaff || (widget.m.role == Role.student && d.studentUid == widget.m.uid && !d.solved);
 
   @override
   void dispose() {
@@ -400,7 +401,31 @@ class _DoubtThreadScreenState extends State<DoubtThreadScreen> {
               padding: const EdgeInsets.symmetric(vertical: 14),
               child: Text(widget.m.isStaff ? tr('reply_first') : tr('waiting_teacher'), textAlign: TextAlign.center, style: TextStyle(color: p.muted, fontWeight: FontWeight.w600)),
             ),
-          if (canSolve && (d.answered || d.solved)) ...[
+          if (d.solved && !widget.m.isStaff) ...[
+            const SizedBox(height: 6),
+            AppCard(
+              padding: const EdgeInsets.all(14),
+              child: Row(children: [
+                Icon(Icons.lock_outline_rounded, color: p.muted),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(tr('doubt_closed_title'), style: const TextStyle(fontWeight: FontWeight.w800)),
+                    Text(tr('doubt_closed_sub'), style: TextStyle(color: p.muted, fontSize: 12.5)),
+                  ]),
+                ),
+              ]),
+            ),
+            if (widget.m.role == Role.student && d.studentUid == me) ...[
+              const SizedBox(height: 10),
+              PrimaryButton(label: tr('ask_new_doubt'), icon: Icons.add_rounded, arrow: false, onPressed: () {
+                final nav = Navigator.of(context);
+                nav.pop();
+                push(nav.context, AskDoubtScreen(m: widget.m));
+              }),
+            ],
+          ],
+          if (canSolve && (d.answered || d.solved) && !(d.solved && !widget.m.isStaff)) ...[
             const SizedBox(height: 6),
             SoftButton(
               label: d.solved ? tr('reopen_doubt') : tr('mark_solved'),
@@ -421,7 +446,7 @@ class _DoubtThreadScreenState extends State<DoubtThreadScreen> {
                   icon: Icons.add_a_photo_outlined,
                   tooltip: tr('photo'),
                   onTap: () async {
-                    final got = await pickPhotos(context, max: 1);
+                    final got = await pickPhotos(context, max: 1, crop: true);
                     if (got.isNotEmpty) setState(() => _photo = got.first);
                   },
                 ),

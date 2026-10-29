@@ -143,7 +143,25 @@ abstract class Backend {
   Future<void> claimSubscription(SubPayment p);
   /// Admin paid in a UPI app. [paidOk]: the UPI app said success → the plan starts now;
   /// otherwise it waits for the owner. Returns the saved payment.
-  Future<SubPayment> startPlan({required Membership admin, required String plan, required bool yearly, required bool paidOk, String ref = '', String via = ''});
+  Future<SubPayment> startPlan({required Membership admin, required String plan, required bool yearly, required bool paidOk, String ref = '', String via = '', String coupon = ''});
+  /// Looks up a discount code (null = no such code).
+  Future<Coupon?> coupon(String code);
+
+  // ---- owner only ----
+  Future<List<Coupon>> coupons();
+  Future<void> saveCoupon(Coupon c);
+  Future<void> deleteCoupon(String code);
+  /// Owner: give / renew / extend trial / stop a coaching's plan. Kept in its history.
+  Future<void> ownerSetPlan(String instituteId, {required String action, required String plan, required int until, int days = 0, String note = ''});
+  Future<List<PlanAction>> planHistory(String instituteId);
+
+  // ---- home banners ----
+  /// Banners that are on (everyone).
+  Future<List<AppBanner>> banners();
+  /// Owner: every banner, on or off.
+  Future<List<AppBanner>> allBanners();
+  Future<void> saveBanner(AppBanner b);
+  Future<void> deleteBanner(String id);
   /// Admin: own payments for this coaching (newest first).
   Future<List<SubPayment>> mySubPayments(String instituteId);
   /// Owner only: all coachings, payments waiting for a check, income this month.

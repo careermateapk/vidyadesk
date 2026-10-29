@@ -62,6 +62,98 @@ class AppState extends ChangeNotifier {
     _prefs?.setString(key, jsonEncode(now));
   }
 
+  // ---------- "new" numbers on home tiles ----------
+
+  /// How many new things in each section since it was last opened:
+  /// doubts, results, notices, resources, admissions.
+  Map<String, int> badges = {};
+
+  /// Newest unseen items for "What's new" (section, title, time).
+  List<(String, String, int)> newItems = [];
+
+  String _seenKey(String k) => 'seen_${active?.id ?? ''}_$k';
+
+  int seenAt(String k) {
+    final key = _seenKey(k);
+    final v = _prefs?.getInt(key);
+    if (v != null) return v;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    _prefs?.setInt(key, now); // first time: start counting from now
+    return now;
+  }
+
+  void markSeen(String k) {
+    _prefs?.setInt(_seenKey(k), DateTime.now().millisecondsSinceEpoch);
+    if ((badges[k] ?? 0) != 0) {
+      badges = {...badges, k: 0};
+      newItems = newItems.where((x) => x.$1 != k).toList();
+      notifyListeners();
+    }
+  }
+
+  bool _loadingBadges = false;
+
+  Future<void> loadBadges() async {
+    final m = active;
+    if (m == null || !m.approved || _loadingBadges) return;
+    _loadingBadges = true;
+    try {
+      final inst = m.instituteId;
+      final out = <String, int>{};
+      final items = <(String, String, int)>[];
+      if (m.isStaff) {
+        final seenD = seenAt('doubts');
+        final ds = await backend.doubts(inst);
+        final open = ds.where((d) => !d.solved && (d.replies.isEmpty || !d.replies.last.staff) && d.lastAt > seenD);
+        out['doubts'] = open.length;
+        if (m.role == Role.admin || m.role == Role.teacher) {
+          try {
+            final seenL = seenAt('admissions');
+            out['admissions'] = (await backend.leads(inst)).where((l) => l.createdAt > seenL).length;
+          } catch (_) {}
+        }
+      } else {
+        final su = m.role == Role.student ? m.uid : (m.childUids.isEmpty ? '' : m.childUids[childIndex.clamp(0, m.childUids.length - 1)]);
+        Set<String> myBatches = {...m.batchIds};
+        if (m.role == Role.parent && su.isNotEmpty) {
+          try {
+            myBatches = (await backend.attendanceForStudent(inst, su)).map((a) => a.batchId).toSet();
+          } catch (_) {}
+        }
+        bool mine(String b) => b.isEmpty || myBatches.isEmpty || myBatches.contains(b);
+        final seenN = seenAt('notices');
+        final ns = (await backend.notices(inst)).where((n) => n.createdAt > seenN && mine(n.batchId)).toList();
+        out['notices'] = ns.length;
+        for (final n in ns) {
+          items.add(('notices', n.text, n.createdAt));
+        }
+        final seenR = seenAt('results');
+        final ts = (await backend.tests(inst, publishedOnly: true)).where((t) => t.publishedAt > seenR && t.marks.containsKey(su)).toList();
+        out['results'] = ts.length;
+        for (final t in ts) {
+          items.add(('results', t.title, t.publishedAt));
+        }
+        if (su.isNotEmpty) {
+          final seenD = seenAt('doubts');
+          final ds = (await backend.doubts(inst, studentUid: su)).where((d) => d.replies.any((r) => r.staff && r.at > seenD)).toList();
+          out['doubts'] = ds.length;
+          for (final d in ds) {
+            items.add(('doubts', d.subject, d.lastAt));
+          }
+        }
+        final seenRes = seenAt('resources');
+        out['resources'] = (await backend.resources(inst)).where((r) => r.createdAt > seenRes && mine(r.batchId)).length;
+      }
+      items.sort((a, b) => b.$3.compareTo(a.$3));
+      badges = out;
+      newItems = items.take(5).toList();
+      notifyListeners();
+    } catch (_) {
+    } finally {
+      _loadingBadges = false;
+    }
+  }
+
   /// A request of mine that just got approved (shows "Congratulations" once).
   Membership? welcome;
 
@@ -117,11 +209,12 @@ class AppState extends ChangeNotifier {
     loadUpiApps();
     // Coming back to the app: read the plan again (it may have been renewed).
     _life ??= AppLifecycleListener(onResume: () {
-      if (signedIn != null) refreshMemberships(check: true);
+      if (signedIn != null) refreshMemberships(check: true).then((_) => loadBadges());
     });
     Push.onChange = () {
       if (signedIn != null) refreshMemberships(check: true);
     };
+    Push.onNew = loadBadges;
     try {
       _prefs = await SharedPreferences.getInstance();
     } catch (_) {}

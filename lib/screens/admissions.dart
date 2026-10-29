@@ -6,6 +6,7 @@ import '../core/strings.dart';
 import '../core/theme.dart';
 import '../data/backend.dart' show newId;
 import '../data/models.dart';
+import '../services/push.dart';
 import '../ui/widgets.dart';
 import 'common.dart';
 import 'money.dart' show confirmDelete;
@@ -269,6 +270,15 @@ class _LeadSheetState extends State<_LeadSheet> {
         ..status = _status
         ..followUp = _follow == null ? 0 : DateTime(_follow!.year, _follow!.month, _follow!.day, 10).millisecondsSinceEpoch;
       await app.backend.saveLead(widget.m.instituteId, l);
+      if (widget.lead == null && (app.inst?.notifOn('leads') ?? true)) {
+        Push.send(
+          inst: widget.m.instituteId,
+          kind: 'lead',
+          title: '🧑‍🎓 ${trf('push_new_lead', {'name': l.name})}',
+          body: [l.className, l.subject, l.phone].where((e) => e.isNotEmpty).join(' · '),
+          topics: [Push.admins(widget.m.instituteId)],
+        );
+      }
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
       if (mounted) toast(context, errorMessage(e));

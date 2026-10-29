@@ -1519,3 +1519,37 @@ class Backdrop extends StatelessWidget {
     );
   }
 }
+
+/// A small red number on the corner of [child] (hidden when [count] is 0).
+class CountBadge extends StatelessWidget {
+  const CountBadge({super.key, required this.count, required this.child, this.top = -6, this.right = -6});
+  final int count;
+  final Widget child;
+  final double top, right;
+  @override
+  Widget build(BuildContext context) {
+    if (count <= 0) return child;
+    final p = context.pal;
+    return Stack(clipBehavior: Clip.none, children: [
+      child,
+      Positioned(
+        top: top,
+        right: right,
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(begin: .4, end: 1),
+          duration: const Duration(milliseconds: 380),
+          curve: Curves.elasticOut,
+          builder: (_, v, c) => Transform.scale(scale: v, child: c),
+          child: Container(
+            constraints: const BoxConstraints(minWidth: 21),
+            height: 21,
+            padding: const EdgeInsets.symmetric(horizontal: 5),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(color: p.danger, borderRadius: BorderRadius.circular(11), border: Border.all(color: p.bg, width: 2)),
+            child: Text(count > 99 ? '99+' : '$count', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800, height: 1)),
+          ),
+        ),
+      ),
+    ]);
+  }
+}

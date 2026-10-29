@@ -332,7 +332,7 @@ class FirebaseBackend implements Backend {
 
   @override
   Future<void> updateInstitute(Institute inst) =>
-      _inst(inst.id).update({'name': inst.name, 'city': inst.city, 'address': inst.address, 'phone': inst.phone, 'upiId': inst.upiId, 'upiName': inst.upiName, 'dueDay': inst.dueDay, 'lateFee': inst.lateFee, ...inst.geoMap, 'logo': inst.logo, 'gstin': inst.gstin, 'gstOn': inst.gstOn});
+      _inst(inst.id).update({'name': inst.name, 'city': inst.city, 'address': inst.address, 'phone': inst.phone, 'upiId': inst.upiId, 'upiName': inst.upiName, 'dueDay': inst.dueDay, 'lateFee': inst.lateFee, ...inst.geoMap, 'logo': inst.logo, 'gstin': inst.gstin, 'gstOn': inst.gstOn, 'notif': inst.notif});
 
   @override
   Future<String> newInstituteCode(Institute inst) async {
@@ -710,7 +710,7 @@ class FirebaseBackend implements Backend {
   Future<void> claimSubscription(SubPayment p) => _subs.doc(p.id).set(p.toMap());
 
   @override
-  Future<SubPayment> startPlan({required Membership admin, required String plan, required bool yearly, required bool paidOk, String ref = '', String via = ''}) async {
+  Future<SubPayment> startPlan({required Membership admin, required String plan, required bool yearly, required bool paidOk, String ref = '', String via = '', String coupon = ''}) async {
     final token = await _auth.currentUser?.getIdToken();
     if (token == null || notifyUrl.isEmpty) throw BackendError('network');
     final r = await http
@@ -727,6 +727,7 @@ class FirebaseBackend implements Backend {
             'via': via,
             'adminName': admin.name,
             'phone': admin.phone,
+            'coupon': coupon,
           }),
         )
         .timeout(const Duration(seconds: 30));
@@ -784,4 +785,58 @@ class FirebaseBackend implements Backend {
       ..status = status
       ..decidedAt = now;
   }
+
+  // ---------- coupons, owner plan actions, banners ----------
+
+  @override
+  Future<Coupon?> coupon(String code) async {
+    final c = normaliseCode(code);
+    if (c.isEmpty) return null;
+    final d = await _db.collection('coupons').doc(c).get();
+    return d.exists && d.data() != null ? Coupon.fromMap(d.data()!) : null;
+  }
+
+  @override
+  Future<List<Coupon>> coupons() async =>
+      (await _db.collection('coupons').get()).docs.map((d) => Coupon.fromMap(d.data())).toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+  @override
+  Future<void> saveCoupon(Coupon c) => _db.collection('coupons').doc(c.code).set(c.toMap());
+
+  @override
+  Future<void> deleteCoupon(String code) => _db.collection('coupons').doc(code).delete();
+
+  @override
+  Future<void> ownerSetPlan(String instituteId, {required String action, required String plan, required int until, int days = 0, String note = ''}) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final b = _db.batch();
+    b.update(_inst(instituteId), {'plan': plan, 'planUntil': until});
+    final a = PlanAction(id: '${instituteId}_$now', instituteId: instituteId, action: action, plan: plan, days: days, until: until, note: note, at: now);
+    b.set(_db.collection('planActions').doc(a.id), a.toMap());
+    await b.commit();
+  }
+
+  @override
+  Future<List<PlanAction>> planHistory(String instituteId) async {
+    final a = (await _db.collection('planActions').where('instituteId', isEqualTo: instituteId).get()).docs.map((d) => PlanAction.fromMap(d.data())).toList();
+    final p = (await _subs.where('instituteId', isEqualTo: instituteId).get()).docs.map((d) => SubPayment.fromMap(d.data()));
+    return [
+      ...a,
+      for (final x in p) PlanAction(id: x.id, instituteId: instituteId, action: 'paid_${x.status}', plan: x.plan, until: x.newUntil, note: x.demo ? 'DEMO' : '₹${x.amount}${x.via.isEmpty ? '' : ' · ${x.via}'}', at: x.createdAt),
+    ]..sort((x, y) => y.at.compareTo(x.at));
+  }
+
+  @override
+  Future<List<AppBanner>> banners() async =>
+      (await _db.collection('banners').where('active', isEqualTo: true).get()).docs.map((d) => AppBanner.fromMap(d.data())).toList()..sort((a, b) => a.order.compareTo(b.order));
+
+  @override
+  Future<List<AppBanner>> allBanners() async =>
+      (await _db.collection('banners').get()).docs.map((d) => AppBanner.fromMap(d.data())).toList()..sort((a, b) => a.order.compareTo(b.order));
+
+  @override
+  Future<void> saveBanner(AppBanner b) => _db.collection('banners').doc(b.id).set(b.toMap());
+
+  @override
+  Future<void> deleteBanner(String id) => _db.collection('banners').doc(id).delete();
 }

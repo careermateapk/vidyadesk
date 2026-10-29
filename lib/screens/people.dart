@@ -88,7 +88,14 @@ class _RequestCardState extends State<_RequestCard> {
       await context.appRead.backend.decide(widget.r, ok, batchIds: ok && changed ? _picked.toList() : null);
 
       if (ok) {
-        Push.send(inst: widget.r.instituteId, kind: 'approved', title: '🎉 ${tr('push_approved')}', body: widget.r.instituteName, topics: [Push.person(widget.r.instituteId, widget.r.uid)]);
+        final names = [for (final id in (_student ? _picked : <String>{})) widget.batches[id]?.title ?? ''].where((e) => e.isNotEmpty).join(', ');
+        Push.send(
+          inst: widget.r.instituteId,
+          kind: 'approved',
+          title: '🎉 ${tr('push_approved')}',
+          body: names.isEmpty ? widget.r.instituteName : '${widget.r.instituteName} · $names',
+          topics: [Push.person(widget.r.instituteId, widget.r.uid)],
+        );
         if (_student) context.appRead.backend.syncRoster(widget.r.instituteId);
         if (mounted) toast(context, trf('approved_toast', {'name': widget.r.name}));
       }

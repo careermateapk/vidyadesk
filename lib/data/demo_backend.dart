@@ -26,6 +26,12 @@ class DemoBackend implements Backend {
   final Map<String, CheckIn> _checkins = {};
   final Map<String, Syllabus> _syllabus = {};
   final List<SubPayment> _planPays = [];
+  final Map<String, Coupon> _coupons = {'DIWALI30': Coupon(code: 'DIWALI30', value: 30, maxUses: 100, used: 12)};
+  final List<PlanAction> _planActs = [];
+  final Map<String, AppBanner> _banners = {
+    'bn1': AppBanner(id: 'bn1', title: 'Board exam tips', sub: 'Economics ke 10 sabse important sawal — video dekho', color: 1, action: 'url', url: 'https://youtu.be/dQw4w9WgXcQ', roles: ['student', 'parent', 'teacher']),
+    'bn2': AppBanner(id: 'bn2', title: 'Diwali offer: 30% off', sub: 'Code DIWALI30 · plan pe chhoot', color: 0, action: 'plans', roles: ['admin'], order: 1),
+  };
 
   static const demoInstituteCode = 'SHRM-4821';
   static const demoBatchCode = 'ECO-TTS-5PM-38';
@@ -717,13 +723,18 @@ class DemoBackend implements Backend {
   }
 
   @override
-  Future<SubPayment> startPlan({required Membership admin, required String plan, required bool yearly, required bool paidOk, String ref = '', String via = ''}) async {
+  Future<SubPayment> startPlan({required Membership admin, required String plan, required bool yearly, required bool paidOk, String ref = '', String via = '', String coupon = ''}) async {
     await _wait();
     final now = DateTime.now().millisecondsSinceEpoch;
     final inst = _institutes[admin.instituteId];
     final prevUntil = inst?.planUntil ?? 0;
     final until = extendUntil(prevUntil, yearly);
-    final amount = planAmount(planFrom(plan), yearly);
+    var amount = planAmount(planFrom(plan), yearly);
+    final cp = _coupons[normaliseCode(coupon)];
+    if (cp != null && cp.problem(plan, yearly).isEmpty) {
+      amount -= cp.discount(amount);
+      cp.used++;
+    }
     final p = SubPayment(
       id: '${admin.instituteId}_$now',
       instituteId: admin.instituteId,
@@ -802,4 +813,50 @@ class DemoBackend implements Backend {
       ..status = status
       ..decidedAt = now;
   }
+
+  // ---------- coupons, owner plan actions, banners ----------
+
+  @override
+  Future<Coupon?> coupon(String code) async => _coupons[normaliseCode(code)];
+
+  @override
+  Future<List<Coupon>> coupons() async => _coupons.values.toList();
+
+  @override
+  Future<void> saveCoupon(Coupon c) async => _coupons[c.code] = c;
+
+  @override
+  Future<void> deleteCoupon(String code) async => _coupons.remove(code);
+
+  @override
+  Future<void> ownerSetPlan(String instituteId, {required String action, required String plan, required int until, int days = 0, String note = ''}) async {
+    await _wait();
+    final inst = _institutes[instituteId];
+    if (inst != null) {
+      _institutes[instituteId] = Institute.fromMap(inst.toMap()
+        ..['plan'] = plan
+        ..['planUntil'] = until);
+    }
+    final now = DateTime.now().millisecondsSinceEpoch;
+    _planActs.add(PlanAction(id: '${instituteId}_$now', instituteId: instituteId, action: action, plan: plan, days: days, until: until, note: note, at: now));
+  }
+
+  @override
+  Future<List<PlanAction>> planHistory(String instituteId) async => [
+        ..._planActs.where((a) => a.instituteId == instituteId),
+        for (final x in _planPays.where((p) => p.instituteId == instituteId))
+          PlanAction(id: x.id, instituteId: instituteId, action: 'paid_${x.status}', plan: x.plan, until: x.newUntil, note: x.demo ? 'DEMO' : '₹${x.amount}', at: x.createdAt),
+      ]..sort((x, y) => y.at.compareTo(x.at));
+
+  @override
+  Future<List<AppBanner>> banners() async => _banners.values.where((b) => b.active).toList()..sort((a, b) => a.order.compareTo(b.order));
+
+  @override
+  Future<List<AppBanner>> allBanners() async => _banners.values.toList()..sort((a, b) => a.order.compareTo(b.order));
+
+  @override
+  Future<void> saveBanner(AppBanner b) async => _banners[b.id] = b;
+
+  @override
+  Future<void> deleteBanner(String id) async => _banners.remove(id);
 }

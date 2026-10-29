@@ -16,6 +16,7 @@ import '../ui/widgets.dart';
 import 'common.dart';
 import 'onboarding.dart' show roleIcon, roleName;
 import 'file_sheet.dart';
+import 'owner.dart';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -619,15 +620,50 @@ class _PayPlanSheet extends StatefulWidget {
 
 class _PayPlanSheetState extends State<_PayPlanSheet> {
   int _app = 0;
+  final _code = TextEditingController();
+  Coupon? _cp;
+  String? _cpErr;
+  bool _checking = false;
+
+  @override
+  void dispose() {
+    _code.dispose();
+    super.dispose();
+  }
+
+  Future<void> _apply() async {
+    final code = _code.text.trim();
+    if (code.isEmpty) return;
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _checking = true;
+      _cpErr = null;
+    });
+    try {
+      final c = await context.appRead.backend.coupon(code);
+      final why = c == null ? 'none' : c.problem(widget.plan.name, widget.yearly);
+      setState(() {
+        _cp = why.isEmpty ? c : null;
+        _cpErr = why.isEmpty ? null : tr('coupon_$why');
+      });
+      if (why.isEmpty) HapticFeedback.mediumImpact();
+    } catch (_) {
+      setState(() => _cpErr = tr('coupon_none'));
+    } finally {
+      if (mounted) setState(() => _checking = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final p = context.pal;
     final lim = planLimit[widget.plan]!;
-    final amount = planAmount(widget.plan, widget.yearly);
+    final full = planAmount(widget.plan, widget.yearly);
+    final off = _cp?.discount(full) ?? 0;
+    final amount = full - off;
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+        padding: EdgeInsets.fromLTRB(20, 4, 20, 16 + MediaQuery.of(context).viewInsets.bottom),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Text('${planName(widget.plan)} · ${widget.yearly ? tr('one_year') : tr('one_month')}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
           const SizedBox(height: 2),
@@ -636,6 +672,48 @@ class _PayPlanSheetState extends State<_PayPlanSheet> {
             style: TextStyle(color: p.muted, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 12),
+          Row(children: [
+            Expanded(
+              child: TextField(
+                controller: _code,
+                textCapitalization: TextCapitalization.characters,
+                onChanged: (_) {
+                  if (_cp != null || _cpErr != null) {
+                    setState(() {
+                      _cp = null;
+                      _cpErr = null;
+                    });
+                  }
+                },
+                decoration: InputDecoration(
+                  isDense: true,
+                  hintText: tr('coupon_hint'),
+                  prefixIcon: Icon(Icons.local_offer_outlined, color: _cp != null ? p.success : p.muted),
+                  errorText: _cpErr,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            SizedBox(
+              height: 48,
+              child: _cp != null
+                  ? Center(child: Tag(tr('coupon_applied'), fg: p.success, bg: p.successTint, leading: Icon(Icons.check_rounded, size: 14, color: p.success)))
+                  : FilledButton.tonal(onPressed: _checking ? null : _apply, child: Text(tr('apply'))),
+            ),
+          ]),
+          const SizedBox(height: 10),
+          if (off > 0)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Column(children: [
+                Row(children: [Expanded(child: Text(tr('plan'), style: TextStyle(color: p.muted))), Text(rupees(full))]),
+                const SizedBox(height: 2),
+                Row(children: [
+                  Expanded(child: Text('${tr('coupon')} ${_cp!.code}${_cp!.pct ? ' (${_cp!.value}%)' : ''}', style: TextStyle(color: p.success, fontWeight: FontWeight.w700))),
+                  Text('− ${rupees(off)}', style: TextStyle(color: p.success, fontWeight: FontWeight.w700)),
+                ]),
+              ]),
+            ),
           AppCard(
             padding: const EdgeInsets.all(16),
             child: Row(children: [
@@ -645,7 +723,7 @@ class _PayPlanSheetState extends State<_PayPlanSheet> {
                   Text(rupees(amount), style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800)),
                 ]),
               ),
-              if (widget.yearly) Tag(tr('two_months_free'), fg: p.success, bg: p.successTint),
+              if (widget.yearly && off == 0) Tag(tr('two_months_free'), fg: p.success, bg: p.successTint),
               if (widget.demo) ...[const SizedBox(width: 6), Tag('DEMO', fg: p.warn, bg: p.warnTint)],
             ]),
           ),
@@ -684,7 +762,7 @@ class _PayPlanSheetState extends State<_PayPlanSheet> {
             label: widget.demo ? tr('demo_pay') : trf('pay_amt_upi', {'amt': rupees(amount)}),
             icon: Icons.bolt_rounded,
             arrow: false,
-            onPressed: () => Navigator.pop(context, widget.demo ? _chooserApp : upiApps[_app.clamp(0, upiApps.length - 1)]),
+            onPressed: () => Navigator.pop(context, (widget.demo ? _chooserApp : upiApps[_app.clamp(0, upiApps.length - 1)], _cp)),
           ),
           const SizedBox(height: 8),
           Text(widget.demo ? tr('demo_pay_note') : tr('no_utr_note'), textAlign: TextAlign.center, style: TextStyle(color: p.muted, fontSize: 12.5)),
@@ -700,17 +778,21 @@ const _chooserApp = UpiApp('Demo', '', 'D', 0xFF6C5CE7);
 Future<bool> payForPlan(BuildContext context, Membership m, Plan plan, bool yearly) async {
   final app = context.appRead;
   final demo = app.isDemo || demoPayEmails.contains((app.profile?.email ?? app.signedIn?.email ?? '').toLowerCase());
-  final amount = planAmount(plan, yearly);
-  final upiApp = await showModalBottomSheet<UpiApp>(
+  final picked = await showModalBottomSheet<(UpiApp, Coupon?)>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
     builder: (_) => _PayPlanSheet(plan: plan, yearly: yearly, demo: demo),
   );
-  if (upiApp == null || !context.mounted) return false;
+  if (picked == null || !context.mounted) return false;
+  final upiApp = picked.$1;
+  final cp = picked.$2;
+  final coupon = cp?.code ?? '';
+  final full = planAmount(plan, yearly);
+  final amount = full - (cp?.discount(full) ?? 0);
   var paidOk = false;
   var ref = '';
-  if (demo) {
+  if (demo || amount <= 0) {
     paidOk = true;
     ref = 'DEMO${DateTime.now().millisecondsSinceEpoch % 100000000}';
   } else {
@@ -753,16 +835,33 @@ Future<bool> payForPlan(BuildContext context, Membership m, Plan plan, bool year
   }
   if (!context.mounted) return false;
   SubPayment pay;
+  final nav = Navigator.of(context, rootNavigator: true);
+  showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    builder: (c) => PopScope(
+      canPop: false,
+      child: AlertDialog(
+        content: Row(children: [
+          const SizedBox(width: 28, height: 28, child: CircularProgressIndicator(strokeWidth: 3)),
+          const SizedBox(width: 16),
+          Expanded(child: Text(tr('starting_plan'), style: const TextStyle(fontWeight: FontWeight.w700))),
+        ]),
+      ),
+    ),
+  );
   try {
-    pay = await app.backend.startPlan(admin: m, plan: plan.name, yearly: yearly, paidOk: paidOk, ref: ref, via: demo ? 'Demo' : upiApp.name);
+    pay = await app.backend.startPlan(admin: m, plan: plan.name, yearly: yearly, paidOk: paidOk, ref: ref, via: demo ? 'Demo' : (amount <= 0 ? 'Coupon' : upiApp.name), coupon: coupon);
   } catch (e) {
+    nav.pop();
     if (context.mounted) toast(context, tr('err_plan_start'));
     return false;
   }
-  await app.loadInstitute();
+  nav.pop();
+  app.loadInstitute(); // in the background — the celebration shows right away
   if (!context.mounted) return true;
   if (pay.started) {
-    await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => PlanSuccessScreen(pay: pay)));
+    await push(context, PlanSuccessScreen(pay: pay));
   } else {
     await showDialog<void>(
       context: context,
@@ -1094,6 +1193,7 @@ class _OwnerPanelScreenState extends State<OwnerPanelScreen> {
                 padding: const EdgeInsets.only(bottom: 8),
                 child: AppCard(
                   padding: const EdgeInsets.all(12),
+                  onTap: () => showManageCoaching(context, i, onChanged: () => setState(() => _v++)),
                   child: Row(children: [
                     Icon(Icons.schedule_rounded, color: s.locked ? p.danger : s.trial ? p.warn : planColor(p, s.plan), size: 20),
                     const SizedBox(width: 10),
@@ -1104,7 +1204,7 @@ class _OwnerPanelScreenState extends State<OwnerPanelScreen> {
                             maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: p.muted, fontSize: 12)),
                       ]),
                     ),
-                    if (i.ownerPhone.isNotEmpty) IconBtn(icon: Icons.chat_rounded, color: p.success, box: 38, tooltip: 'WhatsApp', onTap: () => openWhatsApp(context, i.ownerPhone, trf('owner_remind_text', {'inst': i.name}))),
+                    Tag('${tr('manage')} ›', fg: p.brand, bg: p.brandTint),
                   ]),
                 ),
               );
@@ -1128,6 +1228,28 @@ class _OwnerPanelScreenState extends State<OwnerPanelScreen> {
                   kpi(tr('students'), '${d.students}', p.brand),
                   const SizedBox(width: 8),
                   kpi(tr('locked'), '${locked.length}', p.danger),
+                ]),
+                const SizedBox(height: 8),
+                Row(children: [
+                  for (final t in [
+                    (Icons.local_offer_outlined, tr('coupons'), p.warn, () => push(context, const CouponsScreen())),
+                    (Icons.view_carousel_outlined, tr('banners'), p.indigo, () => push(context, const BannersScreen())),
+                    (Icons.campaign_outlined, tr('notice_to_all'), p.danger, () => showBroadcast(context)),
+                  ]) ...[
+                    if (t.$2 != tr('coupons')) const SizedBox(width: 8),
+                    Expanded(
+                      child: AppCard(
+                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+                        radius: 18,
+                        onTap: t.$4,
+                        child: Column(children: [
+                          Icon(t.$1, color: t.$3),
+                          const SizedBox(height: 6),
+                          Text(t.$2, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                        ]),
+                      ),
+                    ),
+                  ],
                 ]),
                 const SizedBox(height: 18),
                 SectionTitle(tr('check_payments'), trailing: d.pending.isEmpty ? null : Tag(trf('n_new', {'n': '${d.pending.length}'}), fg: p.danger, bg: p.dangerTint)),

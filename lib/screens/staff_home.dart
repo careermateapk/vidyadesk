@@ -18,6 +18,7 @@ import 'schedule.dart';
 import 'tools.dart';
 import 'subscription.dart';
 import '../core/plan.dart';
+import 'owner.dart' show HomeBanners;
 
 class _StaffData {
   _StaffData(this.members, this.batches, this.today, this.fees, this.lastFees, this.notices, this.week);
@@ -143,6 +144,7 @@ class _StaffHomeState extends State<StaffHome> {
           ),
         ])),
         const SizedBox(height: 16),
+        HomeBanners(role: m.role, onPlans: admin ? () => push(context, PlansScreen(m: m)) : null),
         PlanBanner(m: m),
         if (admin)
           item(FeatureCard(

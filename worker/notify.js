@@ -207,7 +207,9 @@ async function fsGet(token, pid, path) {
   if (!r.ok) throw new Error('firestore_' + r.status);
   const f = (await r.json()).fields || {};
   const o = {};
-  for (const [k, v] of Object.entries(f)) o[k] = v.stringValue ?? (v.integerValue !== undefined ? Number(v.integerValue) : v.doubleValue ?? v.booleanValue ?? null);
+  const val = (v) =>
+    v.arrayValue ? (v.arrayValue.values || []).map(val) : v.stringValue ?? (v.integerValue !== undefined ? Number(v.integerValue) : v.doubleValue ?? v.booleanValue ?? null);
+  for (const [k, v] of Object.entries(f)) o[k] = val(v);
   return o;
 }
 
@@ -221,6 +223,19 @@ async function fsPatch(token, pid, path, obj, mask) {
     body: JSON.stringify({ fields }),
   });
   if (!r.ok) throw new Error('firestore_write_' + r.status);
+}
+
+// Discount from a coupon document (0 when it can't be used).
+export function couponDiscount(c, plan, yearly, amount, now = Date.now()) {
+  if (!c || c.active === false) return 0;
+  if (Number(c.until || 0) > 0 && now > Number(c.until)) return 0;
+  if (Number(c.maxUses || 0) > 0 && Number(c.used || 0) >= Number(c.maxUses)) return 0;
+  const plans = Array.isArray(c.plans) ? c.plans : [];
+  if (plans.length && !plans.includes(plan)) return 0;
+  if (c.yearlyOnly === true && !yearly) return 0;
+  const v = Number(c.value || 0);
+  const off = c.pct === false ? v : Math.round((amount * v) / 100);
+  return Math.max(0, Math.min(amount, off));
 }
 
 export function checkPlanRequest(b) {
@@ -242,7 +257,18 @@ async function buyPlan(env, login, b) {
   if (!inst) return json({ error: 'no_institute' }, 404);
   const demo = DEMO_EMAILS.includes(login.email);
   const yearly = b.yearly === true;
-  const amount = PRICES[b.plan][yearly ? 1 : 0];
+  let amount = PRICES[b.plan][yearly ? 1 : 0];
+  const code = String(b.coupon || '').trim().toUpperCase().replace(/\s/g, '');
+  let couponUsed = '';
+  if (code) {
+    const c = await fsGet(token, pid, `coupons/${encodeURIComponent(code)}`).catch(() => null);
+    const off = couponDiscount(c, b.plan, yearly, amount, Date.now());
+    if (off > 0) {
+      amount -= off;
+      couponUsed = code;
+      await fsPatch(token, pid, `coupons/${encodeURIComponent(code)}`, { used: Number(c.used || 0) + 1 }, ['used']).catch(() => {});
+    }
+  }
   const now = Date.now();
   const start = demo || b.result === 'success';
   const prevPlan = inst.plan || 'trial';
@@ -263,6 +289,7 @@ async function buyPlan(env, login, b) {
     via: String(b.via || '').slice(0, 40),
     status: start ? 'auto' : 'pending',
     demo,
+    coupon: couponUsed,
     prevPlan,
     prevUntil,
     newUntil: start ? newUntil : 0,
@@ -274,9 +301,118 @@ async function buyPlan(env, login, b) {
   return json({ ok: true, id, started: start, planUntil: start ? newUntil : prevUntil, amount, demo });
 }
 
+// ---- daily: fee due reminders (morning) and missed teacher check-in (evening) ----
+const IST = 5.5 * 3600e3;
+const pad2 = (n) => String(n).padStart(2, '0');
+
+function decodeFields(f = {}) {
+  const val = (v) =>
+    v.arrayValue
+      ? (v.arrayValue.values || []).map(val)
+      : v.mapValue
+        ? decodeFields(v.mapValue.fields || {})
+        : v.stringValue ?? (v.integerValue !== undefined ? Number(v.integerValue) : v.doubleValue ?? v.booleanValue ?? null);
+  const o = {};
+  for (const [k, v] of Object.entries(f)) o[k] = val(v);
+  return o;
+}
+
+async function listDocs(token, pid, path) {
+  const out = [];
+  let page = '';
+  for (let i = 0; i < 20; i++) {
+    const r = await fetch(`${fsBase(pid)}/${path}?pageSize=300${page ? `&pageToken=${page}` : ''}`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!r.ok) break;
+    const j = await r.json();
+    for (const d of j.documents || []) out.push({ id: d.name.split('/').pop(), ...decodeFields(d.fields) });
+    if (!j.nextPageToken) break;
+    page = j.nextPageToken;
+  }
+  return out;
+}
+
+async function queryEq(token, pid, parent, collection, field, value) {
+  const r = await fetch(`${fsBase(pid)}${parent ? '/' + parent : ''}:runQuery`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      structuredQuery: { from: [{ collectionId: collection }], where: { fieldFilter: { field: { fieldPath: field }, op: 'EQUAL', value: { stringValue: value } } }, limit: 2000 },
+    }),
+  });
+  if (!r.ok) return [];
+  return (await r.json()).filter((x) => x.document).map((x) => ({ id: x.document.name.split('/').pop(), ...decodeFields(x.document.fields) }));
+}
+
+const planLive = (inst, now) => !inst.planUntil || Number(inst.planUntil) > now;
+const notifOn = (inst, k) => !(inst.notif && inst.notif[k] === false);
+
+// Which fee message (if any) goes out today. dueDay: 1..28.
+export function feeStep(day, dueDay) {
+  if (day === dueDay - 2) return 'soon';
+  if (day === dueDay) return 'today';
+  if (day === dueDay + 3) return 'late';
+  return '';
+}
+
+export async function feeReminders(env, now = Date.now()) {
+  const token = await accessToken(JSON.parse(env.SA_JSON));
+  const pid = env.PROJECT_ID;
+  const ist = new Date(now + IST);
+  const day = ist.getUTCDate();
+  const month = `${ist.getUTCFullYear()}-${pad2(ist.getUTCMonth() + 1)}`;
+  let sent = 0;
+  for (const inst of await listDocs(token, pid, 'institutes')) {
+    if (!planLive(inst, now) || !notifOn(inst, 'feeDue')) continue;
+    const due = Math.min(28, Math.max(1, Number(inst.dueDay || 10)));
+    const step = feeStep(day, due);
+    if (!step) continue;
+    const mems = (await queryEq(token, pid, '', 'memberships', 'instituteId', inst.id)).filter((m) => m.status === 'approved');
+    const fees = await queryEq(token, pid, `institutes/${inst.id}`, 'fees', 'month', month);
+    const paid = new Set(fees.filter((f) => f.paid === true || f.claimed === true).map((f) => f.studentUid));
+    const dueDate = `${due} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][ist.getUTCMonth()]}`;
+    const title = step === 'soon' ? `💰 Fees ${dueDate} tak bharni hai` : step === 'today' ? '💰 Aaj fees ki last date hai' : '⚠️ Fees late ho gayi';
+    for (const st of mems.filter((m) => m.role === 'student' && !paid.has(m.uid))) {
+      const parents = mems.filter((m) => m.role === 'parent' && Array.isArray(m.childUids) && m.childUids.includes(st.uid)).map((m) => `u_${inst.id}_${m.uid}`);
+      const topics = [`u_${inst.id}_${st.uid}`, ...parents].slice(0, 5);
+      const body = `${st.name} · ${inst.name}${step === 'late' && Number(inst.lateFee || 0) > 0 ? ` · late fee ₹${inst.lateFee}` : ''} — app mein UPI se bharein`;
+      if (await sendFcm(token, pid, topics, title, body, inst.id, 'fee_due')) sent++;
+    }
+  }
+  return sent;
+}
+
+export async function checkinReminders(env, now = Date.now()) {
+  const token = await accessToken(JSON.parse(env.SA_JSON));
+  const pid = env.PROJECT_ID;
+  const ist = new Date(now + IST);
+  const weekday = ist.getUTCDay() === 0 ? 7 : ist.getUTCDay(); // 1 = Monday … 7 = Sunday
+  const key = `${ist.getUTCFullYear()}${pad2(ist.getUTCMonth() + 1)}${pad2(ist.getUTCDate())}`;
+  let sent = 0;
+  for (const inst of await listDocs(token, pid, 'institutes')) {
+    if (!planLive(inst, now) || !notifOn(inst, 'checkin')) continue;
+    if (inst.geoCheckin !== true && inst.onlineCheckin !== true) continue; // check-in not used here
+    const batches = (await listDocs(token, pid, `institutes/${inst.id}/batches`)).filter((b) => Array.isArray(b.days) && b.days.includes(weekday) && b.teacherUid);
+    const teachers = new Map();
+    for (const b of batches) if (b.teacherUid !== inst.ownerUid) teachers.set(b.teacherUid, b.teacherName || 'Teacher');
+    const missed = [];
+    for (const [uid, name] of teachers) {
+      const c = await fsGet(token, pid, `institutes/${inst.id}/checkins/${uid}_${key}`).catch(() => null);
+      if (!c) missed.push(name);
+    }
+    if (!missed.length) continue;
+    if (await sendFcm(token, pid, [`a_${inst.id}`], `🕘 Aaj check-in nahi kiya: ${missed.slice(0, 3).join(', ')}${missed.length > 3 ? ` +${missed.length - 3}` : ''}`, inst.name, inst.id, 'checkin')) sent++;
+  }
+  return sent;
+}
+
 export default {
   async scheduled(event, env, ctx) {
+    if (event.cron === '30 15 * * *') {
+      ctx.waitUntil(checkinReminders(env).catch((e) => console.log('check-in reminders failed', e)));
+      return;
+    }
     ctx.waitUntil(planReminders(env).catch((e) => console.log('plan reminders failed', e)));
+    ctx.waitUntil(feeReminders(env).catch((e) => console.log('fee reminders failed', e)));
   },
   async fetch(req, env) {
     if (req.method !== 'POST') return json({ ok: true, service: 'vidyadesk-notify' });
@@ -290,6 +426,12 @@ export default {
     try {
       const b = await req.json();
       if (b.action === 'plan') return await buyPlan(env, login, b);
+      if (b.action === 'broadcast') {
+        if (!OWNER_EMAILS.includes(login.email)) return json({ error: 'forbidden' }, 403);
+        const token = await accessToken(JSON.parse(env.SA_JSON));
+        const ok = await sendFcm(token, env.PROJECT_ID, ['all'], String(b.title || 'VidyaDesk').slice(0, 120), String(b.body || '').slice(0, 400), '', 'broadcast');
+        return json({ ok });
+      }
       const bad = checkRequest(b);
       if (bad) return json({ error: bad }, 400);
       const inst = String(b.inst);

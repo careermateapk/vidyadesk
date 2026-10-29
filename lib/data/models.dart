@@ -84,8 +84,14 @@ class Institute {
     this.logo = '',
     this.gstin = '',
     this.gstOn = false,
+    this.notif = const {},
   });
   final String id, name, city, code, ownerUid;
+
+  /// Which automatic notifications the admin turned on (missing = on):
+  /// absent, feeDue, timetable, checkin, leads.
+  final Map<String, bool> notif;
+  bool notifOn(String k) => notif[k] ?? true;
 
   /// Receipt details: logo (small base64 JPEG) and GST number (only when [gstOn]).
   final String logo, gstin;
@@ -133,6 +139,7 @@ class Institute {
     String? logo,
     String? gstin,
     bool? gstOn,
+    Map<String, bool>? notif,
   }) =>
       Institute(
         id: id,
@@ -161,10 +168,11 @@ class Institute {
         logo: logo ?? this.logo,
         gstin: gstin ?? this.gstin,
         gstOn: gstOn ?? this.gstOn,
+        notif: notif ?? this.notif,
       );
 
   Map<String, dynamic> toMap() =>
-      {'id': id, 'name': name, 'city': city, 'code': code, 'ownerUid': ownerUid, 'address': address, 'phone': phone, 'upiId': upiId, 'upiName': upiName, 'dueDay': dueDay, 'lateFee': lateFee, ...geoMap, 'plan': plan, 'planUntil': planUntil, 'ownerName': ownerName, 'ownerPhone': ownerPhone, 'createdAt': createdAt, 'logo': logo, 'gstin': gstin, 'gstOn': gstOn};
+      {'id': id, 'name': name, 'city': city, 'code': code, 'ownerUid': ownerUid, 'address': address, 'phone': phone, 'upiId': upiId, 'upiName': upiName, 'dueDay': dueDay, 'lateFee': lateFee, ...geoMap, 'plan': plan, 'planUntil': planUntil, 'ownerName': ownerName, 'ownerPhone': ownerPhone, 'createdAt': createdAt, 'logo': logo, 'gstin': gstin, 'gstOn': gstOn, 'notif': notif};
 
   Map<String, dynamic> get geoMap => {
         'geoCheckin': geoCheckin,
@@ -202,6 +210,7 @@ class Institute {
         logo: _s(m['logo']),
         gstin: _s(m['gstin']),
         gstOn: _b(m['gstOn']),
+        notif: m['notif'] is Map ? {for (final e in (m['notif'] as Map).entries) '${e.key}': e.value == true} : const {},
       );
 
   /// What is still missing for proper fee receipts.
@@ -775,6 +784,7 @@ class TestPaper {
     required this.maxMarks,
     required this.date,
     this.published = false,
+    this.publishedAt = 0,
     Map<String, double>? marks,
     this.byName = '',
     Map<String, String>? names,
@@ -784,6 +794,7 @@ class TestPaper {
   final int maxMarks;
   final int date; // ms
   bool published;
+  int publishedAt;
   final Map<String, double> marks; // studentUid -> marks
   final Map<String, String> names; // studentUid -> name (so students can see a leaderboard)
 
@@ -803,6 +814,7 @@ class TestPaper {
         'maxMarks': maxMarks,
         'date': date,
         'published': published,
+        'publishedAt': publishedAt,
         'marks': marks,
         'byName': byName,
         'names': names,
@@ -815,6 +827,7 @@ class TestPaper {
         maxMarks: _i(m['maxMarks']) == 0 ? 100 : _i(m['maxMarks']),
         date: _i(m['date']),
         published: _b(m['published']),
+        publishedAt: _i(m['publishedAt']),
         marks: m['marks'] is Map ? (m['marks'] as Map).map((k, v) => MapEntry(k.toString(), v is num ? v.toDouble() : double.tryParse('$v') ?? 0)) : {},
         byName: _s(m['byName']),
         names: m['names'] is Map ? (m['names'] as Map).map((k, v) => MapEntry(k.toString(), v.toString())) : {},
@@ -1030,4 +1043,131 @@ class Syllabus {
   Map<String, dynamic> toMap() => {'batchId': batchId, 'chapters': chapters.map((c) => c.toMap()).toList(), 'updatedAt': updatedAt};
   factory Syllabus.fromMap(Map<String, dynamic> m) =>
       Syllabus(batchId: _s(m['batchId']), chapters: _lm(m['chapters']).map(Chapter.fromMap).toList(), updatedAt: _i(m['updatedAt']));
+}
+
+
+/// A discount code on VidyaDesk plans (made by the owner).
+class Coupon {
+  Coupon({
+    required this.code,
+    this.pct = true,
+    this.value = 0,
+    this.plans = const ['basic', 'standard', 'pro'],
+    this.yearlyOnly = false,
+    this.until = 0,
+    this.maxUses = 0,
+    this.used = 0,
+    this.active = true,
+    this.createdAt = 0,
+  });
+  final String code;
+  bool pct; // true = % off, false = ₹ off
+  int value, until, maxUses, used, createdAt; // until 0 = no end · maxUses 0 = no limit
+  List<String> plans;
+  bool yearlyOnly, active;
+
+  /// Why this coupon can't be used ('' = it can).
+  String problem(String plan, bool yearly, {DateTime? now}) {
+    final n = (now ?? DateTime.now()).millisecondsSinceEpoch;
+    if (!active) return 'off';
+    if (until > 0 && n > until) return 'expired';
+    if (maxUses > 0 && used >= maxUses) return 'used_up';
+    if (!plans.contains(plan)) return 'plan';
+    if (yearlyOnly && !yearly) return 'yearly';
+    return '';
+  }
+
+  int discount(int amount) => (pct ? (amount * value / 100).round() : value).clamp(0, amount);
+
+  Map<String, dynamic> toMap() => {
+        'code': code,
+        'pct': pct,
+        'value': value,
+        'plans': plans,
+        'yearlyOnly': yearlyOnly,
+        'until': until,
+        'maxUses': maxUses,
+        'used': used,
+        'active': active,
+        'createdAt': createdAt,
+      };
+  factory Coupon.fromMap(Map<String, dynamic> m) => Coupon(
+        code: _s(m['code']),
+        pct: m['pct'] != false,
+        value: _i(m['value']),
+        plans: _ls(m['plans']),
+        yearlyOnly: _b(m['yearlyOnly']),
+        until: _i(m['until']),
+        maxUses: _i(m['maxUses']),
+        used: _i(m['used']),
+        active: m['active'] != false,
+        createdAt: _i(m['createdAt']),
+      );
+}
+
+/// A sliding banner on everyone's home page (made by the owner).
+class AppBanner {
+  AppBanner({
+    required this.id,
+    this.title = '',
+    this.sub = '',
+    this.color = 0,
+    this.image = '',
+    this.action = 'none',
+    this.url = '',
+    this.roles = const ['admin', 'teacher', 'student', 'parent'],
+    this.active = true,
+    this.order = 0,
+    this.createdAt = 0,
+  });
+  final String id;
+  String title, sub, image, action, url; // action: plans | url | none
+  int color, order, createdAt;
+  List<String> roles;
+  bool active;
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'title': title,
+        'sub': sub,
+        'color': color,
+        'image': image,
+        'action': action,
+        'url': url,
+        'roles': roles,
+        'active': active,
+        'order': order,
+        'createdAt': createdAt,
+      };
+  factory AppBanner.fromMap(Map<String, dynamic> m) => AppBanner(
+        id: _s(m['id']),
+        title: _s(m['title']),
+        sub: _s(m['sub']),
+        color: _i(m['color']),
+        image: _s(m['image']),
+        action: _s(m['action']).isEmpty ? 'none' : _s(m['action']),
+        url: _s(m['url']),
+        roles: _ls(m['roles']),
+        active: m['active'] != false,
+        order: _i(m['order']),
+        createdAt: _i(m['createdAt']),
+      );
+}
+
+/// Something the owner did to a coaching's plan (kept as history).
+class PlanAction {
+  PlanAction({required this.id, required this.instituteId, required this.action, this.plan = '', this.days = 0, this.until = 0, this.note = '', this.at = 0});
+  final String id, instituteId, action, plan, note; // action: give | renew | trial | stop
+  final int days, until, at;
+  Map<String, dynamic> toMap() => {'id': id, 'instituteId': instituteId, 'action': action, 'plan': plan, 'days': days, 'until': until, 'note': note, 'at': at};
+  factory PlanAction.fromMap(Map<String, dynamic> m) => PlanAction(
+        id: _s(m['id']),
+        instituteId: _s(m['instituteId']),
+        action: _s(m['action']),
+        plan: _s(m['plan']),
+        days: _i(m['days']),
+        until: _i(m['until']),
+        note: _s(m['note']),
+        at: _i(m['at']),
+      );
 }

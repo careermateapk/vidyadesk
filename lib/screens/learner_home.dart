@@ -14,11 +14,14 @@ import 'insights.dart';
 import 'notices.dart';
 import 'notifications.dart';
 import 'tools.dart';
+import 'tests.dart' show TestsPage;
+import 'doubts.dart' show DoubtsPage;
 import 'onboarding.dart';
 import 'schedule.dart';
 import '../ui/mascot.dart';
 import 'subscription.dart';
 import '../core/plan.dart';
+import 'owner.dart' show HomeBanners;
 
 class _LearnerData {
   _LearnerData(this.batches, this.att, this.fees, this.notices);
@@ -250,6 +253,7 @@ class _LearnerBody extends StatelessWidget {
               ])),
               if (childSwitcher != null) ...[const SizedBox(height: 14), childSwitcher!],
               const SizedBox(height: 16),
+              HomeBanners(role: m.role),
               PlanBanner(m: m),
               item(FeatureCard(
                 onTap: () => push(context, ScheduleScreen(m: m)),
@@ -343,6 +347,38 @@ class _LearnerBody extends StatelessWidget {
               const SizedBox(height: 12),
               item(ToolsRow(m: m, studentUid: studentUid, studentName: name)),
               const SizedBox(height: 12),
+              if (app.newItems.isNotEmpty) ...[
+                item(SectionTitle(tr('whats_new'))),
+                for (final n in app.newItems)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: AppCard(
+                      padding: const EdgeInsets.all(12),
+                      onTap: () async {
+                        app.markSeen(n.$1);
+                        await push(context, switch (n.$1) { 'notices' => NoticesPage(m: m, back: true), 'results' => TestsPage(m: m), _ => DoubtsPage(m: m) });
+                        app.loadBadges();
+                      },
+                      child: Row(children: [
+                        IconBox(
+                          switch (n.$1) { 'notices' => Icons.campaign_rounded, 'results' => Icons.emoji_events_rounded, _ => Icons.forum_rounded },
+                          fg: switch (n.$1) { 'notices' => p.danger, 'results' => p.warn, _ => p.brand },
+                          bg: p.cardAlt,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text(n.$1 == 'doubts' ? trf('doubt_answered_new', {'s': n.$2}) : (n.$1 == 'results' ? trf('result_out_new', {'s': n.$2}) : n.$2),
+                                maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                            Text('${tr('wn_${n.$1}')} · ${ago(n.$3)}', style: TextStyle(color: p.muted, fontSize: 12)),
+                          ]),
+                        ),
+                        Container(width: 9, height: 9, decoration: BoxDecoration(color: p.danger, shape: BoxShape.circle)),
+                      ]),
+                    ),
+                  ),
+                const SizedBox(height: 4),
+              ],
               if (planHas(context, Feature.doubts)) BadgesCard(m: m),
               const DemoBanner(),
               const SizedBox(height: 16),

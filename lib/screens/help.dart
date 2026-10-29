@@ -7,6 +7,7 @@ import '../core/strings.dart';
 import '../core/theme.dart';
 import '../ui/mascot.dart';
 import '../ui/widgets.dart';
+import 'common.dart';
 import 'onboarding.dart';
 
 /// Opens the phone's email app with our support address and some details filled in.
@@ -281,6 +282,62 @@ class LegalFooter extends StatelessWidget {
         Text('·', style: base),
         l(tr('help'), () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const Backdrop(child: FaqScreen())))),
       ],
+    );
+  }
+}
+
+/// Our own "About" page (Flutter's built-in one always shows "View licenses").
+class AboutScreen extends StatelessWidget {
+  const AboutScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pal;
+    final demo = context.appRead.isDemo;
+    final feats = [
+      (Icons.fact_check_outlined, tr('about_f1')),
+      (Icons.account_balance_wallet_outlined, tr('about_f2')),
+      (Icons.folder_copy_outlined, tr('about_f3')),
+      (Icons.quiz_outlined, tr('about_f4')),
+      (Icons.forum_outlined, tr('about_f5')),
+      (Icons.bar_chart_rounded, tr('about_f6')),
+    ];
+    return AppScaffold(
+      title: tr('about'),
+      body: ListView(padding: const EdgeInsets.fromLTRB(18, 8, 18, 30), children: [
+        Center(child: const AppLogo(size: 96)),
+        const SizedBox(height: 14),
+        const Center(child: Text('VidyaDesk', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: -.4))),
+        Center(child: Text('${tr('version')} $appVersion', style: TextStyle(color: p.muted, fontWeight: FontWeight.w700))),
+        const SizedBox(height: 8),
+        Center(child: Tag(demo ? tr('mode_demo') : tr('mode_live'), fg: demo ? p.warn : p.success, bg: demo ? p.warnTint : p.successTint)),
+        const SizedBox(height: 18),
+        AppCard(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(tr('about_text'), style: TextStyle(color: p.ink2, height: 1.45, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 12),
+            for (final f in feats)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 5),
+                child: Row(children: [
+                  IconBox(f.$1, fg: p.brand, bg: p.brandTint, size: 32),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(f.$2, style: const TextStyle(fontWeight: FontWeight.w700))),
+                ]),
+              ),
+          ]),
+        ),
+        const SizedBox(height: 12),
+        AppCard(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Column(children: [
+            ListTile(leading: Icon(Icons.description_outlined, color: p.indigo), title: Text(tr('terms')), trailing: const Icon(Icons.chevron_right_rounded), onTap: () => push(context, const LegalScreen())),
+            ListTile(leading: Icon(Icons.verified_user_outlined, color: p.success), title: Text(tr('privacy')), trailing: const Icon(Icons.chevron_right_rounded), onTap: () => push(context, const LegalScreen(privacy: true))),
+            ListTile(leading: Icon(Icons.mail_outline_rounded, color: p.warn), title: Text(tr('contact_us')), trailing: const Icon(Icons.chevron_right_rounded), onTap: () => contactSupport(context)),
+          ]),
+        ),
+        const SizedBox(height: 18),
+        Center(child: Text(tr('made_in_india'), style: TextStyle(color: p.muted, fontWeight: FontWeight.w700, fontSize: 12.5))),
+      ]),
     );
   }
 }

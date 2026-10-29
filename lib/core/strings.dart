@@ -474,7 +474,7 @@ const Map<String, List<String>> _t = {
   'dark_mode': ['Dark mode', 'डार्क मोड', 'Dark mode'],
   'system_mode': ['Same as phone', 'फ़ोन के जैसा', 'Phone jaisa'],
   'about': ['About', 'ऐप के बारे में', 'App ke baare mein'],
-  'about_text': ['VidyaDesk — attendance, fees, batches and notices for coaching and tuition.', 'VidyaDesk — कोचिंग और ट्यूशन के लिए हाज़िरी, फीस, बैच और नोटिस।', 'VidyaDesk — coaching aur tuition ke liye attendance, fees, batch aur notice.'],
+  'about_text': ['VidyaDesk is a complete app for coaching and tuition — for owners, teachers, students and parents.', 'VidyaDesk कोचिंग और ट्यूशन के लिए पूरा ऐप है — मालिक, शिक्षक, छात्र और अभिभावक सबके लिए।', 'VidyaDesk coaching aur tuition ke liye poora app hai — owner, teacher, student aur parent sabke liye.'],
   'mode_demo': ['Running in demo mode (sample data).', 'डेमो मोड में चल रहा है (सैंपल डेटा)।', 'Demo mode mein chal raha hai (sample data).'],
   'mode_live': ['Connected to the online server.', 'ऑनलाइन सर्वर से जुड़ा है।', 'Online server se juda hai.'],
   // ---- remove role / delete institute ----
@@ -1049,4 +1049,11 @@ const Map<String, List<String>> _t = {
   'online_from_home': ['Online (home)', 'ऑनलाइन (घर से)', 'Online (ghar se)'],
   'online_home_tag': ['Online · home', 'ऑनलाइन · घर', 'Online · ghar se'],
   'coaching_tag': ['Coaching', 'कोचिंग', 'Coaching'],
+  'version': ['Version', 'संस्करण', 'Version'],
+  'about_f1': ['Attendance, schedule and teacher check-in', 'हाज़िरी, टाइमटेबल और शिक्षक हाज़िरी', 'Attendance, schedule aur teacher check-in'],
+  'about_f2': ['Fees by UPI, receipts, salary and accounts', 'UPI से फीस, रसीद, वेतन और हिसाब', 'UPI se fees, receipt, salary aur hisaab'],
+  'about_f3': ['Videos, notes, homework and syllabus', 'वीडियो, नोट्स, होमवर्क और सिलेबस', 'Videos, notes, homework aur syllabus'],
+  'about_f4': ['Tests, results, report cards and leaderboard', 'टेस्ट, परिणाम, रिपोर्ट कार्ड और लीडरबोर्ड', 'Tests, results, report card aur leaderboard'],
+  'about_f5': ['Doubt box, notices and notifications', 'डाउट बॉक्स, नोटिस और सूचनाएँ', 'Doubt box, notice aur notifications'],
+  'about_f6': ['Admissions, risk alerts and PDF / Excel reports', 'दाखिले, जोखिम चेतावनी और PDF / Excel रिपोर्ट', 'Admissions, risk alert aur PDF / Excel reports'],
 };

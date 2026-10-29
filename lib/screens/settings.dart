@@ -291,16 +291,7 @@ class SettingsPage extends StatelessWidget {
     }
   }
 
-  void _about(BuildContext context) {
-    final app = context.appRead;
-    showAboutDialog(
-      context: context,
-      applicationName: 'VidyaDesk',
-      applicationVersion: '1.0.0',
-      applicationIcon: const AppLogo(size: 48),
-      children: [Text(tr('about_text')), const SizedBox(height: 8), Text(app.isDemo ? tr('mode_demo') : tr('mode_live'))],
-    );
-  }
+  void _about(BuildContext context) => push(context, const AboutScreen());
 }
 
 /// Asks before leaving a role, or (owner) deleting the whole institute.

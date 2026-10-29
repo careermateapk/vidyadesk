@@ -308,6 +308,13 @@ class AppState extends ChangeNotifier {
         memberships = profile == null ? [] : await backend.myMemberships();
         _checkRemoved(detect: true);
         _pickActive();
+        // Make sure my photo is visible to my coaching (parents see their child's photo).
+        final ph = profile?.photo ?? '';
+        if (ph.isNotEmpty) {
+          for (final m in memberships.where((x) => x.status != MemberStatus.rejected)) {
+            backend.sharePhoto(m.instituteId, ph).catchError((_) {});
+          }
+        }
         Push.sync(backend, memberships);
         await loadInstitute();
       }

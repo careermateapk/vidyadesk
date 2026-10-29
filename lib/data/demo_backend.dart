@@ -687,6 +687,9 @@ class DemoBackend implements Backend {
   }
 
   @override
+  Future<void> sharePhoto(String instituteId, String photo) async {}
+
+  @override
   Future<Map<String, String>> childPhotos(String instituteId, List<String> uids) async => {
         for (final u in uids)
           if ((_members['${u}_$instituteId']?.photo ?? '').isNotEmpty) u: _members['${u}_$instituteId']!.photo,

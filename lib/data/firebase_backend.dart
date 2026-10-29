@@ -153,7 +153,20 @@ class FirebaseBackend implements Backend {
     final q = await _mem.where('uid', isEqualTo: me).get();
     for (final d in q.docs) {
       await d.reference.update({'photo': photo});
+      try {
+        await sharePhoto((d.data()['instituteId'] ?? '').toString(), photo);
+      } catch (_) {}
     }
+  }
+
+  @override
+  Future<void> sharePhoto(String instituteId, String photo) async {
+    if (instituteId.isEmpty) return;
+    final me = _auth.currentUser!.uid;
+    final ref = _inst(instituteId).collection('photos').doc(me);
+    final cur = await ref.get();
+    if (cur.exists && (cur.data()?['photo'] ?? '') == photo) return;
+    await ref.set({'photo': photo, 'at': DateTime.now().millisecondsSinceEpoch});
   }
 
   // ---------- memberships ----------
@@ -661,6 +674,14 @@ class FirebaseBackend implements Backend {
   Future<Map<String, String>> childPhotos(String instituteId, List<String> uids) async {
     final out = <String, String>{};
     for (final u in uids) {
+      try {
+        final d = await _inst(instituteId).collection('photos').doc(u).get();
+        final ph = (d.data()?['photo'] ?? '').toString();
+        if (ph.isNotEmpty) {
+          out[u] = ph;
+          continue;
+        }
+      } catch (_) {}
       try {
         final d = await _mem.doc('${u}_$instituteId').get();
         final ph = (d.data()?['photo'] ?? '').toString();

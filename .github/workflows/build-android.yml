@@ -67,6 +67,12 @@ jobs:
           PY
           if grep -q '"projectId": ""' firebase-app.json; then echo "::warning::Firebase is not connected yet - this APK runs in DEMO mode."; fi
 
+      - name: Ola Maps key
+        env:
+          OLA: ${{ secrets.OLA_MAPS_KEY }}
+        run: |
+          if [ -z "$OLA" ]; then echo "::warning::OLA_MAPS_KEY secret is missing - maps will be hidden."; else echo "::notice::Ola Maps key found (${#OLA} characters)."; fi
+
       - name: Get packages
         run: ci/run_and_report.sh flutter pub get
 

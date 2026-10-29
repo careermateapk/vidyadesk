@@ -7,6 +7,7 @@ import '../core/theme.dart';
 import '../data/backend.dart' show newId;
 import '../data/models.dart';
 import '../services/reports.dart';
+import '../services/push.dart';
 import '../ui/widgets.dart';
 import 'checkin.dart';
 import 'common.dart';
@@ -575,7 +576,15 @@ class _PaySheetState extends State<_PaySheet> {
   Future<void> _savePaid(int amt, String mode, String note) {
     final app = context.appRead;
     final r = widget.r;
-    return _run(() => app.backend.saveTxn(
+    Future<void> notify() => Push.send(
+          inst: widget.m.instituteId,
+          kind: 'salary',
+          title: '💸 ${tr('push_salary_paid')}',
+          body: '${rupees(amt)} · ${monthLabel(widget.month)} · $mode',
+          topics: [Push.person(widget.m.instituteId, r.t.uid)],
+        );
+    return _run(() async {
+      await app.backend.saveTxn(
           widget.m.instituteId,
           Txn(
             id: 'pay_${r.t.uid}_${widget.month}',
@@ -591,7 +600,9 @@ class _PaySheetState extends State<_PaySheet> {
             refName: r.t.name,
             byName: app.profile?.name ?? widget.m.name,
           ),
-        ));
+        );
+      await notify();
+    });
   }
 
   /// Opens GPay / PhonePe / Paytm with the teacher's UPI ID; marks paid with the UTR.

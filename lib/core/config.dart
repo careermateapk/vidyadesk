@@ -14,3 +14,6 @@ const String appVersion = '1.0';
 
 /// Ola Maps key (from the GitHub secret OLA_MAPS_KEY). Empty = maps hidden, GPS still works.
 const String olaMapsKey = String.fromEnvironment('OLA_MAPS_KEY');
+
+/// Our notification server (Cloudflare Worker). Empty = phone notifications off.
+const String notifyUrl = String.fromEnvironment('NOTIFY_URL');

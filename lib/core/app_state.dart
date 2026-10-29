@@ -5,6 +5,7 @@ import '../data/backend.dart';
 import '../data/demo_backend.dart';
 import '../data/firebase_backend.dart';
 import '../data/models.dart';
+import '../services/push.dart';
 import 'config.dart';
 import 'strings.dart';
 
@@ -121,6 +122,7 @@ class AppState extends ChangeNotifier {
         profile = await backend.profile(signedIn!.uid);
         memberships = profile == null ? [] : await backend.myMemberships();
         _pickActive();
+        Push.sync(backend, memberships);
       }
     } finally {
       loadingAccount = false;
@@ -158,6 +160,7 @@ class AppState extends ChangeNotifier {
     joining = false;
     memberships = await backend.myMemberships();
     active = memberships.where((x) => x.id == m.id).firstOrNull ?? m;
+    Push.sync(backend, memberships);
     notifyListeners();
   }
 
@@ -167,6 +170,7 @@ class AppState extends ChangeNotifier {
     final id = active?.id;
     active = memberships.where((m) => m.id == id).firstOrNull;
     if (active == null) _pickActive();
+    Push.sync(backend, memberships);
     notifyListeners();
   }
 
@@ -224,6 +228,7 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
+    await Push.clear();
     await backend.signOut();
     signedIn = null;
     profile = null;

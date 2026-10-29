@@ -1056,4 +1056,8 @@ const Map<String, List<String>> _t = {
   'about_f4': ['Tests, results, report cards and leaderboard', 'टेस्ट, परिणाम, रिपोर्ट कार्ड और लीडरबोर्ड', 'Tests, results, report card aur leaderboard'],
   'about_f5': ['Doubt box, notices and notifications', 'डाउट बॉक्स, नोटिस और सूचनाएँ', 'Doubt box, notice aur notifications'],
   'about_f6': ['Admissions, risk alerts and PDF / Excel reports', 'दाखिले, जोखिम चेतावनी और PDF / Excel रिपोर्ट', 'Admissions, risk alert aur PDF / Excel reports'],
+  'push_fee_confirmed': ['Fee payment confirmed', 'फीस का भुगतान पक्का हुआ', 'Fees payment confirm ho gaya'],
+  'push_fee_not_received': ['Fee payment not received — please check', 'फीस का भुगतान नहीं मिला — कृपया जाँचें', 'Fees payment nahi mila — kripya check karein'],
+  'push_approved': ['Your request is approved — welcome!', 'आपका अनुरोध मंज़ूर — स्वागत है!', 'Aapki request approve ho gayi — swagat hai!'],
+  'push_salary_paid': ['Salary paid', 'वेतन मिल गया', 'Salary mil gayi'],
 };

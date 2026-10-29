@@ -62,7 +62,7 @@ jobs:
           python3 - <<'PY' >> "$GITHUB_ENV"
           import json
           c = json.load(open('firebase-app.json'))
-          for k, env in [('projectId','FB_PROJECT'),('apiKey','FB_API_KEY'),('appId','FB_APP_ID'),('senderId','FB_SENDER'),('webClientId','GOOGLE_CLIENT_ID')]:
+          for k, env in [('projectId','FB_PROJECT'),('apiKey','FB_API_KEY'),('appId','FB_APP_ID'),('senderId','FB_SENDER'),('webClientId','GOOGLE_CLIENT_ID'),('notifyUrl','NOTIFY_URL')]:
               print(env + '=' + (c.get(k) or '').strip())
           PY
           if grep -q '"projectId": ""' firebase-app.json; then echo "::warning::Firebase is not connected yet - this APK runs in DEMO mode."; fi
@@ -89,7 +89,7 @@ jobs:
 
       - name: Build APK
         run: |
-          DEFS="--dart-define=FB_PROJECT=${{ env.FB_PROJECT }} --dart-define=FB_API_KEY=${{ env.FB_API_KEY }} --dart-define=FB_APP_ID=${{ env.FB_APP_ID }} --dart-define=FB_SENDER=${{ env.FB_SENDER }} --dart-define=GOOGLE_CLIENT_ID=${{ env.GOOGLE_CLIENT_ID }} --dart-define=OLA_MAPS_KEY=${{ secrets.OLA_MAPS_KEY }}"
+          DEFS="--dart-define=FB_PROJECT=${{ env.FB_PROJECT }} --dart-define=FB_API_KEY=${{ env.FB_API_KEY }} --dart-define=FB_APP_ID=${{ env.FB_APP_ID }} --dart-define=FB_SENDER=${{ env.FB_SENDER }} --dart-define=GOOGLE_CLIENT_ID=${{ env.GOOGLE_CLIENT_ID }} --dart-define=OLA_MAPS_KEY=${{ secrets.OLA_MAPS_KEY }} --dart-define=NOTIFY_URL=${{ env.NOTIFY_URL }}"
           ci/run_and_report.sh flutter build apk --release $DEFS
           mkdir -p dist && cp build/app/outputs/flutter-apk/app-release.apk dist/VidyaDesk-all-phones.apk
           ci/run_and_report.sh flutter build apk --release --split-per-abi $DEFS

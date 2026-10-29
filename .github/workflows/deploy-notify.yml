@@ -1,0 +1,43 @@
+name: Deploy notification server
+
+on:
+  push:
+    branches: [main]
+    paths: ["worker/**", ".github/workflows/deploy-notify.yml"]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      # worker/deploy.enc holds the Cloudflare token, account id and Firebase server key,
+      # locked with the DEPLOY_KEY secret (only GitHub Actions can open it).
+      - name: Unlock deploy settings
+        env:
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+        run: |
+          if [ -z "$DEPLOY_KEY" ] || [ ! -f worker/deploy.enc ]; then echo "::warning::Notification server not deployed - DEPLOY_KEY secret or worker/deploy.enc missing"; exit 0; fi
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -a -A -in worker/deploy.enc -out /tmp/deploy.json -pass env:DEPLOY_KEY
+          python3 - <<'PY' >> "$GITHUB_ENV"
+          import json
+          d = json.load(open('/tmp/deploy.json'))
+          print('CLOUDFLARE_API_TOKEN=' + d['cf_token'])
+          print('CLOUDFLARE_ACCOUNT_ID=' + d['cf_account'])
+          print('READY=1')
+          PY
+          python3 -c "import json;print(json.dumps(json.load(open('/tmp/deploy.json'))['sa']))" > /tmp/sa.json
+          echo "::add-mask::$(python3 -c "import json;print(json.load(open('/tmp/deploy.json'))['cf_token'])")"
+      - name: Deploy worker
+        if: env.READY == '1'
+        working-directory: worker
+        run: |
+          set -o pipefail
+          npx --yes wrangler@3 deploy 2>&1 | tee /tmp/deploy.log
+          npx --yes wrangler@3 secret put SA_JSON < /tmp/sa.json
+          url=$(grep -oE 'https://[a-zA-Z0-9.-]+\.workers\.dev' /tmp/deploy.log | head -1)
+          echo "::notice::Notification server URL: $url"
+          rm -f /tmp/sa.json /tmp/deploy.json

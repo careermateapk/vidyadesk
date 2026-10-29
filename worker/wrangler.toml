@@ -1,0 +1,7 @@
+name = "vidyadesk-notify"
+main = "notify.js"
+compatibility_date = "2025-06-01"
+workers_dev = true
+
+[vars]
+PROJECT_ID = "vidyadesk-589be"

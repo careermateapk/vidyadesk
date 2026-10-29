@@ -5,6 +5,7 @@ import '../core/strings.dart';
 import '../core/theme.dart';
 import '../data/backend.dart';
 import '../data/models.dart';
+import '../services/push.dart';
 import '../ui/widgets.dart';
 import 'common.dart';
 import 'notices.dart' show ago;
@@ -187,6 +188,7 @@ class _AskDoubtScreenState extends State<AskDoubtScreen> {
           createdAt: DateTime.now().millisecondsSinceEpoch,
         ),
       );
+      Push.send(inst: widget.m.instituteId, kind: 'doubt', title: '❓ ${trf('new_doubt_from', {'name': app.profile?.name ?? widget.m.name})}', body: '${b.subject}: $text', topics: [Push.staff(widget.m.instituteId)]);
       if (!mounted) return;
       toast(context, tr('doubt_sent'));
       Navigator.of(context).pop(true);
@@ -298,6 +300,14 @@ class _DoubtThreadScreenState extends State<DoubtThreadScreen> {
       d.replies.add(r);
       if (!widget.m.isStaff) d.solved = false;
       await _save();
+      final i = widget.m.instituteId;
+      Push.send(
+        inst: i,
+        kind: widget.m.isStaff ? 'doubt_reply' : 'doubt',
+        title: widget.m.isStaff ? '💬 ${trf('teacher_replied', {'name': r.byName})}' : '❓ ${trf('new_doubt_from', {'name': r.byName})}',
+        body: text.isEmpty ? d.subject : text,
+        topics: [widget.m.isStaff ? Push.person(i, d.studentUid) : Push.staff(i)],
+      );
       _text.clear();
       _photo = '';
       WidgetsBinding.instance.addPostFrameCallback((_) {

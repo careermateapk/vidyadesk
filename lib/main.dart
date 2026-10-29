@@ -8,6 +8,7 @@ import 'screens/auth.dart';
 import 'screens/home_shell.dart';
 import 'screens/join.dart';
 import 'screens/onboarding.dart';
+import 'services/push.dart';
 import 'ui/widgets.dart';
 
 void main() {
@@ -37,6 +38,7 @@ class VidyaDeskApp extends StatelessWidget {
           themeMode: app.themeMode,
           themeAnimationDuration: const Duration(milliseconds: 500),
           themeAnimationCurve: Curves.easeInOut,
+          scaffoldMessengerKey: messengerKey,
           home: const Gate(),
         );
       }),

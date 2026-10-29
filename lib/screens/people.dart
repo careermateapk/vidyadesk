@@ -7,6 +7,7 @@ import '../core/app_state.dart';
 import '../core/strings.dart';
 import '../core/theme.dart';
 import '../data/models.dart';
+import '../services/push.dart';
 import '../ui/widgets.dart';
 import 'common.dart';
 import 'join.dart';
@@ -71,6 +72,9 @@ class _RequestCardState extends State<_RequestCard> {
     setState(() => _busy = true);
     try {
       await context.appRead.backend.decide(widget.r, ok);
+      if (ok) {
+        Push.send(inst: widget.r.instituteId, kind: 'approved', title: '🎉 ${tr('push_approved')}', body: widget.r.instituteName, topics: [Push.person(widget.r.instituteId, widget.r.uid)]);
+      }
       HapticFeedback.mediumImpact();
       setState(() => _result = ok);
       await Future<void>.delayed(const Duration(milliseconds: 700));

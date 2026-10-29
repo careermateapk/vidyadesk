@@ -6,6 +6,7 @@ import '../core/strings.dart';
 import '../core/theme.dart';
 import '../data/backend.dart';
 import '../data/models.dart';
+import '../services/push.dart';
 import '../ui/widgets.dart';
 import 'common.dart';
 import 'notices.dart' show ago;
@@ -576,6 +577,14 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
         createdAt: DateTime.now().millisecondsSinceEpoch,
       );
       await app.backend.saveResource(widget.m.instituteId, r);
+      final i = widget.m.instituteId;
+      Push.send(
+        inst: i,
+        kind: _kind == 'homework' ? 'homework' : 'resource',
+        title: '${_kind == 'homework' ? '📝' : '📚'} ${trf('new_kind', {'kind': tr('rk_$_kind')})}',
+        body: [r.title, if (r.chapter.isNotEmpty) r.chapter].join(' · '),
+        topics: [_batch.isEmpty ? Push.learners(i) : Push.batch(i, _batch)],
+      );
       if (!mounted) return;
       toast(context, tr('resource_added'));
       Navigator.of(context).pop(true);
@@ -1019,6 +1028,13 @@ class _CheckSheetState extends State<_CheckSheet> {
         ..marks = _marks.text.trim()
         ..remark = _remark.text.trim();
       await context.appRead.backend.saveSubmission(widget.m.instituteId, s);
+      Push.send(
+        inst: widget.m.instituteId,
+        kind: 'hw_checked',
+        title: '✅ ${tr('hw_checked')}',
+        body: [if (s.marks.isNotEmpty) '${tr('marks')}: ${s.marks}', if (s.remark.isNotEmpty) s.remark].join(' · '),
+        topics: [Push.person(widget.m.instituteId, s.studentUid)],
+      );
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
       if (mounted) toast(context, errorMessage(e));

@@ -7,6 +7,7 @@ import '../core/strings.dart';
 import '../core/theme.dart';
 import '../data/backend.dart';
 import '../data/models.dart';
+import '../services/push.dart';
 import '../ui/widgets.dart';
 import 'common.dart';
 import 'insights.dart' show shareReportCard;
@@ -329,7 +330,11 @@ class _MarksEntryScreenState extends State<MarksEntryScreen> {
         ..clear()
         ..addAll({for (final x in _students ?? <Membership>[]) if (marks.containsKey(x.uid)) x.uid: x.name});
       if (publish != null) t.published = publish;
+      final wasPublished = _published;
       await context.appRead.backend.saveTest(widget.m.instituteId, t);
+      if (publish == true && !wasPublished) {
+        Push.send(inst: widget.m.instituteId, kind: 'result', title: '🏆 ${trf('result_out', {'t': t.title})}', body: widget.batch?.title ?? t.subject, topics: [Push.batch(widget.m.instituteId, t.batchId)]);
+      }
       if (!mounted) return;
       setState(() => _published = t.published);
       toast(context, publish == true ? tr('results_published') : tr('saved'));

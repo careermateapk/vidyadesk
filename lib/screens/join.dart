@@ -8,6 +8,7 @@ import '../core/theme.dart';
 import '../data/backend.dart';
 import '../data/demo_backend.dart';
 import '../data/models.dart';
+import '../services/push.dart';
 import '../ui/widgets.dart';
 import '../ui/mascot.dart';
 import 'auth.dart';
@@ -408,6 +409,13 @@ class _JoinWithCodeState extends State<_JoinWithCode> {
     });
     try {
       final m = await app.backend.requestJoin(user: app.profile!, code: c, relation: widget.role == Role.parent ? _relation : '', subjects: _subjects);
+      Push.send(
+        inst: m.instituteId,
+        kind: 'join',
+        title: '🙋 ${trf('wants_to_join', {'name': app.profile!.name})}',
+        body: tr('role_${widget.role.name}'),
+        topics: [Push.admins(m.instituteId), Push.staff(m.instituteId)],
+      );
       await app.refreshAndShow(m);
     } catch (e) {
       setState(() => _error = e is BackendError && e.code == 'permission' ? tr('err_permission') : errorText(e));

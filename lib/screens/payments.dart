@@ -7,6 +7,7 @@ import '../core/theme.dart';
 import '../data/models.dart';
 import '../services/receipt.dart';
 import '../services/upi.dart';
+import '../services/push.dart';
 import '../ui/widgets.dart';
 import 'common.dart';
 import 'file_sheet.dart';
@@ -134,6 +135,13 @@ class _PaySheetState extends State<_PaySheet> {
       parts: e?.parts,
     );
     await app.backend.claimFee(widget.m.instituteId, f);
+    Push.send(
+      inst: widget.m.instituteId,
+      kind: 'fee_claim',
+      title: '💰 ${trf('fee_received_from', {'name': widget.studentName})}',
+      body: '${rupees(widget.amount)} · ${monthLabel(widget.month)} · UTR ${cleanUtr(utr)} — ${tr('tap_to_confirm')}',
+      topics: [Push.admins(widget.m.instituteId)],
+    );
     if (!mounted) return;
     HapticFeedback.heavyImpact();
     toast(context, tr('payment_sent'));
@@ -284,6 +292,13 @@ class _ConfirmPaymentsScreenState extends State<ConfirmPaymentsScreen> {
             )
           : FeeRecord(studentUid: f.studentUid, studentName: f.studentName, month: f.month, amount: f.amount, lateFee: f.lateFee, parts: f.parts);
       await context.appRead.backend.saveFee(widget.m.instituteId, rec);
+      Push.send(
+        inst: widget.m.instituteId,
+        kind: ok ? 'fee_paid' : 'fee_rejected',
+        title: ok ? '✅ ${tr('push_fee_confirmed')}' : '⚠️ ${tr('push_fee_not_received')}',
+        body: '${f.studentName} · ${rupees(f.amount)} · ${monthLabel(f.month)}',
+        topics: [Push.person(widget.m.instituteId, f.studentUid)],
+      );
       HapticFeedback.mediumImpact();
       setState(() => _done[f.id] = ok);
     } catch (e) {

@@ -6,6 +6,7 @@ import '../core/strings.dart';
 import '../core/theme.dart';
 import '../data/backend.dart';
 import '../data/models.dart';
+import '../services/push.dart';
 import '../ui/widgets.dart';
 import 'common.dart';
 
@@ -165,6 +166,8 @@ class _PostNoticeScreenState extends State<PostNoticeScreen> {
     try {
       final n = Notice(id: newId(), text: text, kind: _kind, byName: app.profile?.name ?? widget.m.name, createdAt: DateTime.now().millisecondsSinceEpoch, batchId: _batch);
       await app.backend.postNotice(widget.m.instituteId, n);
+      final i = widget.m.instituteId;
+      Push.send(inst: i, kind: 'notice', title: '📢 ${widget.m.instituteName} · ${tr('kind_$_kind')}', body: text, topics: [_batch.isEmpty ? Push.learners(i) : Push.batch(i, _batch)]);
       if (share) await SharePlus.instance.share(ShareParams(text: '📢 ${widget.m.instituteName}\n$text\n— ${n.byName}'));
       if (!mounted) return;
       toast(context, tr('notice_posted'));

@@ -38,7 +38,7 @@ Future<void> loadUpiApps() async {
     }
 
     found.sort((a, b) => rank(a).compareTo(rank(b)));
-    upiApps = [...found, if (found.length != 1) _chooser];
+    upiApps = [...found, _chooser];
   } catch (_) {}
 }
 

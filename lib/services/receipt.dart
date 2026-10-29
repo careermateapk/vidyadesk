@@ -204,6 +204,8 @@ Future<Uint8List> buildPlanReceipt(SubPayment p, {required String planLabel}) as
   const mint = PdfColor.fromInt(0xFF12B886);
   const muted = PdfColor.fromInt(0xFF8A87A6);
   const ink = PdfColor.fromInt(0xFF17153A);
+  final noto = pw.Font.ttf(await rootBundle.load('assets/fonts/NotoSansDevanagari-400.ttf'));
+  final notoBold = pw.Font.ttf(await rootBundle.load('assets/fonts/NotoSansDevanagari-700.ttf'));
   final doc = pw.Document(title: 'VidyaDesk plan receipt', author: 'VidyaDesk', creator: 'VidyaDesk');
   pw.Widget row(String k, String v) => pw.Padding(
         padding: const pw.EdgeInsets.symmetric(vertical: 5),
@@ -215,7 +217,7 @@ Future<Uint8List> buildPlanReceipt(SubPayment p, {required String planLabel}) as
   final no = 'VD-${p.createdAt.toRadixString(36).toUpperCase()}';
   doc.addPage(pw.Page(
     pageFormat: PdfPageFormat.a5,
-    theme: pw.ThemeData.withFont(base: regular, bold: bold),
+    theme: pw.ThemeData.withFont(base: regular, bold: bold, fontFallback: [noto, notoBold]),
     margin: const pw.EdgeInsets.all(24),
     build: (c) => pw.Container(
       decoration: pw.BoxDecoration(borderRadius: pw.BorderRadius.circular(14), border: pw.Border.all(color: const PdfColor.fromInt(0xFFECEAF5))),

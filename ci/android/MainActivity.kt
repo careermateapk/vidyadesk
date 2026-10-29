@@ -21,6 +21,12 @@ import io.flutter.plugin.common.MethodChannel
 // Also saves PDFs / Excel files into Download/VidyaDesk and opens them.
 class MainActivity : FlutterActivity() {
     private var pending: MethodChannel.Result? = null
+    private val knownUpi = listOf(
+        "com.google.android.apps.nbu.paisa.user", "com.phonepe.app", "net.one97.paytm", "in.org.npci.upiapp",
+        "in.amazon.mShop.android.shopping", "com.dreamplug.androidapp", "com.mobikwik_new", "com.whatsapp",
+        "com.csam.icici.bank.imobile", "com.sbi.upi", "com.naviapp", "money.super.payments", "com.axis.mobile",
+        "com.fampay.in", "com.freecharge.android", "com.myairtelapp", "com.bharatpe.app"
+    )
     private val upiRequest = 4417
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -84,6 +90,31 @@ class MainActivity : FlutterActivity() {
                             m["icon"] = bos.toByteArray()
                         } catch (e: Exception) {}
                         out.add(m)
+                    }
+                    // Well-known UPI apps that did not answer the upi:// search (some phones hide them)
+                    for (pkgName in knownUpi) {
+                        if (seen.contains(pkgName)) continue
+                        try {
+                            val ai = packageManager.getApplicationInfo(pkgName, 0)
+                            if (!ai.enabled) continue
+                            seen.add(pkgName)
+                            val m = HashMap<String, Any>()
+                            m["package"] = pkgName
+                            m["activity"] = ""
+                            m["label"] = packageManager.getApplicationLabel(ai).toString()
+                            try {
+                                val d = packageManager.getApplicationIcon(ai)
+                                val size = 144
+                                val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+                                val c = Canvas(bmp)
+                                d.setBounds(0, 0, size, size)
+                                d.draw(c)
+                                val bos = ByteArrayOutputStream()
+                                bmp.compress(Bitmap.CompressFormat.PNG, 100, bos)
+                                m["icon"] = bos.toByteArray()
+                            } catch (e: Exception) {}
+                            out.add(m)
+                        } catch (e: Exception) {}
                     }
                     result.success(out)
                 } catch (e: Exception) {

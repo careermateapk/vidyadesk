@@ -1526,4 +1526,6 @@ const Map<String, List<String>> _t = {
   'pf_reports_short': ['Reports', 'रिपोर्ट', 'Reports'],
   'pf_checkin_short': ['Teacher check-in', 'टीचर चेक-इन', 'Teacher check-in'],
   'pf_support_short': ['Priority support', 'ख़ास सहायता', 'Priority support'],
+  'delete_coupon_q': ['Coupon {code} will be removed. Nobody can use it after this.', 'कूपन {code} हट जाएगा। इसके बाद कोई इसे इस्तेमाल नहीं कर पाएगा।', 'Coupon {code} hat jayega. Iske baad koi ise use nahi kar payega.'],
+  'delete_banner_q': ['This banner will be removed from everyone\'s home page.', 'यह बैनर सबके होम पेज से हट जाएगा।', 'Ye banner sabke home page se hat jayega.'],
 };

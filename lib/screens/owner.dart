@@ -13,6 +13,7 @@ import '../services/push.dart';
 import '../ui/widgets.dart';
 import 'common.dart';
 import 'subscription.dart' show planName, planColor, featureOn;
+import 'money.dart' show confirmDelete;
 import 'viewers.dart' show openExternal;
 
 String _d(int ms) {
@@ -363,7 +364,21 @@ class _CouponsScreenState extends State<CouponsScreen> {
                         }
                       },
                     ),
-                    const SizedBox(width: 6),
+                    IconButton(
+                      tooltip: tr('delete'),
+                      icon: Icon(Icons.delete_outline_rounded, color: p.danger),
+                      onPressed: () async {
+                        if (!await confirmDelete(context, trf('delete_coupon_q', {'code': c.code}))) return;
+                        try {
+                          await context.appRead.backend.deleteCoupon(c.code);
+                          if (context.mounted) toast(context, tr('deleted'));
+                          setState(() => _v++);
+                        } catch (e) {
+                          if (context.mounted) toast(context, errorMessage(e));
+                        }
+                      },
+                    ),
+                    const SizedBox(width: 2),
                   ]),
                 ),
               ),
@@ -445,6 +460,8 @@ class _CouponEditScreenState extends State<CouponEditScreen> {
             icon: Icons.delete_outline_rounded,
             tooltip: tr('delete'),
             onTap: () async {
+              if (!await confirmDelete(context, trf('delete_coupon_q', {'code': widget.coupon!.code}))) return;
+              if (!context.mounted) return;
               await context.appRead.backend.deleteCoupon(widget.coupon!.code);
               if (context.mounted) Navigator.pop(context, true);
             },
@@ -621,6 +638,20 @@ class _BannersScreenState extends State<BannersScreen> {
                     ),
                     IconButton(onPressed: i == 0 ? null : () => _move(list, i, -1), icon: const Icon(Icons.arrow_upward_rounded)),
                     IconButton(onPressed: i == list.length - 1 ? null : () => _move(list, i, 1), icon: const Icon(Icons.arrow_downward_rounded)),
+                    IconButton(
+                      tooltip: tr('delete'),
+                      icon: Icon(Icons.delete_outline_rounded, color: p.danger),
+                      onPressed: () async {
+                        if (!await confirmDelete(context, tr('delete_banner_q'))) return;
+                        try {
+                          await context.appRead.backend.deleteBanner(list[i].id);
+                          if (context.mounted) toast(context, tr('deleted'));
+                          setState(() => _v++);
+                        } catch (e) {
+                          if (context.mounted) toast(context, errorMessage(e));
+                        }
+                      },
+                    ),
                     Switch(
                       value: list[i].active,
                       onChanged: (v) async {
@@ -710,6 +741,8 @@ class _BannerEditScreenState extends State<BannerEditScreen> {
             icon: Icons.delete_outline_rounded,
             tooltip: tr('delete'),
             onTap: () async {
+              if (!await confirmDelete(context, tr('delete_banner_q'))) return;
+              if (!context.mounted) return;
               await context.appRead.backend.deleteBanner(_b.id);
               if (context.mounted) Navigator.pop(context, true);
             },

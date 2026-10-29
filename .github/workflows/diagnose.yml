@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Check parent / child photos
+      - name: Check owner login type and sign-in settings
         env:
           DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
         run: |
@@ -23,25 +23,22 @@ jobs:
           from google.auth.transport.requests import Request
           sa = json.load(open('/tmp/d.json'))['sa']
           pid = sa['project_id']
-          c = service_account.Credentials.from_service_account_info(sa, scopes=['https://www.googleapis.com/auth/datastore'])
+          c = service_account.Credentials.from_service_account_info(sa, scopes=['https://www.googleapis.com/auth/cloud-platform'])
           c.refresh(Request())
           h = {'Authorization': 'Bearer ' + c.token}
-          base = f'https://firestore.googleapis.com/v1/projects/{pid}/databases/(default)/documents'
-          docs = requests.get(f'{base}/memberships?pageSize=300', headers=h).json().get('documents', [])
-          mems = {}
-          for d in docs:
-              f = d.get('fields', {})
-              mid = d['name'].split('/')[-1]
-              mems[mid] = f
-          for mid, f in mems.items():
-              role = f.get('role', {}).get('stringValue')
-              ph = len(f.get('photo', {}).get('stringValue', ''))
-              print(f"::notice::{role} {mid[:6]}…_{mid.split('_')[-1][:5]} photo={ph}")
-              if role == 'parent':
-                  inst = f.get('instituteId', {}).get('stringValue')
-                  kids = [v.get('stringValue') for v in f.get('childUids', {}).get('arrayValue', {}).get('values', [])]
-                  for k in kids:
-                      cm = mems.get(f'{k}_{inst}')
-                      print(f"::notice::  child {k[:6]} membership={'yes' if cm else 'MISSING'} photo={len(cm.get('photo',{}).get('stringValue','')) if cm else 0}")
+          for label, email in [('owner', 'support.sangam360@gmail.com'), ('demo', 'ksuraj.th@gmail.com')]:
+              r = requests.post(f'https://identitytoolkit.googleapis.com/v1/projects/{pid}/accounts:lookup', headers=h, json={'email': [email]})
+              us = r.json().get('users', []) if r.ok else []
+              if not r.ok: print(f"::notice::{label} lookup failed {r.status_code}")
+              for u in us:
+                  print(f"::notice::{label}: providers={[x.get('providerId') for x in u.get('providerUserInfo', [])]} verified={u.get('emailVerified', False)}")
+              if r.ok and not us: print(f"::notice::{label}: no account")
+          r = requests.get(f'https://identitytoolkit.googleapis.com/admin/v2/projects/{pid}/config', headers=h)
+          if r.ok:
+              j = r.json()
+              si = j.get('signIn', {})
+              print(f"::notice::email/password on={si.get('email', {}).get('enabled')} oneAccountPerEmail={not si.get('allowDuplicateEmails', False)} enumProtection={j.get('emailPrivacyConfig', {}).get('enableImprovedEmailPrivacy')}")
+          else:
+              print(f"::notice::config read failed {r.status_code}")
           PY
           rm -f /tmp/d.json

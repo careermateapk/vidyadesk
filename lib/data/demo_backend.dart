@@ -25,7 +25,7 @@ class DemoBackend implements Backend {
   final Map<String, Lead> _leads = {};
   final Map<String, CheckIn> _checkins = {};
   final Map<String, Syllabus> _syllabus = {};
-  final List<SubPayment> _subs = [];
+  final List<SubPayment> _planPays = [];
 
   static const demoInstituteCode = 'SHRM-4821';
   static const demoBatchCode = 'ECO-TTS-5PM-38';
@@ -680,13 +680,13 @@ class DemoBackend implements Backend {
   @override
   Future<void> claimSubscription(SubPayment p) async {
     await _wait();
-    _subs.add(p);
+    _planPays.add(p);
   }
 
   @override
   Future<List<SubPayment>> mySubPayments(String instituteId) async {
     await _wait();
-    return _subs.where((p) => p.instituteId == instituteId).toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return _planPays.where((p) => p.instituteId == instituteId).toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
   }
 
   @override
@@ -704,8 +704,8 @@ class DemoBackend implements Backend {
     final demoPend = [
       SubPayment(id: 'sp1', instituteId: 'x1', instituteName: 'Jha Tutorials', adminUid: 'o2', adminName: 'Sunil Jha', phone: '+919800000001', plan: 'standard', yearly: false, amount: 599, utr: '551028731104', createdAt: ms - 3600000),
     ];
-    final pend = [..._subs.where((p) => p.status == 'pending'), ...demoPend.where((d) => !_subs.any((x) => x.id == d.id))];
-    final income = 9990 + _subs.where((p) => p.status == 'confirmed' && p.decidedAt >= monthStart).fold<int>(0, (a, p) => a + p.amount);
+    final pend = [..._planPays.where((p) => p.status == 'pending'), ...demoPend.where((d) => !_planPays.any((x) => x.id == d.id))];
+    final income = 9990 + _planPays.where((p) => p.status == 'confirmed' && p.decidedAt >= monthStart).fold<int>(0, (a, p) => a + p.amount);
     final students = _members.values.where((m) => m.role == Role.student && m.approved).length + 180;
     return OwnerStats(institutes: [..._institutes.values, ...others], pending: pend, monthIncome: income, students: students);
   }
@@ -714,7 +714,7 @@ class DemoBackend implements Backend {
   Future<void> decideSubPayment(SubPayment p, bool ok) async {
     await _wait();
     final now = DateTime.now().millisecondsSinceEpoch;
-    if (!_subs.any((x) => x.id == p.id)) _subs.add(p);
+    if (!_planPays.any((x) => x.id == p.id)) _planPays.add(p);
     p
       ..status = ok ? 'confirmed' : 'rejected'
       ..decidedAt = now;

@@ -10,6 +10,7 @@ import '../services/upi.dart';
 import '../ui/mascot.dart';
 import '../ui/widgets.dart';
 import 'common.dart';
+import 'onboarding.dart' show roleIcon, roleName;
 import 'payments.dart' show askUtr;
 
 // ---------------------------------------------------------------------------

@@ -261,6 +261,188 @@ class PlanBanner extends StatelessWidget {
 // Plans
 // ---------------------------------------------------------------------------
 
+// ---------- small animated pieces used by the plan screens ----------
+
+/// A number that counts up (or to its new value) smoothly. ₹ when [money].
+class _CountTo extends StatelessWidget {
+  const _CountTo(this.value, {super.key, required this.style, this.money = false, this.ms = 900});
+  final int value;
+  final TextStyle style;
+  final bool money;
+  final int ms;
+  @override
+  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: value.toDouble()),
+        duration: Duration(milliseconds: ms),
+        curve: Curves.easeOutCubic,
+        builder: (_, v, __) => Text(money ? rupees(v.round()) : '${v.round()}', style: style),
+      );
+}
+
+/// Ring that fills from 0 to [pct] when the screen opens.
+class _Ring extends StatelessWidget {
+  const _Ring({required this.pct, required this.child, this.size = 124, this.colors = const [Color(0xFFFFD27A), Color(0xFFFF9F43)]});
+  final double pct;
+  final Widget child;
+  final double size;
+  final List<Color> colors;
+  @override
+  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: pct.clamp(0, 1)),
+        duration: const Duration(milliseconds: 1300),
+        curve: Curves.easeOutCubic,
+        builder: (_, v, c) => SizedBox(width: size, height: size, child: CustomPaint(painter: _RingPainter(v, colors), child: Center(child: c))),
+        child: child,
+      );
+}
+
+class _RingPainter extends CustomPainter {
+  _RingPainter(this.v, this.colors);
+  final double v;
+  final List<Color> colors;
+  @override
+  void paint(Canvas canvas, Size size) {
+    const w = 12.0;
+    final r = Rect.fromLTWH(w / 2, w / 2, size.width - w, size.height - w);
+    canvas.drawArc(r, 0, math.pi * 2, false, Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = w
+      ..color = Colors.white.withValues(alpha: .18));
+    if (v <= 0) return;
+    canvas.drawArc(
+      r,
+      -math.pi / 2,
+      math.pi * 2 * v,
+      false,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = w
+        ..strokeCap = StrokeCap.round
+        ..shader = SweepGradient(colors: colors, startAngle: -math.pi / 2, endAngle: math.pi * 1.5, transform: const GradientRotation(-math.pi / 2)).createShader(r),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_RingPainter o) => o.v != v;
+}
+
+/// A soft light that sweeps across [child] again and again (premium shine).
+class _Shine extends StatefulWidget {
+  const _Shine({super.key, required this.child, this.radius = 26, this.seconds = 3});
+  final Widget child;
+  final double radius;
+  final int seconds;
+  @override
+  State<_Shine> createState() => _ShineState();
+}
+
+class _ShineState extends State<_Shine> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: Duration(seconds: widget.seconds))..repeat();
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => ClipRRect(
+        borderRadius: BorderRadius.circular(widget.radius),
+        child: Stack(children: [
+          widget.child,
+          Positioned.fill(
+            child: IgnorePointer(
+              child: AnimatedBuilder(
+                animation: _c,
+                builder: (_, __) {
+                  // sweep during the first 45% of each loop, then rest
+                  final t = (_c.value / .45).clamp(0.0, 1.0);
+                  return FractionalTranslation(
+                    translation: Offset(-1.2 + 2.4 * Curves.easeInOut.transform(t), 0),
+                    child: Transform.rotate(
+                      angle: .35,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(colors: [Colors.white.withValues(alpha: 0), Colors.white.withValues(alpha: .16), Colors.white.withValues(alpha: 0)], stops: const [.3, .5, .7]),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ]),
+      );
+}
+
+/// Little stars that twinkle (on dark cards).
+class _Twinkle extends StatefulWidget {
+  const _Twinkle({required this.spots});
+  final List<(double, double, double)> spots; // (x 0..1, y 0..1, size)
+  @override
+  State<_Twinkle> createState() => _TwinkleState();
+}
+
+class _TwinkleState extends State<_Twinkle> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 2400))..repeat();
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => IgnorePointer(
+        child: LayoutBuilder(
+          builder: (_, box) => AnimatedBuilder(
+            animation: _c,
+            builder: (_, __) => Stack(children: [
+              for (var i = 0; i < widget.spots.length; i++)
+                Positioned(
+                  left: widget.spots[i].$1 * box.maxWidth,
+                  top: widget.spots[i].$2 * box.maxHeight,
+                  child: Opacity(
+                    opacity: (.25 + .75 * (0.5 + 0.5 * math.sin((_c.value + i * .29) * math.pi * 2))).clamp(0.0, 1.0),
+                    child: Icon(Icons.auto_awesome, size: widget.spots[i].$3, color: Colors.white),
+                  ),
+                ),
+            ]),
+          ),
+        ),
+      );
+}
+
+/// Shakes [child] gently once when it appears (a warning).
+class _ShakeOnce extends StatelessWidget {
+  const _ShakeOnce({required this.child});
+  final Widget child;
+  @override
+  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: 1),
+        duration: const Duration(milliseconds: 700),
+        builder: (_, v, c) => Transform.translate(offset: Offset(math.sin(v * math.pi * 6) * 6 * (1 - v), 0), child: c),
+        child: child,
+      );
+}
+
+/// Rupees saved by paying yearly, and how many months that is.
+(int, int) yearlySaving(Plan x) {
+  final pr = planPrice[x]!;
+  final save = pr.$1 * 12 - pr.$2;
+  return (save < 0 ? 0 : save, pr.$1 <= 0 ? 0 : (save / pr.$1).round());
+}
+
+IconData planIcon(Plan x) => switch (x) {
+      Plan.basic => Icons.menu_book_rounded,
+      Plan.standard => Icons.bolt_rounded,
+      Plan.pro => Icons.star_rounded,
+      Plan.trial => Icons.card_giftcard_rounded,
+    };
+
+// ---------------------------------------------------------------------------
+// Plans
+// ---------------------------------------------------------------------------
+
 class PlansScreen extends StatefulWidget {
   const PlansScreen({super.key, required this.m, this.pick});
   final Membership m;
@@ -274,6 +456,11 @@ class _PlansScreenState extends State<PlansScreen> {
   late Plan _plan = widget.pick ?? context.appRead.plan?.renewPlan ?? Plan.standard;
   int _v = 0;
 
+  Future<void> _pay() async {
+    final ok = await payForPlan(context, widget.m, _plan, _yearly);
+    if (ok && mounted) setState(() => _v++);
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = context.pal;
@@ -282,13 +469,28 @@ class _PlansScreenState extends State<PlansScreen> {
     final sub = st == null
         ? widget.m.instituteName
         : st.trial
-            ? '${widget.m.instituteName} · ${trf('trial_days_left', {'n': '${st.daysLeft.clamp(0, 999)}'})}'
-            : '${widget.m.instituteName} · ${planName(st.plan)} · ${st.active ? trf('plan_ends_on', {'date': _date(st.endDate)}) : tr('plan_ended')}';
+            ? '${tr('plan_trial')} · ${trf('n_days_left', {'n': '${st.daysLeft.clamp(0, 999)}'})}'
+            : '${tr('now')}: ${planName(st.plan)} · ${st.active ? trf('till_date', {'date': _date(st.endDate)}) : tr('plan_ended')}';
+    final amt = planAmount(_plan, _yearly);
     return Scaffold(
       appBar: InnerBar(
         title: tr('choose_plan'),
         subtitle: sub,
-        trailing: IconBtn(icon: Icons.table_chart_outlined, tooltip: tr('compare_plans'), onTap: () => push(context, const ComparePlansScreen())),
+        trailing: IconBtn(icon: Icons.table_chart_outlined, tooltip: tr('compare_plans'), onTap: () => push(context, ComparePlansScreen(m: widget.m))),
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            PrimaryButton(
+              icon: Icons.verified_user_rounded,
+              label: trf('take_plan', {'plan': planName(_plan), 'amt': rupees(amt), 'per': _yearly ? tr('per_year') : tr('per_month')}),
+              onPressed: _pay,
+            ),
+            const SizedBox(height: 6),
+            Text(tr('plans_footer'), textAlign: TextAlign.center, style: TextStyle(color: p.muted, fontSize: 11.5)),
+          ]),
+        ),
       ),
       body: Loader<List<SubPayment>>(
         key: ValueKey(_v),
@@ -299,7 +501,7 @@ class _PlansScreenState extends State<PlansScreen> {
           // Hide the red note once a newer plan payment went through.
           final lastNo = lastNoAny == null || pays.any((x) => x.started && x.createdAt > lastNoAny.createdAt) ? null : lastNoAny;
           return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 6, 16, 30),
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 20),
             children: [
               if (waiting.isNotEmpty)
                 Padding(
@@ -322,30 +524,33 @@ class _PlansScreenState extends State<PlansScreen> {
               if (lastNo != null && waiting.isEmpty)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
-                  child: AppCard(
-                    color: p.dangerTint,
-                    padding: const EdgeInsets.all(14),
-                    child: Text(trf('sub_not_found', {'plan': planName(planFrom(lastNo.plan)), 'amt': rupees(lastNo.amount)}), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: p.danger, height: 1.4)),
+                  child: _ShakeOnce(
+                    child: AppCard(
+                      color: p.dangerTint,
+                      padding: const EdgeInsets.all(14),
+                      child: Text(trf('sub_not_found', {'plan': planName(planFrom(lastNo.plan)), 'amt': rupees(lastNo.amount)}), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: p.danger, height: 1.4)),
+                    ),
                   ),
                 ),
               _Segment(yearly: _yearly, onChanged: (v) => setState(() => _yearly = v)),
-              const SizedBox(height: 12),
-              for (final x in paidPlans)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _PlanCard(plan: x, yearly: _yearly, selected: _plan == x, current: st != null && !st.trial && st.plan == x, onTap: () => setState(() => _plan = x)),
-                ),
-              const SizedBox(height: 4),
-              PrimaryButton(
-                label: trf('take_plan', {'plan': planName(_plan), 'amt': rupees(planAmount(_plan, _yearly)), 'per': _yearly ? tr('per_year') : tr('per_month')}),
-                onPressed: () async {
-                  final ok = await payForPlan(context, widget.m, _plan, _yearly);
-                  if (ok && mounted) setState(() => _v++);
-                },
-              ),
-              const SizedBox(height: 8),
-              Text(tr('plans_footer'), textAlign: TextAlign.center, style: TextStyle(color: p.muted, fontSize: 12.5)),
               const SizedBox(height: 14),
+              for (var i = 0; i < paidPlans.length; i++)
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0, end: 1),
+                  duration: Duration(milliseconds: 450 + i * 140),
+                  curve: Curves.easeOutCubic,
+                  builder: (_, v, c) => Opacity(opacity: v, child: Transform.translate(offset: Offset(0, 24 * (1 - v)), child: c)),
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: _PlanCard(
+                      plan: paidPlans[i],
+                      yearly: _yearly,
+                      selected: _plan == paidPlans[i],
+                      current: st != null && !st.trial && st.plan == paidPlans[i],
+                      onTap: () => setState(() => _plan = paidPlans[i]),
+                    ),
+                  ),
+                ),
               AppCard(
                 color: p.cardAlt,
                 padding: const EdgeInsets.all(14),
@@ -371,6 +576,7 @@ class _PlansScreenState extends State<PlansScreen> {
   }
 }
 
+/// Monthly / yearly switch with a sliding coloured pill.
 class _Segment extends StatelessWidget {
   const _Segment({required this.yearly, required this.onChanged});
   final bool yearly;
@@ -378,25 +584,58 @@ class _Segment extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.pal;
-    Widget seg(bool y, String t) => Expanded(
+    final months = yearlySaving(Plan.standard).$2;
+    Widget seg(bool y, String t, String? sub) => Expanded(
           child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
             onTap: () {
               HapticFeedback.selectionClick();
               onChanged(y);
             },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 220),
-              height: 40,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(color: yearly == y ? p.card : Colors.transparent, borderRadius: BorderRadius.circular(12), boxShadow: yearly == y ? [BoxShadow(color: Colors.black.withValues(alpha: .06), blurRadius: 8, offset: const Offset(0, 2))] : null),
-              child: Text(t, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: yearly == y ? p.ink : p.muted)),
+            child: SizedBox(
+              height: 50,
+              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                AnimatedDefaultTextStyle(
+                  duration: const Duration(milliseconds: 250),
+                  style: TextStyle(fontFamily: Theme.of(context).textTheme.bodyMedium?.fontFamily, fontWeight: FontWeight.w900, fontSize: 15, color: yearly == y ? Colors.white : p.muted),
+                  child: Text(t),
+                ),
+                if (sub != null)
+                  AnimatedDefaultTextStyle(
+                    duration: const Duration(milliseconds: 250),
+                    style: TextStyle(fontFamily: Theme.of(context).textTheme.bodyMedium?.fontFamily, fontWeight: FontWeight.w800, fontSize: 11, color: yearly == y ? const Color(0xFFFFE08A) : p.success),
+                    child: Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ),
+              ]),
             ),
           ),
         );
     return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(color: p.cardAlt, borderRadius: BorderRadius.circular(15)),
-      child: Row(children: [seg(false, tr('monthly')), seg(true, tr('yearly_free2'))]),
+      padding: const EdgeInsets.all(5),
+      decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(18), boxShadow: [BoxShadow(color: p.brand.withValues(alpha: .10), blurRadius: 20, offset: const Offset(0, 8))]),
+      child: Stack(children: [
+        Positioned.fill(
+          child: AnimatedAlign(
+            duration: const Duration(milliseconds: 320),
+            curve: Curves.easeOutBack,
+            alignment: yearly ? Alignment.centerRight : Alignment.centerLeft,
+            child: FractionallySizedBox(
+              widthFactor: .5,
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: [p.brand, p.brand2]),
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [BoxShadow(color: p.brand.withValues(alpha: .4), blurRadius: 14, offset: const Offset(0, 6))],
+                ),
+              ),
+            ),
+          ),
+        ),
+        Row(children: [
+          seg(false, tr('monthly'), null),
+          seg(true, tr('yearly'), months > 0 ? trf('n_months_free', {'n': '$months'}) : null),
+        ]),
+      ]),
     );
   }
 }
@@ -410,73 +649,160 @@ class _PlanCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.pal;
-    final col = planColor(p, plan);
+    final dark = plan == Plan.pro;
+    final col = dark ? const Color(0xFFFFD27A) : planColor(p, plan);
     final i = paidPlans.indexOf(plan);
     final lim = planLimit[plan]!;
     final price = planPrice[plan]!;
+    final (save, _) = yearlySaving(plan);
     final own = [
       for (final f in planFeatureRows)
         if ((i == 0 && f.$2) || (i == 1 && f.$3 && !f.$2) || (i == 2 && f.$4 && !f.$3)) f.$1,
-    ].take(4);
-    final tag = plan == Plan.standard ? tr('most_popular') : plan == Plan.pro ? tr('best_value') : '';
+    ].take(4).toList();
+    final ribbon = current ? tr('current_plan') : plan == Plan.standard ? tr('most_popular') : plan == Plan.pro ? tr('best_value') : '';
+    final fg = dark ? Colors.white : p.ink;
+    final soft = dark ? Colors.white.withValues(alpha: .65) : p.muted;
+
+    Widget card = Container(
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
+      decoration: BoxDecoration(
+        color: dark ? null : p.card,
+        gradient: dark ? const LinearGradient(colors: [Color(0xFF1E1A45), Color(0xFF2B2370), Color(0xFF3D2E8C)], begin: Alignment.topLeft, end: Alignment.bottomRight) : null,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Stack(clipBehavior: Clip.none, children: [
+        if (dark)
+          Positioned(
+            right: -60,
+            top: -60,
+            child: Container(width: 180, height: 180, decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [const Color(0xFFFFD27A).withValues(alpha: .35), const Color(0xFFFFD27A).withValues(alpha: 0)]))),
+          ),
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(color: col.withValues(alpha: dark ? .16 : .13), borderRadius: BorderRadius.circular(16)),
+              child: Icon(planIcon(plan), color: col, size: 26),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(planName(plan), style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900, color: fg, letterSpacing: -.3)),
+                Text(
+                  '${lim.$1 < 0 ? tr('unlimited_students') : trf('n_students', {'n': '${lim.$1}'})} · ${lim.$2 < 0 ? tr('unlimited_teachers') : trf('n_teachers', {'n': '${lim.$2}'})}',
+                  style: TextStyle(color: soft, fontSize: 12.5, fontWeight: FontWeight.w700),
+                ),
+              ]),
+            ),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              width: 26,
+              height: 26,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: selected ? p.brand : Colors.transparent,
+                border: Border.all(color: selected ? p.brand : (dark ? Colors.white38 : p.border), width: 2),
+              ),
+              child: selected ? const Icon(Icons.check_rounded, color: Colors.white, size: 16) : null,
+            ),
+          ]),
+          const SizedBox(height: 14),
+          Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            _CountTo(yearly ? price.$2 : price.$1, money: true, ms: 600, style: TextStyle(fontSize: 34, fontWeight: FontWeight.w900, color: fg, letterSpacing: -1.2, height: 1)),
+            Padding(padding: const EdgeInsets.only(left: 6, bottom: 3), child: Text(yearly ? tr('per_year') : tr('per_month'), style: TextStyle(color: soft, fontWeight: FontWeight.w700, fontSize: 13))),
+            const Spacer(),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 250),
+              child: yearly && save > 0
+                  ? Column(key: const ValueKey('y'), crossAxisAlignment: CrossAxisAlignment.end, children: [
+                      Text(rupees(price.$1 * 12), style: TextStyle(color: soft, fontSize: 12, fontWeight: FontWeight.w700, decoration: TextDecoration.lineThrough, decorationColor: soft)),
+                      const SizedBox(height: 3),
+                      Tag(trf('rs_saved', {'amt': rupees(save)}), fg: dark ? const Color(0xFF4ADE80) : p.success, bg: dark ? const Color(0xFF4ADE80).withValues(alpha: .16) : p.successTint),
+                    ])
+                  : Text(yearly ? '' : '≈${rupees((price.$1 / 30).round())}${tr('per_day')}', key: const ValueKey('m'), style: TextStyle(color: soft, fontSize: 12, fontWeight: FontWeight.w700)),
+            ),
+          ]),
+          const SizedBox(height: 12),
+          Wrap(runSpacing: 6, children: [
+            for (final k in own)
+              FractionallySizedBox(
+                widthFactor: .5,
+                child: Row(children: [
+                  Icon(Icons.check_rounded, size: 16, color: col),
+                  const SizedBox(width: 5),
+                  Expanded(child: Text(tr('${k}_short'), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: dark ? Colors.white.withValues(alpha: .9) : p.ink2))),
+                ]),
+              ),
+            if (i > 0)
+              FractionallySizedBox(
+                widthFactor: .5,
+                child: Row(children: [
+                  Icon(Icons.add_rounded, size: 16, color: soft),
+                  const SizedBox(width: 5),
+                  Expanded(child: Text(trf('all_of_plan_short', {'plan': planName(paidPlans[i - 1])}), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: soft))),
+                ]),
+              ),
+          ]),
+        ]),
+        if (dark) const Positioned.fill(child: _Twinkle(spots: [(.86, .02, 13), (.74, .2, 8), (.6, .05, 7)])),
+      ]),
+    );
+    if (dark) card = _Shine(radius: 24, child: card);
+
     return GestureDetector(
       onTap: () {
         HapticFeedback.selectionClick();
         onTap();
       },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: p.card,
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: selected ? col : p.border, width: selected ? 2 : 1),
-          boxShadow: selected ? [BoxShadow(color: col.withValues(alpha: .18), blurRadius: 0, spreadRadius: 4)] : null,
-        ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            IconBox(plan == Plan.basic ? Icons.menu_book_rounded : plan == Plan.standard ? Icons.bolt_rounded : Icons.star_rounded, fg: col, bg: col.withValues(alpha: .13)),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Wrap(spacing: 8, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
-                  Text(planName(plan), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-                  if (current) Tag(tr('current_plan'), fg: p.success, bg: p.successTint) else if (tag.isNotEmpty) Tag(tag, fg: Colors.white, bg: col),
-                ]),
-                Text(
-                  '${lim.$1 < 0 ? tr('unlimited_students') : trf('n_students', {'n': '${lim.$1}'})} · ${lim.$2 < 0 ? tr('unlimited_teachers') : trf('n_teachers', {'n': '${lim.$2}'})}',
-                  style: TextStyle(color: p.muted, fontSize: 12.5, fontWeight: FontWeight.w600),
+      child: AnimatedScale(
+        duration: const Duration(milliseconds: 250),
+        scale: selected ? 1 : .98,
+        child: Stack(clipBehavior: Clip.none, children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            padding: const EdgeInsets.all(2.5),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(26.5),
+              gradient: dark
+                  ? const LinearGradient(colors: [Color(0xFFFFD27A), Color(0xFFFF9F43), Color(0xFF8B7CF6)])
+                  : LinearGradient(colors: selected ? [p.brand, p.brand2] : [p.border, p.border]),
+              boxShadow: [
+                BoxShadow(
+                  color: (dark ? const Color(0xFFFF9F43) : (selected ? p.brand : Colors.black)).withValues(alpha: dark || selected ? .28 : .04),
+                  blurRadius: selected || dark ? 26 : 12,
+                  offset: const Offset(0, 12),
+                  spreadRadius: -8,
                 ),
-              ]),
+              ],
             ),
-            Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-              Text(rupees(yearly ? price.$2 : price.$1), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-              Text(yearly ? '${tr('per_year')} · ≈${rupees((price.$2 / 12).round())}${tr('per_month_short')}' : tr('per_month'), style: TextStyle(color: p.muted, fontSize: 11.5)),
-            ]),
-          ]),
-          const SizedBox(height: 10),
-          for (final k in own)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 3),
-              child: Row(children: [
-                Icon(Icons.check_rounded, size: 16, color: col),
-                const SizedBox(width: 6),
-                Expanded(child: Text(tr(k), style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: p.ink2))),
-              ]),
+            child: card,
+          ),
+          if (ribbon.isNotEmpty)
+            Positioned(
+              right: 18,
+              top: 2.5,
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(10, 4, 10, 5),
+                decoration: BoxDecoration(
+                  color: current ? p.success : null,
+                  gradient: current ? null : (dark ? const LinearGradient(colors: [Color(0xFFFF9F43), Color(0xFFF0466E)]) : LinearGradient(colors: [planColor(p, plan), planColor(p, plan)])),
+                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(10)),
+                ),
+                child: Text(ribbon.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w900, letterSpacing: .5)),
+              ),
             ),
-          if (i > 0)
-            Row(children: [
-              Icon(Icons.add_rounded, size: 16, color: p.muted),
-              const SizedBox(width: 6),
-              Expanded(child: Text(trf('all_of_plan', {'plan': planName(paidPlans[i - 1])}), style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: p.muted))),
-            ]),
         ]),
       ),
     );
   }
 }
 
-/// The coaching's VidyaDesk plan and every payment (with receipts).
+// ---------------------------------------------------------------------------
+// My plan (dashboard)
+// ---------------------------------------------------------------------------
+
+/// The coaching's VidyaDesk plan: days left, usage, what's included, payments.
 class MyPlanScreen extends StatelessWidget {
   const MyPlanScreen({super.key, required this.m});
   final Membership m;
@@ -488,155 +814,425 @@ class MyPlanScreen extends StatelessWidget {
     final st = app.plan;
     return Scaffold(
       appBar: InnerBar(title: tr('my_plan'), subtitle: m.instituteName),
-      body: Loader<List<SubPayment>>(
+      body: Loader<(List<SubPayment>, List<Membership>)>(
         key: ValueKey(st?.until ?? 0),
-        load: () => app.backend.mySubPayments(m.instituteId),
-        builder: (context, pays, reload) => RefreshIndicator(
-          onRefresh: () async {
-            await app.loadInstitute();
-            await reload();
-          },
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(16, 6, 16, 30),
-            children: [
-              if (st != null)
-                AppCard(
-                  gradient: const LinearGradient(colors: [Color(0xFF7A6AF0), Color(0xFF5545D6)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-                  padding: const EdgeInsets.all(18),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                    Row(children: [
-                      Expanded(
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text(tr('current_plan_caps'), style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: .6)),
-                          Text(planName(st.plan), style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800)),
-                          Text(
-                            st.active ? '${trf('till_date', {'date': _date(st.endDate)})} · ${trf('n_days_left', {'n': '${st.daysLeft}'})}' : tr('plan_ended'),
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
-                          ),
+        load: () async => (
+          await app.backend.mySubPayments(m.instituteId),
+          await app.backend.members(m.instituteId).catchError((_) => <Membership>[]),
+        ),
+        builder: (context, d, reload) {
+          final pays = d.$1;
+          final mem = d.$2;
+          final studs = mem.where((x) => x.role == Role.student && x.approved).length;
+          final teach = mem.where((x) => x.role == Role.teacher && x.approved).length;
+          final lastPaid = pays.where((x) => x.started).firstOrNull;
+          final total = st == null ? 30 : (st.trial ? trialDays : (lastPaid?.yearly ?? false) ? 365 : 30);
+          final left = st == null ? 0 : st.daysLeft.clamp(0, 9999);
+          final pct = total == 0 ? 0.0 : (left / total).clamp(0.0, 1.0);
+          final ended = st != null && !st.active;
+          final nextUp = st == null || st.trial ? Plan.standard : (st.plan == Plan.pro ? null : paidPlans[(paidPlans.indexOf(st.plan) + 1).clamp(0, 2)]);
+          return RefreshIndicator(
+            onRefresh: () async {
+              await app.loadInstitute();
+              await reload();
+            },
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 30),
+              children: [
+                if (st != null)
+                  Container(
+                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(28), boxShadow: [BoxShadow(color: const Color(0xFF4B3FC4).withValues(alpha: .45), blurRadius: 34, offset: const Offset(0, 18), spreadRadius: -16)]),
+                    child: _Shine(
+                      radius: 28,
+                      seconds: 4,
+                      child: Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          gradient: ended
+                              ? const LinearGradient(colors: [Color(0xFF7A1F3D), Color(0xFFC23A5E)], begin: Alignment.topLeft, end: Alignment.bottomRight)
+                              : const LinearGradient(colors: [Color(0xFF2B2370), Color(0xFF4B3FC4), Color(0xFF6C5CE7)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                        ),
+                        child: Stack(clipBehavior: Clip.none, children: [
+                          Positioned(right: -70, top: -70, child: Container(width: 190, height: 190, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: .07)))),
+                          Positioned(left: -50, bottom: -80, child: Container(width: 160, height: 160, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: .05)))),
+                          const Positioned.fill(child: _Twinkle(spots: [(.8, .02, 12), (.92, .3, 8), (.06, .7, 9)])),
+                          Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                            Row(children: [
+                              _Ring(
+                                pct: pct,
+                                colors: ended ? const [Color(0xFFFFFFFF), Color(0xFFFFB3C4)] : const [Color(0xFFFFD27A), Color(0xFFFF9F43)],
+                                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                                  _CountTo(left, ms: 1300, style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900, height: 1, letterSpacing: -1.5)),
+                                  Text(tr('days_left_short'), style: TextStyle(color: Colors.white.withValues(alpha: .8), fontSize: 12, fontWeight: FontWeight.w700)),
+                                ]),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: .16), borderRadius: BorderRadius.circular(99)),
+                                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                                      Icon(planIcon(st.plan), size: 13, color: Colors.white),
+                                      const SizedBox(width: 4),
+                                      Text(planName(st.plan).toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w900, letterSpacing: .5)),
+                                    ]),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(ended ? tr('plan_ended') : (st.trial ? tr('trial_running') : tr('plan_running')),
+                                      style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: -.4, height: 1.15)),
+                                  const SizedBox(height: 2),
+                                  Text(trf('till_date', {'date': _date(st.endDate)}), style: TextStyle(color: Colors.white.withValues(alpha: .8), fontWeight: FontWeight.w600, fontSize: 13)),
+                                  if (!ended) ...[
+                                    const SizedBox(height: 8),
+                                    Row(children: [
+                                      Container(width: 8, height: 8, decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(0xFF4ADE80), boxShadow: [BoxShadow(color: const Color(0xFF4ADE80).withValues(alpha: .5), blurRadius: 6, spreadRadius: 2)])),
+                                      const SizedBox(width: 6),
+                                      Expanded(child: Text(tr('auto_reminder_7'), maxLines: 2, style: TextStyle(color: Colors.white.withValues(alpha: .9), fontSize: 11.5, fontWeight: FontWeight.w700))),
+                                    ]),
+                                  ],
+                                ]),
+                              ),
+                            ]),
+                            const SizedBox(height: 18),
+                            Row(children: [
+                              Expanded(
+                                child: _HeroBtn(
+                                  label: st.trial ? tr('choose_plan') : tr('renew_now'),
+                                  icon: Icons.refresh_rounded,
+                                  bg: Colors.white,
+                                  fg: const Color(0xFF4B3FC4),
+                                  onTap: () => push(context, PlansScreen(m: m, pick: st.renewPlan)),
+                                ),
+                              ),
+                              if (nextUp != null && !st.trial) ...[
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: _HeroBtn(
+                                    label: trf('take_plan_short', {'plan': planName(nextUp)}),
+                                    icon: Icons.star_rounded,
+                                    gradient: const LinearGradient(colors: [Color(0xFFFFD27A), Color(0xFFFF9F43)]),
+                                    fg: const Color(0xFF3A2300),
+                                    onTap: () => push(context, PlansScreen(m: m, pick: nextUp)),
+                                  ),
+                                ),
+                              ],
+                            ]),
+                          ]),
                         ]),
                       ),
-                      const Icon(Icons.workspace_premium_rounded, color: Colors.white, size: 42),
-                    ]),
-                    const SizedBox(height: 14),
-                    Row(children: [
-                      Expanded(
-                        child: SizedBox(
-                          height: 42,
-                          child: FilledButton(
-                            style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: p.brandDeep, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                            onPressed: () => push(context, PlansScreen(m: m, pick: st.plan == Plan.pro ? Plan.pro : (st.trial ? Plan.standard : paidPlans[(paidPlans.indexOf(st.plan) + 1).clamp(0, 2)]))),
-                            child: Text(st.trial ? tr('choose_plan') : (st.plan == Plan.pro ? tr('renew_now') : tr('upgrade_now')), style: const TextStyle(fontWeight: FontWeight.w800)),
+                    ),
+                  ),
+                const SizedBox(height: 20),
+                SectionTitle(tr('usage_title')),
+                Row(children: [
+                  for (final u in [
+                    (Icons.groups_rounded, tr('students'), studs, st?.maxStudents ?? -1, p.brand, p.brand2),
+                    (Icons.school_rounded, tr('teachers'), teach, st?.maxTeachers ?? -1, p.success, const Color(0xFF4ADE80)),
+                  ]) ...[
+                    if (u.$2 == tr('teachers')) const SizedBox(width: 10),
+                    Expanded(
+                      child: AppCard(
+                        padding: const EdgeInsets.all(14),
+                        radius: 20,
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Row(children: [
+                            IconBox(u.$1, fg: u.$5, bg: u.$5.withValues(alpha: .12), size: 34),
+                            const SizedBox(width: 8),
+                            Expanded(child: Text(u.$2, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: p.muted, fontWeight: FontWeight.w700, fontSize: 13))),
+                          ]),
+                          const SizedBox(height: 10),
+                          Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                            _CountTo(u.$3, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: -.8, height: 1)),
+                            Text(' / ${u.$4 < 0 ? '∞' : u.$4}', style: TextStyle(color: p.muted, fontWeight: FontWeight.w700)),
+                          ]),
+                          const SizedBox(height: 8),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: SizedBox(
+                              height: 10,
+                              child: Stack(children: [
+                                Container(color: p.cardAlt),
+                                TweenAnimationBuilder<double>(
+                                  tween: Tween(begin: 0, end: u.$4 <= 0 ? (u.$4 < 0 ? .08 : 0) : (u.$3 / u.$4).clamp(0.0, 1.0)),
+                                  duration: const Duration(milliseconds: 1100),
+                                  curve: Curves.easeOutCubic,
+                                  builder: (_, v, __) => FractionallySizedBox(
+                                    widthFactor: v,
+                                    child: Container(decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), gradient: LinearGradient(colors: [u.$5, u.$6]))),
+                                  ),
+                                ),
+                              ]),
+                            ),
                           ),
-                        ),
+                          const SizedBox(height: 6),
+                          Text(u.$4 < 0 ? tr('no_limit') : trf('n_more_can_join', {'n': '${(u.$4 - u.$3).clamp(0, 99999)}'}),
+                              style: TextStyle(color: u.$4 > 0 && u.$3 >= u.$4 * .9 ? p.danger : p.muted, fontSize: 11.5, fontWeight: FontWeight.w600)),
+                        ]),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: SizedBox(
-                          height: 42,
-                          child: FilledButton(
-                            style: FilledButton.styleFrom(backgroundColor: Colors.white.withValues(alpha: .2), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                            onPressed: () => push(context, PlansScreen(m: m)),
-                            child: Text(tr('see_plans'), style: const TextStyle(fontWeight: FontWeight.w800)),
-                          ),
+                    ),
+                  ],
+                ]),
+                const SizedBox(height: 20),
+                SectionTitle(tr('in_this_plan')),
+                AppCard(
+                  padding: const EdgeInsets.all(14),
+                  child: Wrap(spacing: 8, runSpacing: 8, children: [
+                    for (final f in planFeatureRows)
+                      if (st == null || st.trial || [f.$2, f.$3, f.$4][(paidPlans.indexOf(st.plan)).clamp(0, 2)])
+                        _Chip(text: tr('${f.$1}_short'), icon: Icons.check_rounded, fg: p.brand, bg: p.brandTint)
+                      else
+                        _Chip(
+                          text: '${tr('${f.$1}_short')} · ${planName(f.$3 ? Plan.standard : Plan.pro)}',
+                          icon: Icons.lock_outline_rounded,
+                          fg: p.muted,
+                          bg: p.cardAlt,
+                          onTap: () => push(context, PlansScreen(m: m, pick: f.$3 ? Plan.standard : Plan.pro)),
                         ),
-                      ),
-                    ]),
                   ]),
                 ),
-              const SizedBox(height: 18),
-              SectionTitle(tr('payment_history')),
-              if (pays.isEmpty) Text(tr('no_plan_payments'), style: TextStyle(color: p.muted)),
-              for (final x in pays)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: AppCard(
-                    padding: const EdgeInsets.all(14),
-                    child: Row(children: [
-                      IconBox(Icons.receipt_long_rounded, fg: p.brand, bg: p.brandTint),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text('${planName(planFrom(x.plan))} · ${x.yearly ? tr('one_year') : tr('one_month')}', style: const TextStyle(fontWeight: FontWeight.w800)),
-                          Text('${_date(DateTime.fromMillisecondsSinceEpoch(x.createdAt))}${x.via.isEmpty ? '' : ' · ${x.via}'}', style: TextStyle(color: p.muted, fontSize: 12.5)),
-                        ]),
-                      ),
-                      Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                        Text(x.demo ? 'DEMO' : rupees(x.amount), style: const TextStyle(fontWeight: FontWeight.w800)),
-                        Text(tr('pay_status_${x.status}'), style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: x.started ? p.success : (x.status == 'pending' ? p.warn : p.danger))),
-                      ]),
-                      if (x.started) ...[
-                        const SizedBox(width: 6),
-                        IconBtn(icon: Icons.download_rounded, box: 38, size: 18, tooltip: tr('receipt'), onTap: () => planReceipt(context, x)),
-                      ],
-                    ]),
+                const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: () => push(context, ComparePlansScreen(m: m, students: studs)),
+                    icon: Icon(Icons.table_chart_outlined, color: p.brand, size: 18),
+                    label: Text(tr('compare_plans'), style: TextStyle(color: p.brand, fontWeight: FontWeight.w800)),
                   ),
                 ),
-            ],
-          ),
-        ),
+                const SizedBox(height: 6),
+                SectionTitle(tr('payment_history')),
+                if (pays.isEmpty) Text(tr('no_plan_payments'), style: TextStyle(color: p.muted)),
+                if (pays.isNotEmpty)
+                  AppCard(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                    child: Column(children: [
+                      for (var i = 0; i < pays.length; i++) _PayRow(x: pays[i], first: i == 0),
+                    ]),
+                  ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
 }
 
-class ComparePlansScreen extends StatelessWidget {
-  const ComparePlansScreen({super.key});
+class _HeroBtn extends StatelessWidget {
+  const _HeroBtn({required this.label, required this.icon, required this.fg, required this.onTap, this.bg, this.gradient});
+  final String label;
+  final IconData icon;
+  final Color fg;
+  final Color? bg;
+  final Gradient? gradient;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => Material(
+        color: Colors.transparent,
+        child: Ink(
+          height: 48,
+          decoration: BoxDecoration(color: bg, gradient: gradient, borderRadius: BorderRadius.circular(15)),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(15),
+            onTap: () {
+              HapticFeedback.lightImpact();
+              onTap();
+            },
+            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Icon(icon, color: fg, size: 18),
+              const SizedBox(width: 6),
+              Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: fg, fontWeight: FontWeight.w900, fontSize: 14.5))),
+            ]),
+          ),
+        ),
+      );
+}
+
+class _Chip extends StatelessWidget {
+  const _Chip({required this.text, required this.icon, required this.fg, required this.bg, this.onTap});
+  final String text;
+  final IconData icon;
+  final Color fg, bg;
+  final VoidCallback? onTap;
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(99), border: onTap != null ? Border.all(color: context.pal.border) : null),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(icon, size: 13, color: fg),
+            const SizedBox(width: 4),
+            Text(text, style: TextStyle(color: fg, fontWeight: FontWeight.w800, fontSize: 12)),
+          ]),
+        ),
+      );
+}
+
+class _PayRow extends StatelessWidget {
+  const _PayRow({required this.x, required this.first});
+  final SubPayment x;
+  final bool first;
   @override
   Widget build(BuildContext context) {
     final p = context.pal;
-    Widget cell(Widget c) => SizedBox(width: 58, child: Center(child: c));
-    Widget row(String label, List<Widget> v, {bool bold = false, bool last = false}) => Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-          decoration: BoxDecoration(border: last ? null : Border(bottom: BorderSide(color: p.border))),
-          child: Row(children: [
-            Expanded(child: Text(label, style: TextStyle(fontSize: 12.5, fontWeight: bold ? FontWeight.w800 : FontWeight.w600, color: bold ? p.muted : p.ink2))),
-            ...v.map(cell),
-          ]),
-        );
-    TextStyle b = const TextStyle(fontWeight: FontWeight.w800, fontSize: 12);
-    return Scaffold(
-      appBar: InnerBar(title: tr('compare_plans'), subtitle: tr('compare_sub')),
-      body: ListView(padding: const EdgeInsets.fromLTRB(16, 6, 16, 30), children: [
-        AppCard(
-          padding: EdgeInsets.zero,
-          child: Column(children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-              decoration: BoxDecoration(color: p.cardAlt, borderRadius: const BorderRadius.vertical(top: Radius.circular(22))),
-              child: Row(children: [
-                Expanded(child: Text(tr('feature'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5))),
-                for (final x in paidPlans) cell(Text(planName(x), style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: planColor(p, x)))),
-              ]),
-            ),
-            row(tr('per_month_label'), [for (final x in paidPlans) Text(rupees(planPrice[x]!.$1), style: b)], bold: true),
-            row(tr('students'), [for (final x in paidPlans) Text(planLimit[x]!.$1 < 0 ? '∞' : '${planLimit[x]!.$1}', style: b)], bold: true),
-            row(tr('teachers'), [for (final x in paidPlans) Text(planLimit[x]!.$2 < 0 ? '∞' : '${planLimit[x]!.$2}', style: b)], bold: true),
-            for (var i = 0; i < planFeatureRows.length; i++)
-              row(
-                tr(planFeatureRows[i].$1),
-                [
-                  for (final (k, has) in [(0, planFeatureRows[i].$2), (1, planFeatureRows[i].$3), (2, planFeatureRows[i].$4)])
-                    has ? Icon(Icons.check_rounded, size: 18, color: planColor(p, paidPlans[k])) : Text('—', style: TextStyle(color: p.border, fontWeight: FontWeight.w800)),
-                ],
-                last: i == planFeatureRows.length - 1,
-              ),
+    final ok = x.started;
+    final c = ok ? p.success : (x.status == 'pending' ? p.warn : p.danger);
+    final t = ok ? p.successTint : (x.status == 'pending' ? p.warnTint : p.dangerTint);
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      decoration: BoxDecoration(border: first ? null : Border(top: BorderSide(color: p.border))),
+      child: Row(children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(color: t, borderRadius: BorderRadius.circular(12)),
+          child: Icon(ok ? Icons.check_rounded : (x.status == 'pending' ? Icons.hourglass_top_rounded : Icons.close_rounded), color: c, size: 20),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('${planName(planFrom(x.plan))} · ${x.yearly ? tr('one_year') : tr('one_month')}', style: const TextStyle(fontWeight: FontWeight.w800)),
+            Text('${_date(DateTime.fromMillisecondsSinceEpoch(x.createdAt))}${x.via.isEmpty ? '' : ' · ${x.via}'}', style: TextStyle(color: p.muted, fontSize: 12)),
           ]),
         ),
-        const SizedBox(height: 12),
-        AppCard(
-          color: p.successTint,
-          padding: const EdgeInsets.all(14),
-          child: Row(children: [
-            Icon(Icons.star_rounded, color: p.success),
-            const SizedBox(width: 10),
-            Expanded(child: Text(tr('trial_note'), style: TextStyle(color: p.success, fontWeight: FontWeight.w700, fontSize: 13))),
-          ]),
-        ),
+        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          Text(x.demo ? 'DEMO' : rupees(x.amount), style: const TextStyle(fontWeight: FontWeight.w900)),
+          Text(tr('pay_status_${x.status}'), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: c)),
+        ]),
+        if (ok) ...[
+          const SizedBox(width: 6),
+          IconBtn(icon: Icons.download_rounded, box: 36, size: 18, tooltip: tr('receipt'), onTap: () => planReceipt(context, x)),
+        ],
       ]),
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// Compare
+// ---------------------------------------------------------------------------
+
+class ComparePlansScreen extends StatelessWidget {
+  const ComparePlansScreen({super.key, this.m, this.students = -1});
+  final Membership? m;
+  /// Students now (for the "near your limit" warning); -1 = unknown.
+  final int students;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pal;
+    final st = context.app.plan;
+    final cur = st == null || st.trial ? null : st.plan;
+    final max = st?.maxStudents ?? -1;
+    final near = cur != null && students >= 0 && max > 0 && students >= (max * .85).floor();
+    Widget cell(Widget c, int k) => Expanded(
+          child: Container(
+            height: 42,
+            color: paidPlans[k] == cur ? p.brandTint : null,
+            alignment: Alignment.center,
+            child: c,
+          ),
+        );
+    Widget row(String label, List<Widget> v, {bool first = false}) => Container(
+          decoration: BoxDecoration(border: first ? null : Border(top: BorderSide(color: p.border))),
+          child: Row(children: [
+            Expanded(flex: 5, child: Padding(padding: const EdgeInsets.only(left: 12), child: Text(label, maxLines: 2, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: p.ink2)))),
+            Expanded(flex: 12, child: Row(children: [for (var k = 0; k < v.length; k++) cell(v[k], k)])),
+          ]),
+        );
+    const b = TextStyle(fontWeight: FontWeight.w900, fontSize: 12.5);
+    final next = cur == null || cur == Plan.pro ? null : paidPlans[paidPlans.indexOf(cur) + 1];
+    return Scaffold(
+      appBar: InnerBar(title: tr('compare_plans'), subtitle: tr('compare_sub')),
+      body: ListView(padding: const EdgeInsets.fromLTRB(16, 6, 16, 30), children: [
+        if (near)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: _ShakeOnce(
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFFFFF4DB), Color(0xFFFFE6EC)]), borderRadius: BorderRadius.circular(20)),
+                child: Row(children: [
+                  Container(width: 44, height: 44, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.warning_amber_rounded, color: Color(0xFFE8930C))),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(trf('n_of_max_students', {'n': '$students', 'max': '$max'}), style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF7A4A00), fontSize: 14.5)),
+                      Text(trf('near_limit_sub', {'n': '${(max - students).clamp(0, 99999)}'}), style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF9A6A20), fontSize: 12)),
+                    ]),
+                  ),
+                ]),
+              ),
+            ),
+          ),
+        AppCard(
+          padding: EdgeInsets.zero,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(22),
+            child: Column(children: [
+              Row(children: [
+                const Expanded(flex: 5, child: SizedBox(height: 48)),
+                Expanded(
+                  flex: 12,
+                  child: Row(children: [
+                    for (var k = 0; k < 3; k++)
+                      Expanded(
+                        child: Container(
+                          height: 48,
+                          color: paidPlans[k] == cur ? p.brandTint : null,
+                          alignment: Alignment.center,
+                          child: Text(planName(paidPlans[k]), style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: planColor(p, paidPlans[k]))),
+                        ),
+                      ),
+                  ]),
+                ),
+              ]),
+              row(tr('students'), [for (final x in paidPlans) Text(planLimit[x]!.$1 < 0 ? '∞' : '${planLimit[x]!.$1}', style: b)]),
+              row(tr('teachers'), [for (final x in paidPlans) Text(planLimit[x]!.$2 < 0 ? '∞' : '${planLimit[x]!.$2}', style: b)]),
+              for (final f in planFeatureRows)
+                row(tr('${f.$1}_short'), [
+                  for (final has in [f.$2, f.$3, f.$4]) has ? Icon(Icons.check_rounded, size: 19, color: p.success) : Text('—', style: TextStyle(color: p.muted.withValues(alpha: .5), fontWeight: FontWeight.w900)),
+                ]),
+              row(tr('per_month_label'), [for (final x in paidPlans) Text(rupees(planPrice[x]!.$1), style: b)]),
+              row(tr('one_year'), [for (final x in paidPlans) FittedBox(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 4), child: Text(rupees(planPrice[x]!.$2), style: b)))]),
+            ]),
+          ),
+        ),
+        const SizedBox(height: 14),
+        if (m != null && cur != null)
+          Row(children: [
+            Expanded(child: SoftButton(label: trf('keep_plan', {'plan': planName(cur)}), height: 52, onPressed: () => push(context, PlansScreen(m: m!, pick: cur)))),
+            if (next != null) ...[
+              const SizedBox(width: 10),
+              Expanded(
+                child: _HeroBtn(
+                  label: trf('take_plan_short', {'plan': planName(next)}),
+                  icon: Icons.star_rounded,
+                  gradient: const LinearGradient(colors: [Color(0xFFFF9F43), Color(0xFFF0466E)]),
+                  fg: Colors.white,
+                  onTap: () => push(context, PlansScreen(m: m!, pick: next)),
+                ),
+              ),
+            ],
+          ])
+        else
+          AppCard(
+            color: p.successTint,
+            padding: const EdgeInsets.all(14),
+            child: Row(children: [
+              Icon(Icons.star_rounded, color: p.success),
+              const SizedBox(width: 10),
+              Expanded(child: Text(tr('trial_note'), style: TextStyle(color: p.success, fontWeight: FontWeight.w700, fontSize: 13))),
+            ]),
+          ),
+      ]),
+    );
+  }
+}
+
 
 // ---------------------------------------------------------------------------
 // Paying for a plan (UPI to the VidyaDesk owner — no UTR to type)

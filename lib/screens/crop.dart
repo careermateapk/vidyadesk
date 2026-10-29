@@ -11,7 +11,7 @@ Future<Uint8List?> cropPhoto(BuildContext context, Uint8List bytes) =>
     Navigator.of(context, rootNavigator: true).push<Uint8List>(MaterialPageRoute(fullscreenDialog: true, builder: (_) => ImageCropScreen(bytes: bytes)));
 
 // Work done away from the screen thread (so the app does not freeze).
-Uint8List _rotate((Uint8List, int) a) {
+Uint8List _rotateBytes((Uint8List, int) a) {
   final im = img.decodeImage(a.$1);
   if (im == null) return a.$1;
   return Uint8List.fromList(img.encodeJpg(img.copyRotate(im, angle: a.$2), quality: 90));
@@ -113,7 +113,7 @@ class _ImageCropScreenState extends State<ImageCropScreen> {
     });
   }
 
-  static Uint8List _rotate90(Uint8List b) => _rotate((b, 90));
+  static Uint8List _rotate90(Uint8List b) => _rotateBytes((b, 90));
 
   void _reset() => setState(() {
         _img = widget.bytes;

@@ -415,10 +415,16 @@ class DemoBackend implements Backend {
     final existing = _members[id];
     if (existing != null) {
       if (code.type == CodeType.batch && existing.role == Role.student && !existing.batchIds.contains(code.batchId)) existing.batchIds = [...existing.batchIds, code.batchId];
-      if (code.type == CodeType.batch && existing.role == Role.parent && childUid.isNotEmpty && !existing.childUids.contains(childUid)) {
-        existing
-          ..childUids = [...existing.childUids, childUid]
-          ..childNames = [...existing.childNames, childName];
+      if (code.type == CodeType.batch && existing.role == Role.parent && childUid.isNotEmpty && !existing.childUids.contains(childUid) && !existing.newChildUids.contains(childUid)) {
+        if (existing.approved) {
+          existing
+            ..newChildUids = [...existing.newChildUids, childUid]
+            ..newChildNames = [...existing.newChildNames, childName];
+        } else {
+          existing
+            ..childUids = [...existing.childUids, childUid]
+            ..childNames = [...existing.childNames, childName];
+        }
       }
       return existing;
     }
@@ -805,6 +811,24 @@ class DemoBackend implements Backend {
     final income = 9990 + _planPays.where((p) => p.started && p.createdAt >= monthStart).fold<int>(0, (a, p) => a + p.amount);
     final students = _members.values.where((m) => m.role == Role.student && m.approved).length + 180;
     return OwnerStats(institutes: [..._institutes.values, ...others], pending: pend, monthIncome: income, students: students);
+  }
+
+  @override
+  Future<void> decideChildRequest(Membership m, bool approve) async {
+    await _wait();
+    final real = _members[m.id] ?? m;
+    if (approve) {
+      real.childUids = [...real.childUids, ...real.newChildUids];
+      real.childNames = [...real.childNames, ...real.newChildNames];
+    }
+    real
+      ..newChildUids = []
+      ..newChildNames = [];
+    m
+      ..childUids = real.childUids
+      ..childNames = real.childNames
+      ..newChildUids = []
+      ..newChildNames = [];
   }
 
   @override

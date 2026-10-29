@@ -391,17 +391,20 @@ class FirebaseBackend implements Backend {
       if (code.type == CodeType.batch && m.role == Role.student && !m.batchIds.contains(code.batchId)) {
         await _mem.doc(id).update({'batchIds': FieldValue.arrayUnion([code.batchId])});
         m.batchIds = [...m.batchIds, code.batchId];
-      } else if (code.type == CodeType.batch && m.role == Role.parent && childUid.isNotEmpty && !m.childUids.contains(childUid)) {
-        await _mem.doc(id).update({
-          'childUids': FieldValue.arrayUnion([childUid]),
-          'childNames': FieldValue.arrayUnion([childName]),
-        });
-        m.childUids = [...m.childUids, childUid];
-      } else if (code.type == CodeType.student && m.role == Role.parent && !m.childUids.contains(code.studentUid)) {
-        await _mem.doc(id).update({
-          'childUids': FieldValue.arrayUnion([code.studentUid]),
-          'childNames': FieldValue.arrayUnion([code.studentName]),
-        });
+      } else if (m.role == Role.parent) {
+        final (cu, cn) = code.type == CodeType.student ? (code.studentUid, code.studentName) : (childUid, childName);
+        if (cu.isNotEmpty && !m.childUids.contains(cu) && !m.newChildUids.contains(cu)) {
+          if (m.approved) {
+            // Already approved: the admin must say yes before this child's data opens.
+            await _mem.doc(id).update({'newChildUids': FieldValue.arrayUnion([cu]), 'newChildNames': FieldValue.arrayUnion([cn])});
+            m.newChildUids = [...m.newChildUids, cu];
+            m.newChildNames = [...m.newChildNames, cn];
+          } else {
+            await _mem.doc(id).update({'childUids': FieldValue.arrayUnion([cu]), 'childNames': FieldValue.arrayUnion([cn])});
+            m.childUids = [...m.childUids, cu];
+            m.childNames = [...m.childNames, cn];
+          }
+        }
       }
       return m;
     }
@@ -810,6 +813,22 @@ class FirebaseBackend implements Backend {
       students = (await _mem.where('role', isEqualTo: 'student').where('status', isEqualTo: 'approved').count().get()).count ?? 0;
     } catch (_) {}
     return OwnerStats(institutes: insts, pending: pend, monthIncome: income, students: students);
+  }
+
+  @override
+  Future<void> decideChildRequest(Membership m, bool approve) async {
+    await _mem.doc(m.id).update({
+      if (approve) 'childUids': FieldValue.arrayUnion(m.newChildUids),
+      if (approve) 'childNames': FieldValue.arrayUnion(m.newChildNames),
+      'newChildUids': <String>[],
+      'newChildNames': <String>[],
+    });
+    if (approve) {
+      m.childUids = [...m.childUids, ...m.newChildUids.where((c) => !m.childUids.contains(c))];
+      m.childNames = [...m.childNames, ...m.newChildNames.where((c) => !m.childNames.contains(c))];
+    }
+    m.newChildUids = [];
+    m.newChildNames = [];
   }
 
   @override

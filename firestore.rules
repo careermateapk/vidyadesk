@@ -61,12 +61,14 @@ service cloud.firestore {
         );
 
       allow list: if appOwner();
-      allow update: if (own() && changed().hasOnly(['batchIds', 'childUids', 'childNames', 'photo', 'upiId']))
+      // A parent can link children only before approval; after that, new ones wait for the admin.
+      allow update: if (own() && changed().hasOnly(['batchIds', 'photo', 'upiId', 'newChildUids', 'newChildNames']))
+        || (own() && resource.data.status == 'pending' && changed().hasOnly(['batchIds', 'childUids', 'childNames', 'photo', 'upiId']))
         || (isStaff(resource.data.instituteId) && live(resource.data.instituteId)
             && changed().hasOnly(['status', 'studentCode', 'monthlyFee', 'batchIds'])
             && (resource.data.role in ['student', 'parent'] || isAdmin(resource.data.instituteId)))
         || (isAdmin(resource.data.instituteId) && live(resource.data.instituteId)
-            && changed().hasOnly(['monthlyFee', 'discount', 'feeNote', 'salary', 'payType', 'upiId', 'childUids', 'childNames', 'childFees']));
+            && changed().hasOnly(['monthlyFee', 'discount', 'feeNote', 'salary', 'payType', 'upiId', 'childUids', 'childNames', 'childFees', 'newChildUids', 'newChildNames']));
 
       allow delete: if own() || isAdmin(resource.data.instituteId);
     }

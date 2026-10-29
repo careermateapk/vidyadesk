@@ -43,6 +43,9 @@ abstract class Backend {
   Future<List<Membership>> members(String instituteId);
   /// [batchIds]: batches picked by staff while approving (students who joined with the institute code).
   Future<void> decide(Membership m, bool approve, {List<String>? batchIds});
+
+  /// Admin: yes / no to the extra children an approved parent asked for.
+  Future<void> decideChildRequest(Membership m, bool approve);
   Future<void> setMonthlyFee(Membership m, int fee);
   /// Admin: a student's fee plan. [monthlyFee] is the final amount after [discount].
   Future<void> setFeePlan(Membership m, {required int monthlyFee, required int discount, required String note});

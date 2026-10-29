@@ -1528,4 +1528,9 @@ const Map<String, List<String>> _t = {
   'pf_support_short': ['Priority support', 'ख़ास सहायता', 'Priority support'],
   'delete_coupon_q': ['Coupon {code} will be removed. Nobody can use it after this.', 'कूपन {code} हट जाएगा। इसके बाद कोई इसे इस्तेमाल नहीं कर पाएगा।', 'Coupon {code} hat jayega. Iske baad koi ise use nahi kar payega.'],
   'delete_banner_q': ['This banner will be removed from everyone\'s home page.', 'यह बैनर सबके होम पेज से हट जाएगा।', 'Ye banner sabke home page se hat jayega.'],
+  'push_child_added': ['Child added — you can see their details now', 'बच्चा जुड़ गया — अब उसकी जानकारी देख सकते हैं', 'Bachcha jud gaya — ab uski details dekh sakte hain'],
+  'push_child_no': ['Your request to add a child was not approved', 'बच्चा जोड़ने की आपकी रिक्वेस्ट मंज़ूर नहीं हुई', 'Bachcha jodne ki request approve nahi hui'],
+  'child_added_toast': ['{name} added to the parent', '{name} पैरेंट से जुड़ गया', '{name} parent se jud gaya'],
+  'child_request_detail': ['Wants to add: {new}\nAlready linked: {old}', 'जोड़ना चाहते हैं: {new}\nपहले से जुड़े: {old}', 'Jodna chahte hain: {new}\nPehle se jude: {old}'],
+  'child_request_sent': ['Request sent. You will see this child once the admin approves.', 'रिक्वेस्ट भेज दी। एडमिन की मंज़ूरी के बाद बच्चा दिखेगा।', 'Request bhej di. Admin approve karega tab bachcha dikhega.'],
 };

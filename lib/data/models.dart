@@ -341,6 +341,8 @@ class Membership {
     this.batchIds = const [],
     this.childUids = const [],
     this.childNames = const [],
+    this.newChildUids = const [],
+    this.newChildNames = const [],
     this.relation = '',
     this.studentCode = '',
     this.monthlyFee = 0,
@@ -375,6 +377,9 @@ class Membership {
   final List<String> subjects;
   List<String> batchIds;
   List<String> childUids, childNames;
+  /// Parents: children asked for after approval — the admin must say yes first.
+  List<String> newChildUids, newChildNames;
+  bool get childRequest => role == Role.parent && approved && newChildUids.isNotEmpty;
   final String relation;
   String studentCode;
   int monthlyFee;
@@ -401,6 +406,8 @@ class Membership {
         'batchIds': batchIds,
         'childUids': childUids,
         'childNames': childNames,
+        'newChildUids': newChildUids,
+        'newChildNames': newChildNames,
         'relation': relation,
         'studentCode': studentCode,
         'monthlyFee': monthlyFee,
@@ -430,6 +437,8 @@ class Membership {
         batchIds: _ls(m['batchIds']),
         childUids: _ls(m['childUids']),
         childNames: _ls(m['childNames']),
+        newChildUids: _ls(m['newChildUids']),
+        newChildNames: _ls(m['newChildNames']),
         relation: _s(m['relation']),
         studentCode: _s(m['studentCode']),
         monthlyFee: _i(m['monthlyFee']),

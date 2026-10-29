@@ -75,6 +75,7 @@ class _RequestCardState extends State<_RequestCard> {
   bool get _student => widget.r.role == Role.student;
 
   Future<void> _decide(bool ok) async {
+    if (widget.r.childRequest) return _decideChild(ok);
     if (ok && _student && _picked.isEmpty) {
       toast(context, tr('pick_batch_first'));
       HapticFeedback.mediumImpact();
@@ -110,12 +111,38 @@ class _RequestCardState extends State<_RequestCard> {
     }
   }
 
+  /// An approved parent wants to add another child.
+  Future<void> _decideChild(bool ok) async {
+    setState(() => _busy = true);
+    try {
+      final names = widget.r.newChildNames.join(', ');
+      await context.appRead.backend.decideChildRequest(widget.r, ok);
+      Push.send(
+        inst: widget.r.instituteId,
+        kind: 'approved',
+        title: ok ? '🎉 ${tr('push_child_added')}' : tr('push_child_no'),
+        body: names,
+        topics: [Push.person(widget.r.instituteId, widget.r.uid)],
+      );
+      if (mounted) toast(context, ok ? trf('child_added_toast', {'name': names}) : tr('rejected'));
+      HapticFeedback.mediumImpact();
+      setState(() => _result = ok);
+      await Future<void>.delayed(const Duration(milliseconds: 700));
+      await widget.onDone();
+    } catch (e) {
+      if (mounted) toast(context, errorMessage(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = context.pal;
     final r = widget.r;
     final detail = switch (r.role) {
       Role.student => r.batchIds.map((id) => widget.batches[id]?.title ?? id).join(', '),
+      Role.parent when r.childRequest => trf('child_request_detail', {'new': r.newChildNames.join(', '), 'old': r.childNames.join(', ')}),
       Role.parent => '${tr('rel_${r.relation.isEmpty ? 'guardian' : r.relation}')} · ${r.childNames.join(', ')}',
       Role.teacher => r.subjects.join(', '),
       Role.admin => '',

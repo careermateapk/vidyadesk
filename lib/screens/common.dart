@@ -19,7 +19,7 @@ List<Membership> approvedStudents(List<Membership> members, {String? batchId}) =
 /// Pending requests this person may approve.
 List<Membership> pendingFor(Membership me, List<Membership> members, List<Batch> batches) {
   final pend = members.where((x) => x.status == MemberStatus.pending).toList();
-  if (me.role == Role.admin) return pend;
+  if (me.role == Role.admin) return [...pend, ...members.where((x) => x.childRequest)];
   final mine = batches.where((b) => b.teacherUid == me.uid).map((b) => b.id).toSet();
   final myStudents = members.where((x) => x.role == Role.student && x.batchIds.any(mine.contains)).map((x) => x.uid).toSet();
   return pend.where((x) {

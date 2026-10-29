@@ -119,7 +119,7 @@ export function allowed(m, kind, topics) {
   if (topics.includes('owner')) return topics.every((t) => t === 'owner') && kind === 'ticket' && m.status === 'approved' && m.role === 'admin';
   const toStaff = topics.every((t) => /^[sa]_/.test(t));
   if (m.status === 'approved' && (m.role === 'admin' || m.role === 'teacher')) return true;
-  if (m.status === 'approved' && (m.role === 'student' || m.role === 'parent')) return toStaff && ['doubt', 'fee_claim'].includes(kind);
+  if (m.status === 'approved' && (m.role === 'student' || m.role === 'parent')) return toStaff && ['doubt', 'fee_claim', 'join'].includes(kind);
   if (m.status === 'pending') return toStaff && kind === 'join';
   return false;
 }

@@ -1,0 +1,60 @@
+name: Publish Firestore rules
+
+on:
+  push:
+    branches: [main]
+    paths: ["firestore.rules", ".github/workflows/deploy-rules.yml"]
+  workflow_dispatch:
+
+jobs:
+  rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Same locked file as the notification server: it holds the Firebase server key.
+      - name: Unlock server key
+        env:
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+        run: |
+          if [ -z "$DEPLOY_KEY" ]; then echo "::warning::DEPLOY_KEY secret missing - rules not published"; exit 0; fi
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -a -A -in worker/deploy.enc -out /tmp/deploy.json -pass env:DEPLOY_KEY
+          python3 -c "import json;print(json.dumps(json.load(open('/tmp/deploy.json'))['sa']))" > /tmp/sa.json
+          rm -f /tmp/deploy.json
+          echo "READY=1" >> "$GITHUB_ENV"
+      - name: Publish rules
+        if: env.READY == '1'
+        run: |
+          pip install --quiet google-auth requests
+          python3 - <<'PY'
+          import json, requests
+          from google.oauth2 import service_account
+          from google.auth.transport.requests import Request
+          sa = json.load(open('/tmp/sa.json'))
+          pid = sa['project_id']
+          cred = service_account.Credentials.from_service_account_info(sa, scopes=['https://www.googleapis.com/auth/cloud-platform', 'https://www.googleapis.com/auth/firebase'])
+          cred.refresh(Request())
+          h = {'Authorization': 'Bearer ' + cred.token, 'Content-Type': 'application/json'}
+          base = f'https://firebaserules.googleapis.com/v1/projects/{pid}'
+          # what is live now?
+          r = requests.get(f'{base}/releases/cloud.firestore', headers=h)
+          if r.ok:
+              cur = r.json().get('rulesetName', '')
+              rs = requests.get(f'https://firebaserules.googleapis.com/v1/{cur}', headers=h).json()
+              live = rs.get('source', {}).get('files', [{}])[0].get('content', '')
+              print('::notice::Live rules before: ' + ('has parent-photo rule' if 'childUids)' in live or "mem(resource.data.instituteId).childUids" in live else 'OLD rules (parent photo rule missing)'))
+          else:
+              print('::warning::Could not read live rules: %s %s' % (r.status_code, r.text[:200]))
+          src = open('firestore.rules').read()
+          r = requests.post(f'{base}/rulesets', headers=h, json={'source': {'files': [{'name': 'firestore.rules', 'content': src}]}})
+          if not r.ok:
+              print('::error::Rules not accepted: %s %s' % (r.status_code, r.text[:500])); raise SystemExit(1)
+          name = r.json()['name']
+          body = {'release': {'name': f'projects/{pid}/releases/cloud.firestore', 'rulesetName': name}}
+          r = requests.patch(f'{base}/releases/cloud.firestore', headers=h, json=body)
+          if not r.ok:
+              r = requests.post(f'{base}/releases', headers=h, json=body['release'])
+          if not r.ok:
+              print('::error::Could not publish: %s %s' % (r.status_code, r.text[:500])); raise SystemExit(1)
+          print('::notice::Firestore rules published: ' + name)
+          PY
+          rm -f /tmp/sa.json

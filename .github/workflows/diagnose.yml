@@ -1,0 +1,47 @@
+name: Diagnose data
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [".github/workflows/diagnose.yml"]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check parent / child photos
+        env:
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+        run: |
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -a -A -in worker/deploy.enc -out /tmp/d.json -pass env:DEPLOY_KEY
+          pip install --quiet google-auth requests
+          python3 - <<'PY'
+          import json, requests
+          from google.oauth2 import service_account
+          from google.auth.transport.requests import Request
+          sa = json.load(open('/tmp/d.json'))['sa']
+          pid = sa['project_id']
+          c = service_account.Credentials.from_service_account_info(sa, scopes=['https://www.googleapis.com/auth/datastore'])
+          c.refresh(Request())
+          h = {'Authorization': 'Bearer ' + c.token}
+          base = f'https://firestore.googleapis.com/v1/projects/{pid}/databases/(default)/documents'
+          docs = requests.get(f'{base}/memberships?pageSize=300', headers=h).json().get('documents', [])
+          mems = {}
+          for d in docs:
+              f = d.get('fields', {})
+              mid = d['name'].split('/')[-1]
+              mems[mid] = f
+          for mid, f in mems.items():
+              role = f.get('role', {}).get('stringValue')
+              ph = len(f.get('photo', {}).get('stringValue', ''))
+              print(f"::notice::{role} {mid[:6]}…_{mid.split('_')[-1][:5]} photo={ph}")
+              if role == 'parent':
+                  inst = f.get('instituteId', {}).get('stringValue')
+                  kids = [v.get('stringValue') for v in f.get('childUids', {}).get('arrayValue', {}).get('values', [])]
+                  for k in kids:
+                      cm = mems.get(f'{k}_{inst}')
+                      print(f"::notice::  child {k[:6]} membership={'yes' if cm else 'MISSING'} photo={len(cm.get('photo',{}).get('stringValue','')) if cm else 0}")
+          PY
+          rm -f /tmp/d.json

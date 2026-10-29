@@ -332,9 +332,12 @@ class Membership {
     this.salary = 0,
     this.payType = 'fixed',
     this.upiId = '',
+    this.childFees = const {},
   });
 
   final String uid, instituteId, instituteName;
+  /// Parents: each child's monthly fee (kept up to date by the admin's app).
+  Map<String, int> childFees;
   /// Fee plan (students): ₹ off every month and a note like "Merit scholarship".
   /// [monthlyFee] is always the final amount after the discount.
   int discount;
@@ -389,6 +392,7 @@ class Membership {
         'salary': salary,
         'payType': payType,
         'upiId': upiId,
+        'childFees': childFees,
       };
 
   factory Membership.fromMap(Map<String, dynamic> m) => Membership(
@@ -417,6 +421,7 @@ class Membership {
         salary: _i(m['salary']),
         payType: _s(m['payType']).isEmpty ? 'fixed' : _s(m['payType']),
         upiId: _s(m['upiId']),
+        childFees: m['childFees'] is Map ? {for (final e in (m['childFees'] as Map).entries) '${e.key}': _i(e.value)} : const {},
       );
 }
 

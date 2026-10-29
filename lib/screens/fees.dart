@@ -63,6 +63,7 @@ class _FeesPageState extends State<FeesPage> {
     final members = await b.members(id);
     final fees = await b.feesForMonth(id, monthKey(_month));
     _inst = await b.institute(id);
+    if (widget.m.role == Role.admin) b.syncParentFees(id); // parents see what is due
     final byUid = {for (final f in fees) f.studentUid: f};
     final parents = members.where((x) => x.role == Role.parent && x.approved).toList();
     return [
@@ -527,7 +528,11 @@ class _FeeSheetState extends State<_FeeSheet> {
     final base = int.tryParse(_base.text.trim()) ?? 0;
     var disc = int.tryParse(_disc.text.trim()) ?? 0;
     if (disc > base) disc = base;
-    return _run(() => context.appRead.backend.setFeePlan(widget.r.s, monthlyFee: base - disc, discount: disc, note: _note.text.trim()), tr('saved'));
+    final b = context.appRead.backend;
+    return _run(() async {
+      await b.setFeePlan(widget.r.s, monthlyFee: base - disc, discount: disc, note: _note.text.trim());
+      await b.syncParentFees(widget.m.instituteId);
+    }, tr('saved'));
   }
 
   @override
@@ -781,7 +786,9 @@ class _MyFeesPageState extends State<MyFeesPage> {
           final inst = d.$2;
           final cur = monthKey(DateTime.now());
           final saved = fees.where((f) => f.month == cur).firstOrNull;
-          final monthly = m.role == Role.student ? m.monthlyFee : (saved?.amount ?? (fees.isEmpty ? 0 : fees.first.amount - fees.first.lateFee.clamp(0, 1 << 30)));
+          final monthly = m.role == Role.student
+              ? m.monthlyFee
+              : (saved?.amount ?? m.childFees[widget.studentUid] ?? (fees.isEmpty ? 0 : fees.first.amount - fees.first.lateFee.clamp(0, 1 << 30)));
           // this month's fee, with the late fee once the due date has passed
           final rec = withLateFee(saved ?? FeeRecord(studentUid: widget.studentUid, studentName: widget.studentName, month: cur, amount: monthly), inst);
           final thisOne = saved == null ? null : rec;

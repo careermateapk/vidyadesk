@@ -65,7 +65,7 @@ service cloud.firestore {
             && changed().hasOnly(['status', 'studentCode', 'monthlyFee', 'batchIds'])
             && (resource.data.role in ['student', 'parent'] || isAdmin(resource.data.instituteId)))
         || (isAdmin(resource.data.instituteId) && live(resource.data.instituteId)
-            && changed().hasOnly(['monthlyFee', 'discount', 'feeNote', 'salary', 'payType', 'upiId', 'childUids', 'childNames']));
+            && changed().hasOnly(['monthlyFee', 'discount', 'feeNote', 'salary', 'payType', 'upiId', 'childUids', 'childNames', 'childFees']));
 
       allow delete: if own() || isAdmin(resource.data.instituteId);
     }

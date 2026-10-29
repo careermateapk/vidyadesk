@@ -82,7 +82,7 @@ class AppState extends ChangeNotifier {
 
   /// Test: every student/parent account can make ONE demo fee payment (no money).
   /// Turn off with [demoFeeOn] = false when testing is over.
-  static const demoFeeOn = true;
+  static const demoFeeOn = false;
   bool get demoFeeLeft => demoFeeOn && !isDemo && !(_prefs?.getBool('demoFee_${signedIn?.uid ?? ''}') ?? false);
   void useDemoFee() => _prefs?.setBool('demoFee_${signedIn?.uid ?? ''}', true);
 

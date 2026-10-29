@@ -160,6 +160,22 @@ class FirebaseBackend implements Backend {
   }
 
   @override
+  Future<void> syncParentFees(String instituteId) async {
+    try {
+      final all = await members(instituteId);
+      final fee = {for (final x in all) if (x.role == Role.student) x.uid: x.monthlyFee};
+      for (final p in all.where((x) => x.role == Role.parent)) {
+        final want = {for (final c in p.childUids) if (fee.containsKey(c)) c: fee[c]!};
+        final same = want.length == p.childFees.length && want.entries.every((e) => p.childFees[e.key] == e.value);
+        if (!same) {
+          await _mem.doc(p.id).update({'childFees': want});
+          p.childFees = want;
+        }
+      }
+    } catch (_) {}
+  }
+
+  @override
   Future<void> sharePhoto(String instituteId, String photo) async {
     if (instituteId.isEmpty) return;
     final me = _auth.currentUser!.uid;

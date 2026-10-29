@@ -63,6 +63,8 @@ abstract class Backend {
   Future<JoinCode?> lookupCode(String code);
   /// [role]: who is joining. Students may join with a batch code or the institute code.
   Future<Membership> requestJoin({required AppUser user, required JoinCode code, String relation = '', List<String> subjects = const [], Role? role, String childUid = '', String childName = ''});
+  /// Admin: copies each student's monthly fee into their parents' records (parents see what is due).
+  Future<void> syncParentFees(String instituteId);
   /// Puts my photo where my coaching's members can see it (parents see their child's).
   Future<void> sharePhoto(String instituteId, String photo);
   /// Parent: profile photos of my children (uid → base64 photo).

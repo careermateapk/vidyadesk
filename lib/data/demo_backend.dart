@@ -687,6 +687,14 @@ class DemoBackend implements Backend {
   }
 
   @override
+  Future<void> syncParentFees(String instituteId) async {
+    final fee = {for (final x in _members.values.where((x) => x.instituteId == instituteId && x.role == Role.student)) x.uid: x.monthlyFee};
+    for (final p in _members.values.where((x) => x.instituteId == instituteId && x.role == Role.parent)) {
+      p.childFees = {for (final c in p.childUids) if (fee.containsKey(c)) c: fee[c]!};
+    }
+  }
+
+  @override
   Future<void> sharePhoto(String instituteId, String photo) async {}
 
   @override

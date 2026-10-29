@@ -99,7 +99,7 @@ class ParentHome extends StatelessWidget {
           name: name,
           studentUid: uid,
           studentCode: '',
-          monthlyFee: d.fees.isEmpty ? 0 : d.fees.first.amount,
+          monthlyFee: m.childFees[uid] ?? (d.fees.isEmpty ? 0 : d.fees.first.amount),
           batches: batches,
           d: d,
           notices: d.notices,

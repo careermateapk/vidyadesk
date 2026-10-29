@@ -10,6 +10,7 @@ import '../ui/widgets.dart';
 import 'common.dart';
 import 'notices.dart' show ago;
 import 'resources.dart' show learnerUid;
+import 'subscription.dart' show featureOn;
 import 'viewers.dart';
 
 (String, Color, Color) doubtStatus(Palette p, Doubt d) {
@@ -224,7 +225,7 @@ class _AskDoubtScreenState extends State<AskDoubtScreen> {
               else
                 GestureDetector(
                   onTap: () async {
-                    final got = await pickPhotos(context, max: 1, crop: true);
+                    final got = await pickPhotos(context, max: 1, crop: featureOn(context, 'doubtCrop'));
                     if (got.isNotEmpty) setState(() => _photo = got.first);
                   },
                   child: Container(
@@ -446,7 +447,7 @@ class _DoubtThreadScreenState extends State<DoubtThreadScreen> {
                   icon: Icons.add_a_photo_outlined,
                   tooltip: tr('photo'),
                   onTap: () async {
-                    final got = await pickPhotos(context, max: 1, crop: true);
+                    final got = await pickPhotos(context, max: 1, crop: featureOn(context, 'doubtCrop'));
                     if (got.isNotEmpty) setState(() => _photo = got.first);
                   },
                 ),

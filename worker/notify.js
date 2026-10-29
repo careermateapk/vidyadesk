@@ -107,13 +107,15 @@ export function checkRequest(b) {
   const topics = Array.isArray(b.topics) ? b.topics.map(String) : [];
   if (!/^[A-Za-z0-9_-]{4,64}$/.test(inst) || inst.includes('_')) return 'bad_inst';
   if (!topics.length || topics.length > 5) return 'bad_topics';
-  const re = new RegExp(`^(?:[lsa]_${inst}|[bu]_${inst}_[A-Za-z0-9-]{1,64})$`);
+  const re = new RegExp(`^(?:owner|[lsa]_${inst}|[bu]_${inst}_[A-Za-z0-9-]{1,64})$`);
   if (!topics.every((t) => re.test(t))) return 'bad_topic';
   return null;
 }
 
 export function allowed(m, kind, topics) {
   if (!m) return false;
+  // Help box: only an approved admin may write to the VidyaDesk owner.
+  if (topics.includes('owner')) return topics.every((t) => t === 'owner') && kind === 'ticket' && m.status === 'approved' && m.role === 'admin';
   const toStaff = topics.every((t) => /^[sa]_/.test(t));
   if (m.status === 'approved' && (m.role === 'admin' || m.role === 'teacher')) return true;
   if (m.status === 'approved' && (m.role === 'student' || m.role === 'parent')) return toStaff && ['doubt', 'fee_claim'].includes(kind);
@@ -225,6 +227,29 @@ async function fsPatch(token, pid, path, obj, mask) {
   if (!r.ok) throw new Error('firestore_write_' + r.status);
 }
 
+// Plan prices: the owner can change them from the app (config/app → prices).
+export function pickPrices(cfg) {
+  const out = { ...PRICES };
+  const p = cfg && cfg.prices;
+  if (p && typeof p === 'object') {
+    for (const k of Object.keys(PRICES)) {
+      const v = p[k];
+      if (Array.isArray(v) && Number(v[0]) > 0 && Number(v[1]) > 0) out[k] = [Number(v[0]), Number(v[1])];
+    }
+  }
+  return out;
+}
+
+async function appPrices(token, pid) {
+  try {
+    const r = await fetch(`${fsBase(pid)}/config/app`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!r.ok) return PRICES;
+    return pickPrices(decodeFields((await r.json()).fields || {}));
+  } catch (_) {
+    return PRICES;
+  }
+}
+
 // Discount from a coupon document (0 when it can't be used).
 export function couponDiscount(c, plan, yearly, amount, now = Date.now()) {
   if (!c || c.active === false) return 0;
@@ -257,7 +282,8 @@ async function buyPlan(env, login, b) {
   if (!inst) return json({ error: 'no_institute' }, 404);
   const demo = DEMO_EMAILS.includes(login.email);
   const yearly = b.yearly === true;
-  let amount = PRICES[b.plan][yearly ? 1 : 0];
+  const prices = await appPrices(token, pid);
+  let amount = prices[b.plan][yearly ? 1 : 0];
   const code = String(b.coupon || '').trim().toUpperCase().replace(/\s/g, '');
   let couponUsed = '';
   if (code) {
@@ -405,6 +431,25 @@ export async function checkinReminders(env, now = Date.now()) {
   return sent;
 }
 
+// ---- morning: tell the owner how many coachings have not opened the app for 7+ days ----
+export function sleepingCount(insts, now = Date.now()) {
+  return insts.filter((i) => {
+    const until = Number(i.planUntil || 0);
+    if (until > 0 && until + 3 * DAY < now) return false; // plan over → already "left"
+    const last = Number(i.lastActive || 0);
+    return last <= 0 || now - last > 7 * DAY;
+  }).length;
+}
+
+async function sleepingNotice(env, now = Date.now()) {
+  const token = await accessToken(JSON.parse(env.SA_JSON));
+  const insts = await listDocs(token, env.PROJECT_ID, 'institutes');
+  const n = sleepingCount(insts, now);
+  if (n <= 0) return 0;
+  await sendFcm(token, env.PROJECT_ID, ['owner'], `😴 ${n} coaching app use nahi kar rahi`, '7 din se app nahi khola. Owner panel → So rahi → call / WhatsApp karein.', '', 'owner');
+  return n;
+}
+
 export default {
   async scheduled(event, env, ctx) {
     if (event.cron === '30 15 * * *') {
@@ -413,6 +458,7 @@ export default {
     }
     ctx.waitUntil(planReminders(env).catch((e) => console.log('plan reminders failed', e)));
     ctx.waitUntil(feeReminders(env).catch((e) => console.log('fee reminders failed', e)));
+    ctx.waitUntil(sleepingNotice(env).catch((e) => console.log('sleeping notice failed', e)));
   },
   async fetch(req, env) {
     if (req.method !== 'POST') return json({ ok: true, service: 'vidyadesk-notify' });

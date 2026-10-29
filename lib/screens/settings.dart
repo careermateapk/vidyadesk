@@ -8,6 +8,7 @@ import '../ui/widgets.dart';
 import 'auth.dart';
 import 'common.dart';
 import 'help.dart';
+import 'owner2.dart' show HelpBoxScreen;
 import 'payments.dart';
 import 'photo.dart';
 import 'learner_home.dart';
@@ -184,9 +185,9 @@ class SettingsPage extends StatelessWidget {
                 ],
                 if (m.role == Role.admin) _Tile(icon: Icons.how_to_reg_outlined, color: p.success, label: tr('teacher_checkins'), onTap: () => gated(context, Feature.checkin, () => push(context, CheckInsScreen(m: m)))),
                 if (m.role == Role.admin) _Tile(icon: Icons.location_on_outlined, color: p.brand, label: tr('checkin_rules'), onTap: () => gated(context, Feature.checkin, () => push(context, CheckInRulesScreen(m: m)))),
-                if (m.role == Role.admin || planHas(context, Feature.admissions)) _Tile(icon: Icons.person_search_rounded, color: p.warn, label: tr('admissions'), onTap: () => gated(context, Feature.admissions, () => push(context, AdmissionsScreen(m: m)))),
+                if ((m.role == Role.admin || planHas(context, Feature.admissions)) && featureOn(context, 'admissions')) _Tile(icon: Icons.person_search_rounded, color: p.warn, label: tr('admissions'), onTap: () => gated(context, Feature.admissions, () => push(context, AdmissionsScreen(m: m)))),
                 if (m.role == Role.admin || planHas(context, Feature.risk)) _Tile(icon: Icons.warning_amber_rounded, color: p.danger, label: tr('risk_alert'), onTap: () => gated(context, Feature.risk, () => push(context, RiskScreen(m: m)))),
-                if (m.role == Role.admin || planHas(context, Feature.doubts)) _Tile(icon: Icons.leaderboard_rounded, color: p.warn, label: tr('leaderboard'), onTap: () => gated(context, Feature.doubts, () => push(context, LeaderboardScreen(m: m)))),
+                if ((m.role == Role.admin || planHas(context, Feature.doubts)) && featureOn(context, 'doubts')) _Tile(icon: Icons.leaderboard_rounded, color: p.warn, label: tr('leaderboard'), onTap: () => gated(context, Feature.doubts, () => push(context, LeaderboardScreen(m: m)))),
                 if (m.role == Role.admin || planHas(context, Feature.tests)) _Tile(icon: Icons.description_outlined, color: p.indigo, label: tr('report_cards'), onTap: () => gated(context, Feature.tests, () => pickReportCard(context, m))),
                 _Tile(icon: Icons.checklist_rounded, color: p.success, label: tr('syllabus_tracker'), onTap: () => push(context, SyllabusScreen(m: m))),
                 if (m.role == Role.teacher) _Tile(icon: Icons.payments_outlined, color: p.success, label: tr('my_salary'), onTap: () => push(context, MySalaryScreen(m: m))),
@@ -240,6 +241,7 @@ class SettingsPage extends StatelessWidget {
           item(AppCard(
             padding: const EdgeInsets.symmetric(vertical: 4),
             child: Column(children: [
+              if (m.role == Role.admin && !context.app.isOwner) _Tile(icon: Icons.support_agent_rounded, color: p.success, label: tr('help_box'), onTap: () => push(context, HelpBoxScreen(m: m))),
               _Tile(icon: Icons.help_outline_rounded, color: p.brand, label: tr('help_faq'), onTap: () => push(context, const FaqScreen())),
               _Tile(icon: Icons.description_outlined, color: p.indigo, label: tr('terms'), onTap: () => push(context, const LegalScreen())),
               _Tile(icon: Icons.verified_user_outlined, color: p.success, label: tr('privacy'), onTap: () => push(context, const LegalScreen(privacy: true))),

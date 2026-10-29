@@ -12,6 +12,7 @@ import 'common.dart';
 import 'fees.dart';
 import 'learner_home.dart';
 import 'notices.dart';
+import 'owner2.dart' show maybeShowWhatsNew;
 import 'people.dart';
 import 'resources.dart';
 import 'schedule.dart';
@@ -51,7 +52,9 @@ class HomeShellState extends State<HomeShell> {
     super.initState();
     context.appRead.childIndex = 0;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.appRead.loadBadges();
+      if (!mounted) return;
+      context.appRead.loadBadges();
+      if (context.appRead.viewAs == null) maybeShowWhatsNew(context);
     });
   }
 
@@ -136,6 +139,11 @@ class HomeShellState extends State<HomeShell> {
         if (didPop) return;
         if (i != 0) {
           setState(() => _i = 0);
+          return;
+        }
+        // Owner looking at a coaching: Back goes back to the owner panel.
+        if (context.appRead.viewAs != null) {
+          context.appRead.stopViewAs();
           return;
         }
         // On the home tab: press Back twice (within 2 seconds) to leave the app.

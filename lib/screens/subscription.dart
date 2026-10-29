@@ -17,6 +17,7 @@ import 'common.dart';
 import 'onboarding.dart' show roleIcon, roleName;
 import 'file_sheet.dart';
 import 'owner.dart';
+import 'owner2.dart';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -68,6 +69,12 @@ class PlanBadge extends StatelessWidget {
 }
 
 /// Does the coaching's plan include [f]? (true while the plan is unknown).
+/// Is a feature switched on by the VidyaDesk owner for this coaching?
+bool featureOn(BuildContext context, String key) {
+  final app = context.appRead;
+  return app.config.on(key, app.active?.instituteId ?? '');
+}
+
 bool planHas(BuildContext context, Feature f) => context.appRead.plan?.has(f) ?? true;
 
 /// Opens [go] only if the plan has [f]; otherwise shows what plan is needed.
@@ -695,7 +702,7 @@ class _PayPlanSheetState extends State<_PayPlanSheet> {
             style: TextStyle(color: p.muted, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 12),
-          Row(children: [
+          if (featureOn(context, 'coupons')) Row(children: [
             Expanded(
               child: TextField(
                 controller: _code,
@@ -1220,6 +1227,7 @@ class _OwnerPanelScreenState extends State<OwnerPanelScreen> {
           final trial = st.where((x) => x.$2.trial && !x.$2.locked).length;
           final soon = st.where((x) => x.$2.daysLeft <= 7 && !x.$2.locked).toList()..sort((a, b) => a.$2.until.compareTo(b.$2.until));
           final locked = st.where((x) => x.$2.locked).toList();
+          final sleeping = d.institutes.where((i) => !PlanStatus(planFrom(i.plan), i.planUntil).locked && (i.lastActive <= 0 || DateTime.now().millisecondsSinceEpoch - i.lastActive > 7 * 86400000)).length;
           Widget kpi(String label, String v, Color c) => Expanded(
                 child: AppCard(
                   padding: const EdgeInsets.all(12),
@@ -1234,7 +1242,10 @@ class _OwnerPanelScreenState extends State<OwnerPanelScreen> {
                 padding: const EdgeInsets.only(bottom: 8),
                 child: AppCard(
                   padding: const EdgeInsets.all(12),
-                  onTap: () => showManageCoaching(context, i, onChanged: () => setState(() => _v++)),
+                  onTap: () async {
+                    await push(context, CoachingDetailScreen(inst: i));
+                    if (mounted) setState(() => _v++);
+                  },
                   child: Row(children: [
                     Icon(Icons.schedule_rounded, color: s.locked ? p.danger : s.trial ? p.warn : planColor(p, s.plan), size: 20),
                     const SizedBox(width: 10),
@@ -1245,7 +1256,7 @@ class _OwnerPanelScreenState extends State<OwnerPanelScreen> {
                             maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: p.muted, fontSize: 12)),
                       ]),
                     ),
-                    Tag('${tr('manage')} ›', fg: p.brand, bg: p.brandTint),
+                    i.blocked ? Tag(tr('blocked'), fg: p.danger, bg: p.dangerTint) : Tag('${tr('open')} ›', fg: p.brand, bg: p.brandTint),
                   ]),
                 ),
               );
@@ -1271,27 +1282,39 @@ class _OwnerPanelScreenState extends State<OwnerPanelScreen> {
                   kpi(tr('locked'), '${locked.length}', p.danger),
                 ]),
                 const SizedBox(height: 8),
-                Row(children: [
-                  for (final t in [
-                    (Icons.local_offer_outlined, tr('coupons'), p.warn, () => push(context, const CouponsScreen())),
-                    (Icons.view_carousel_outlined, tr('banners'), p.indigo, () => push(context, const BannersScreen())),
-                    (Icons.campaign_outlined, tr('notice_to_all'), p.danger, () => showBroadcast(context)),
-                  ]) ...[
-                    if (t.$2 != tr('coupons')) const SizedBox(width: 8),
-                    Expanded(
-                      child: AppCard(
-                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+                GridView.count(
+                  crossAxisCount: 4,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  mainAxisSpacing: 8,
+                  crossAxisSpacing: 8,
+                  childAspectRatio: .95,
+                  children: [
+                    for (final t in [
+                      (Icons.bar_chart_rounded, tr('earnings'), p.success, () => push(context, const EarningsScreen()), 0),
+                      (Icons.currency_rupee_rounded, tr('prices'), p.brand, () => push(context, const PricesScreen()), 0),
+                      (Icons.bedtime_outlined, tr('sleeping'), p.danger, () => push(context, const SleepingScreen()), sleeping),
+                      (Icons.support_agent_rounded, tr('inbox'), p.indigo, () => push(context, const OwnerInboxScreen()), 0),
+                      (Icons.local_offer_outlined, tr('coupons'), p.warn, () => push(context, const CouponsScreen()), 0),
+                      (Icons.view_carousel_outlined, tr('banners'), p.indigo, () => push(context, const BannersScreen()), 0),
+                      (Icons.campaign_outlined, tr('notice_to_all'), p.danger, () => showBroadcast(context), 0),
+                      (Icons.auto_awesome_outlined, tr('whats_new_short'), p.brand, () => push(context, const NewsEditorScreen()), 0),
+                      (Icons.toggle_on_outlined, tr('features'), p.success, () => push(context, const FlagsScreen()), 0),
+                      (Icons.construction_rounded, tr('maintenance'), p.warn, () => push(context, const MaintenanceEditorScreen()), 0),
+                      (Icons.download_rounded, tr('download'), p.success, () => push(context, const ExportScreen()), 0),
+                    ])
+                      AppCard(
+                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
                         radius: 18,
                         onTap: t.$4,
-                        child: Column(children: [
-                          Icon(t.$1, color: t.$3),
+                        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                          CountBadge(count: t.$5, child: Icon(t.$1, color: t.$3)),
                           const SizedBox(height: 6),
-                          Text(t.$2, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                          Text(t.$2, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11.5)),
                         ]),
                       ),
-                    ),
                   ],
-                ]),
+                ),
                 const SizedBox(height: 18),
                 SectionTitle(tr('check_payments'), trailing: d.pending.isEmpty ? null : Tag(trf('n_new', {'n': '${d.pending.length}'}), fg: p.danger, bg: p.dangerTint)),
                 if (d.pending.isEmpty)

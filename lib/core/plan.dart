@@ -13,6 +13,9 @@ const demoPayEmails = {'ksuraj.th@gmail.com'};
 /// True while the active coaching's plan has ended (3 days view-only).
 bool planReadOnly = false;
 
+/// True while the owner is looking at a coaching as its admin (nothing can be saved).
+bool viewOnly = false;
+
 const trialDays = 30;
 const graceDays = 3;
 const keepDataDays = 90;
@@ -28,14 +31,15 @@ Plan planFrom(String s) => Plan.values.where((p) => p.name == s).firstOrNull ?? 
 const paidPlans = [Plan.basic, Plan.standard, Plan.pro];
 
 /// (per month, per year) in rupees.
-const planPrice = {
+/// Changed by the owner (Owner panel → Plan prices); these are the starting values.
+final Map<Plan, (int, int)> planPrice = {
   Plan.basic: (299, 2990),
   Plan.standard: (599, 5990),
   Plan.pro: (999, 9990),
 };
 
 /// (students, teachers). -1 = no limit.
-const planLimit = {
+final Map<Plan, (int, int)> planLimit = {
   Plan.trial: (-1, -1),
   Plan.basic: (50, 2),
   Plan.standard: (200, 10),
@@ -137,3 +141,20 @@ int extendUntil(int currentUntil, bool yearly, {DateTime? now}) {
   final to = yearly ? DateTime(from.year + 1, from.month, from.day, from.hour, from.minute) : DateTime(from.year, from.month + 1, from.day, from.hour, from.minute);
   return to.millisecondsSinceEpoch;
 }
+
+
+/// Owner's price list from the server: {basic: [month, year, students, teachers], …}.
+void applyPrices(Map<String, dynamic>? prices) {
+  if (prices == null) return;
+  for (final p in paidPlans) {
+    final v = prices[p.name];
+    if (v is List && v.length >= 4) {
+      int n(Object? x) => x is num ? x.toInt() : int.tryParse('$x') ?? 0;
+      planPrice[p] = (n(v[0]), n(v[1]));
+      planLimit[p] = (n(v[2]), n(v[3]));
+    }
+  }
+}
+
+/// Features the owner can switch on/off (for everyone, some coachings, or nobody).
+const flagFeatures = ['banners', 'doubtCrop', 'doubts', 'checkin', 'admissions', 'coupons'];

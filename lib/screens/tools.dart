@@ -32,14 +32,16 @@ class AdminToolsRow extends StatelessWidget {
       onBack?.call();
     }
 
+    final adm = featureOn(context, 'admissions');
     return _tiles(counts: [0, 0, 0, app.badges['admissions'] ?? 0], [
       (Icons.savings_rounded, tr('accounts'), p.success, () => gated(context, Feature.accounts, () => go(AccountsScreen(m: m)))),
       (Icons.payments_rounded, tr('payroll'), p.indigo, () => gated(context, Feature.payroll, () => go(PayrollScreen(m: m)))),
       (Icons.bar_chart_rounded, tr('reports'), p.brand, () => gated(context, Feature.reports, () => go(ReportsScreen(m: m)))),
-      (Icons.person_search_rounded, tr('admissions'), p.warn, () => gated(context, Feature.admissions, () {
-            app.markSeen('admissions');
-            go(AdmissionsScreen(m: m));
-          })),
+      if (adm)
+        (Icons.person_search_rounded, tr('admissions'), p.warn, () => gated(context, Feature.admissions, () {
+              app.markSeen('admissions');
+              go(AdmissionsScreen(m: m));
+            })),
     ]);
   }
 }
@@ -92,7 +94,7 @@ class ToolsRow extends StatelessWidget {
     // Teachers, students, parents never see what the admin's plan does not have.
     final hide = m.role != Role.admin;
     final tests = !hide || planHas(context, Feature.tests);
-    final doubts = !hide || planHas(context, Feature.doubts);
+    final doubts = (!hide || planHas(context, Feature.doubts)) && featureOn(context, 'doubts');
     final all = <((IconData, String, Color, VoidCallback), int)>[
       if (m.isStaff) ...[
         ((Icons.folder_copy_rounded, tr('nav_resources'), const Color(0xFF0EA5B7), () => go(ResourcesPage(m: m, back: true))), 0),

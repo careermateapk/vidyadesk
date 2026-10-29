@@ -12,7 +12,7 @@ import '../data/models.dart';
 import '../services/push.dart';
 import '../ui/widgets.dart';
 import 'common.dart';
-import 'subscription.dart' show planName, planColor;
+import 'subscription.dart' show planName, planColor, featureOn;
 import 'viewers.dart' show openExternal;
 
 String _d(int ms) {
@@ -858,6 +858,7 @@ class _HomeBannersState extends State<HomeBanners> {
 
   @override
   Widget build(BuildContext context) {
+    if (!featureOn(context, 'banners')) return const SizedBox.shrink();
     final p = context.pal;
     final shown = _shown;
     if (shown.isEmpty) return const SizedBox.shrink();

@@ -190,6 +190,66 @@ class AppState extends ChangeNotifier {
   Institute? inst;
   PlanStatus? get plan => inst == null || inst!.id != active?.instituteId ? null : PlanStatus(planFrom(inst!.plan), inst!.planUntil);
 
+  // ---------- owner settings for the whole app (prices, maintenance, news, feature switches) ----------
+
+  AppConfig config = AppConfig();
+
+  Future<void> loadConfig() async {
+    try {
+      config = await backend.config();
+      applyPrices(config.prices);
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  /// "What's new" already shown up to this id.
+  int get newsSeen => _prefs?.getInt('newsSeen') ?? 0;
+  void markNewsSeen(int id) => _prefs?.setInt('newsSeen', id);
+
+  /// Tell the owner this coaching uses the app (at most once an hour).
+  void _markActive() {
+    final m = active;
+    if (m == null || !m.approved || viewAs != null || isDemo) return;
+    final key = 'act_${m.instituteId}';
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - (_prefs?.getInt(key) ?? 0) < 3600000) return;
+    _prefs?.setInt(key, now);
+    backend.markActive(m.instituteId).catchError((_) {});
+  }
+
+  // ---------- owner: look at a coaching as its admin ----------
+
+  Institute? viewAs;
+
+  void startViewAs(Institute i) {
+    viewAs = i;
+    viewOnly = true;
+    active = Membership(
+      uid: signedIn?.uid ?? '',
+      instituteId: i.id,
+      instituteName: i.name,
+      role: Role.admin,
+      status: MemberStatus.approved,
+      name: i.ownerName.isEmpty ? 'Admin' : i.ownerName,
+      phone: i.ownerPhone,
+      city: i.city,
+    );
+    inst = i;
+    badges = {};
+    newItems = [];
+    notifyListeners();
+  }
+
+  void stopViewAs() {
+    viewAs = null;
+    viewOnly = false;
+    active = null;
+    inst = null;
+    badges = {};
+    newItems = [];
+    notifyListeners();
+  }
+
   /// The VidyaDesk owner (sees the owner panel).
   bool get isOwner => ownerEmails.contains((profile?.email ?? signedIn?.email ?? '').toLowerCase());
 
@@ -205,6 +265,7 @@ class AppState extends ChangeNotifier {
       inst = await backend.institute(m.instituteId);
     } catch (_) {}
     planReadOnly = plan?.grace ?? false;
+    _markActive();
     notifyListeners();
   }
 
@@ -228,10 +289,13 @@ class AppState extends ChangeNotifier {
     loadUpiApps();
     // Coming back to the app: read the plan again (it may have been renewed).
     _life ??= AppLifecycleListener(onResume: () {
-      if (signedIn != null) refreshMemberships(check: true).then((_) => loadBadges());
+      if (signedIn == null) return;
+      loadConfig();
+      if (viewAs != null) return;
+      refreshMemberships(check: true).then((_) => loadBadges());
     });
     Push.onChange = () {
-      if (signedIn != null) refreshMemberships(check: true);
+      if (signedIn != null && viewAs == null) refreshMemberships(check: true);
     };
     Push.onNew = loadBadges;
     try {
@@ -304,6 +368,7 @@ class AppState extends ChangeNotifier {
         memberships = [];
         active = null;
       } else {
+        await loadConfig();
         profile = await backend.profile(signedIn!.uid);
         memberships = profile == null ? [] : await backend.myMemberships();
         _checkRemoved(detect: true);
@@ -315,7 +380,7 @@ class AppState extends ChangeNotifier {
             backend.sharePhoto(m.instituteId, ph).catchError((_) {});
           }
         }
-        Push.sync(backend, memberships);
+        Push.sync(backend, memberships, owner: isOwner);
         await loadInstitute();
       }
     } finally {
@@ -357,7 +422,7 @@ class AppState extends ChangeNotifier {
     memberships = await backend.myMemberships();
     _checkRemoved(detect: false);
     active = memberships.where((x) => x.id == m.id).firstOrNull ?? m;
-    Push.sync(backend, memberships);
+    Push.sync(backend, memberships, owner: isOwner);
     notifyListeners();
     await loadInstitute();
   }
@@ -373,7 +438,7 @@ class AppState extends ChangeNotifier {
     final id = active?.id;
     active = memberships.where((m) => m.id == id).firstOrNull;
     if (active == null) _pickActive();
-    Push.sync(backend, memberships);
+    Push.sync(backend, memberships, owner: isOwner);
     notifyListeners();
     await loadInstitute();
   }
@@ -442,6 +507,9 @@ class AppState extends ChangeNotifier {
     joining = false;
     removedFrom = null;
     welcome = null;
+    viewAs = null;
+    viewOnly = false;
+    inst = null;
     notifyListeners();
   }
 }

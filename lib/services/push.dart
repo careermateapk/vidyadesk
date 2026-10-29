@@ -36,7 +36,7 @@ class Push {
   static String person(String inst, String uid) => 'u_${inst}_$uid';
 
   /// Ask permission and listen to the topics of all my roles.
-  static Future<void> sync(Backend backend, List<Membership> mine) async {
+  static Future<void> sync(Backend backend, List<Membership> mine, {bool owner = false}) async {
     if (!enabled) return;
     try {
       final fm = FirebaseMessaging.instance;
@@ -60,7 +60,7 @@ class Push {
           ));
         });
       }
-      final want = <String>{'all'};
+      final want = <String>{'all', if (owner) 'owner'};
       for (final m in mine) {
         if (m.status == MemberStatus.rejected) continue;
         final i = m.instituteId;

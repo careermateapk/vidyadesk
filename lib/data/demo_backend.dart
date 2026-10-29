@@ -876,4 +876,57 @@ class DemoBackend implements Backend {
 
   @override
   Future<void> deleteBanner(String id) async => _banners.remove(id);
+
+  // ---------- owner: config, activity, block, tickets ----------
+  AppConfig _config = AppConfig();
+  final List<Ticket> _tickets = [];
+
+  @override
+  Future<AppConfig> config() async => _config;
+
+  @override
+  Future<void> saveConfig(AppConfig c) async => _config = c;
+
+  @override
+  Future<void> markActive(String instituteId) async {
+    final i = _institutes[instituteId];
+    if (i == null) return;
+    final n = DateTime.now();
+    final key = '${n.year}${n.month.toString().padLeft(2, '0')}${n.day.toString().padLeft(2, '0')}';
+    final m = i.toMap()
+      ..['lastActive'] = n.millisecondsSinceEpoch
+      ..['usage'] = {...i.usage, key: (i.usage[key] ?? 0) + 1};
+    _institutes[instituteId] = Institute.fromMap(m);
+  }
+
+  @override
+  Future<void> setBlocked(String instituteId, bool blocked, String reason) async {
+    final i = _institutes[instituteId];
+    if (i == null) return;
+    _institutes[instituteId] = Institute.fromMap(i.toMap()
+      ..['blocked'] = blocked
+      ..['blockReason'] = reason
+      ..['lastActive'] = i.lastActive
+      ..['usage'] = i.usage);
+  }
+
+  @override
+  Future<List<SubPayment>> allSubPayments() async => [..._planPays]..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+  @override
+  Future<void> sendTicket(Ticket t) async => _tickets.add(t);
+
+  @override
+  Future<List<Ticket>> myTickets(String instituteId) async => _tickets.where((t) => t.instituteId == instituteId).toList().reversed.toList();
+
+  @override
+  Future<List<Ticket>> allTickets() async => _tickets.reversed.toList();
+
+  @override
+  Future<void> replyTicket(Ticket t, String reply) async {
+    t
+      ..reply = reply
+      ..status = 'answered'
+      ..repliedAt = DateTime.now().millisecondsSinceEpoch;
+  }
 }

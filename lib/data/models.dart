@@ -85,8 +85,20 @@ class Institute {
     this.gstin = '',
     this.gstOn = false,
     this.notif = const {},
+    this.blocked = false,
+    this.blockReason = '',
+    this.lastActive = 0,
+    this.usage = const {},
   });
   final String id, name, city, code, ownerUid;
+
+  /// Stopped by the VidyaDesk owner (everyone's app shows "coaching closed").
+  final bool blocked;
+  final String blockReason;
+
+  /// When anyone of this coaching last opened the app, and opens per day (yyyymmdd → count).
+  final int lastActive;
+  final Map<String, int> usage;
 
   /// Which automatic notifications the admin turned on (missing = on):
   /// absent, feeDue, timetable, checkin, leads.
@@ -169,10 +181,14 @@ class Institute {
         gstin: gstin ?? this.gstin,
         gstOn: gstOn ?? this.gstOn,
         notif: notif ?? this.notif,
+        blocked: blocked,
+        blockReason: blockReason,
+        lastActive: lastActive,
+        usage: usage,
       );
 
   Map<String, dynamic> toMap() =>
-      {'id': id, 'name': name, 'city': city, 'code': code, 'ownerUid': ownerUid, 'address': address, 'phone': phone, 'upiId': upiId, 'upiName': upiName, 'dueDay': dueDay, 'lateFee': lateFee, ...geoMap, 'plan': plan, 'planUntil': planUntil, 'ownerName': ownerName, 'ownerPhone': ownerPhone, 'createdAt': createdAt, 'logo': logo, 'gstin': gstin, 'gstOn': gstOn, 'notif': notif};
+      {'id': id, 'name': name, 'city': city, 'code': code, 'ownerUid': ownerUid, 'address': address, 'phone': phone, 'upiId': upiId, 'upiName': upiName, 'dueDay': dueDay, 'lateFee': lateFee, ...geoMap, 'plan': plan, 'planUntil': planUntil, 'ownerName': ownerName, 'ownerPhone': ownerPhone, 'createdAt': createdAt, 'logo': logo, 'gstin': gstin, 'gstOn': gstOn, 'notif': notif, 'blocked': blocked, 'blockReason': blockReason};
 
   Map<String, dynamic> get geoMap => {
         'geoCheckin': geoCheckin,
@@ -211,6 +227,10 @@ class Institute {
         gstin: _s(m['gstin']),
         gstOn: _b(m['gstOn']),
         notif: m['notif'] is Map ? {for (final e in (m['notif'] as Map).entries) '${e.key}': e.value == true} : const {},
+        blocked: _b(m['blocked']),
+        blockReason: _s(m['blockReason']),
+        lastActive: _i(m['lastActive']),
+        usage: m['usage'] is Map ? {for (final e in (m['usage'] as Map).entries) '${e.key}': _i(e.value)} : const {},
       );
 
   /// What is still missing for proper fee receipts.
@@ -1174,5 +1194,112 @@ class PlanAction {
         until: _i(m['until']),
         note: _s(m['note']),
         at: _i(m['at']),
+      );
+}
+
+
+/// App-wide settings the owner controls (one document: config/app).
+class AppConfig {
+  AppConfig({this.prices, this.maintOn = false, this.maintMsg = '', this.maintUntil = 0, this.newsId = 0, this.newsTitle = '', this.newsItems = const [], this.flags = const {}});
+  Map<String, dynamic>? prices;
+  bool maintOn;
+  String maintMsg;
+  int maintUntil; // 0 = until the owner turns it off
+  int newsId; // changes every time the owner publishes "What's new"
+  String newsTitle;
+  List<(String, String)> newsItems;
+  Map<String, (String, List<String>)> flags; // feature → (all | some | off, coaching ids)
+
+  bool get maintenanceNow => maintOn && (maintUntil == 0 || maintUntil > DateTime.now().millisecondsSinceEpoch);
+
+  /// Is [feature] on for coaching [inst]?
+  bool on(String feature, String inst) {
+    final f = flags[feature];
+    if (f == null) return true;
+    return switch (f.$1) { 'off' => false, 'some' => f.$2.contains(inst), _ => true };
+  }
+
+  Map<String, dynamic> toMap() => {
+        if (prices != null) 'prices': prices,
+        'maintOn': maintOn,
+        'maintMsg': maintMsg,
+        'maintUntil': maintUntil,
+        'newsId': newsId,
+        'newsTitle': newsTitle,
+        'newsItems': [for (final x in newsItems) {'t': x.$1, 's': x.$2}],
+        'flags': {for (final e in flags.entries) e.key: {'mode': e.value.$1, 'insts': e.value.$2}},
+      };
+
+  factory AppConfig.fromMap(Map<String, dynamic> m) => AppConfig(
+        prices: m['prices'] is Map ? Map<String, dynamic>.from(m['prices'] as Map) : null,
+        maintOn: _b(m['maintOn']),
+        maintMsg: _s(m['maintMsg']),
+        maintUntil: _i(m['maintUntil']),
+        newsId: _i(m['newsId']),
+        newsTitle: _s(m['newsTitle']),
+        newsItems: [
+          if (m['newsItems'] is List)
+            for (final x in m['newsItems'] as List)
+              if (x is Map) (_s(x['t']), _s(x['s'])),
+        ],
+        flags: {
+          if (m['flags'] is Map)
+            for (final e in (m['flags'] as Map).entries)
+              if (e.value is Map) '${e.key}': (_s((e.value as Map)['mode']).isEmpty ? 'all' : _s((e.value as Map)['mode']), _ls((e.value as Map)['insts'])),
+        },
+      );
+}
+
+/// A help request from a coaching admin to the VidyaDesk owner.
+class Ticket {
+  Ticket({
+    required this.id,
+    required this.instituteId,
+    required this.instituteName,
+    required this.adminUid,
+    required this.adminName,
+    this.phone = '',
+    this.topic = 'app',
+    this.text = '',
+    this.image = '',
+    this.reply = '',
+    this.status = 'open',
+    this.createdAt = 0,
+    this.repliedAt = 0,
+  });
+  final String id, instituteId, instituteName, adminUid, adminName, phone, topic, text, image;
+  String reply, status; // open | answered
+  final int createdAt;
+  int repliedAt;
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'instituteId': instituteId,
+        'instituteName': instituteName,
+        'adminUid': adminUid,
+        'adminName': adminName,
+        'phone': phone,
+        'topic': topic,
+        'text': text,
+        'image': image,
+        'reply': reply,
+        'status': status,
+        'createdAt': createdAt,
+        'repliedAt': repliedAt,
+      };
+  factory Ticket.fromMap(Map<String, dynamic> m) => Ticket(
+        id: _s(m['id']),
+        instituteId: _s(m['instituteId']),
+        instituteName: _s(m['instituteName']),
+        adminUid: _s(m['adminUid']),
+        adminName: _s(m['adminName']),
+        phone: _s(m['phone']),
+        topic: _s(m['topic']),
+        text: _s(m['text']),
+        image: _s(m['image']),
+        reply: _s(m['reply']),
+        status: _s(m['status']).isEmpty ? 'open' : _s(m['status']),
+        createdAt: _i(m['createdAt']),
+        repliedAt: _i(m['repliedAt']),
       );
 }

@@ -202,7 +202,7 @@ class _StaffHomeState extends State<StaffHome> {
           Expanded(child: StatTile(icon: Icons.fact_check_outlined, value: pct(present, marked), suffix: '%', label: tr('today_present'), fg: p.success, bg: p.successTint, empty: marked == 0)),
         ])),
         const SizedBox(height: 12),
-        if (m.role == Role.teacher && planHas(context, Feature.checkin)) ...[item(CheckInCard(m: m)), const SizedBox(height: 12)],
+        if (m.role == Role.teacher && planHas(context, Feature.checkin) && featureOn(context, 'checkin')) ...[item(CheckInCard(m: m)), const SizedBox(height: 12)],
         item(ToolsRow(m: m, onBack: reload)),
         if (admin) ...[const SizedBox(height: 10), item(AdminToolsRow(m: m, onBack: reload))],
         const SizedBox(height: 12),

@@ -889,4 +889,53 @@ class FirebaseBackend implements Backend {
 
   @override
   Future<void> deleteBanner(String id) => _db.collection('banners').doc(id).delete();
+
+  // ---------- owner: config, activity, block, tickets ----------
+
+  @override
+  Future<AppConfig> config() async {
+    final d = await _db.collection('config').doc('app').get();
+    return AppConfig.fromMap(d.data() ?? {});
+  }
+
+  @override
+  Future<void> saveConfig(AppConfig c) => _db.collection('config').doc('app').set(c.toMap());
+
+  @override
+  Future<void> markActive(String instituteId) async {
+    final n = DateTime.now();
+    final key = '${n.year}${n.month.toString().padLeft(2, '0')}${n.day.toString().padLeft(2, '0')}';
+    await _inst(instituteId).update({'lastActive': n.millisecondsSinceEpoch, 'usage.$key': FieldValue.increment(1)});
+  }
+
+  @override
+  Future<void> setBlocked(String instituteId, bool blocked, String reason) => _inst(instituteId).update({'blocked': blocked, 'blockReason': reason});
+
+  @override
+  Future<List<SubPayment>> allSubPayments() async => (await _subs.get()).docs.map((d) => SubPayment.fromMap(d.data())).toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+  CollectionReference<Map<String, dynamic>> get _tickets => _db.collection('tickets');
+
+  @override
+  Future<void> sendTicket(Ticket t) => _tickets.doc(t.id).set(t.toMap());
+
+  @override
+  Future<List<Ticket>> myTickets(String instituteId) async {
+    final uid = _auth.currentUser?.uid ?? '';
+    return (await _tickets.where('adminUid', isEqualTo: uid).get()).docs.map((d) => Ticket.fromMap(d.data())).where((t) => t.instituteId == instituteId).toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  }
+
+  @override
+  Future<List<Ticket>> allTickets() async => (await _tickets.get()).docs.map((d) => Ticket.fromMap(d.data())).toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+  @override
+  Future<void> replyTicket(Ticket t, String reply) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    await _tickets.doc(t.id).update({'reply': reply, 'status': 'answered', 'repliedAt': now});
+    t
+      ..reply = reply
+      ..status = 'answered'
+      ..repliedAt = now;
+  }
 }

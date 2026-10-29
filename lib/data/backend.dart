@@ -161,6 +161,25 @@ abstract class Backend {
   Future<void> ownerSetPlan(String instituteId, {required String action, required String plan, required int until, int days = 0, String note = ''});
   Future<List<PlanAction>> planHistory(String instituteId);
 
+  // ---- app settings from the owner (prices, maintenance, what's new, feature switches) ----
+  Future<AppConfig> config();
+  Future<void> saveConfig(AppConfig c);
+
+  /// Someone of this coaching opened the app (owner sees active / sleeping coachings).
+  Future<void> markActive(String instituteId);
+
+  /// Owner: stop / restart a coaching.
+  Future<void> setBlocked(String instituteId, bool blocked, String reason);
+
+  /// Owner: every plan payment (for earnings and Excel).
+  Future<List<SubPayment>> allSubPayments();
+
+  // ---- help box ----
+  Future<void> sendTicket(Ticket t);
+  Future<List<Ticket>> myTickets(String instituteId);
+  Future<List<Ticket>> allTickets();
+  Future<void> replyTicket(Ticket t, String reply);
+
   // ---- home banners ----
   /// Banners that are on (everyone).
   Future<List<AppBanner>> banners();

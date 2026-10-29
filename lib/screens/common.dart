@@ -91,6 +91,7 @@ String nextClassText(Batch b) {
 
 String errorMessage(Object e) {
   final denied = (e is BackendError && e.code == 'permission') || e.toString().contains('permission-denied');
+  if (denied && viewOnly) return tr('err_view_only');
   if (denied && planReadOnly) return tr('err_plan_readonly');
   if (denied) return tr('err_permission');
   if (e is BackendError) {

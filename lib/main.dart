@@ -8,6 +8,7 @@ import 'screens/auth.dart';
 import 'screens/home_shell.dart';
 import 'screens/join.dart';
 import 'screens/onboarding.dart';
+import 'screens/owner2.dart';
 import 'screens/status_screens.dart';
 import 'screens/subscription.dart';
 import 'services/push.dart';
@@ -72,10 +73,20 @@ class Gate extends StatelessWidget {
         page = const LoginScreen();
         key = 'login';
       }
+    } else if (app.isOwner && app.viewAs != null && app.active != null) {
+      // Owner looking at a coaching as its admin (read-only).
+      page = Column(children: [
+        ViewAsBar(name: app.viewAs!.name, onClose: app.stopViewAs),
+        Expanded(child: MediaQuery.removePadding(context: context, removeTop: true, child: HomeShell(m: app.active!))),
+      ]);
+      key = 'viewas-${app.viewAs!.id}';
     } else if (app.isOwner) {
       // VidyaDesk owner: straight to the owner panel — no role, profile or join code.
       page = const OwnerPanelScreen(standalone: true);
       key = 'owner';
+    } else if (app.config.maintenanceNow) {
+      page = const MaintenanceView();
+      key = 'maint';
     } else if (app.loadingAccount && app.profile == null) {
       page = const Scaffold(body: LoadingView());
       key = 'loading';
@@ -98,6 +109,9 @@ class Gate extends StatelessWidget {
     } else if (app.welcome != null && app.welcome!.approved) {
       page = WelcomeScreen(m: app.welcome!);
       key = 'welcome';
+    } else if (app.inst != null && app.inst!.id == app.active!.instituteId && app.inst!.blocked) {
+      page = BlockedScreen(inst: app.inst!);
+      key = 'blocked-${app.active!.id}';
     } else if (app.plan?.locked ?? false) {
       page = PlanLockedScreen(m: app.active!);
       key = 'locked-${app.active!.id}';

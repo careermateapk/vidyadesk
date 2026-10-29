@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
       # worker/deploy.enc holds the Cloudflare token, account id and Firebase server key,
       # locked with the DEPLOY_KEY secret (only GitHub Actions can open it).
       - name: Unlock deploy settings
@@ -36,8 +36,8 @@ jobs:
         working-directory: worker
         run: |
           set -o pipefail
-          npx --yes wrangler@3 deploy 2>&1 | tee /tmp/deploy.log
-          npx --yes wrangler@3 secret put SA_JSON < /tmp/sa.json
+          npx --yes wrangler@4 deploy 2>&1 | tee /tmp/deploy.log
+          npx --yes wrangler@4 secret put SA_JSON < /tmp/sa.json
           url=$(grep -oE 'https://[a-zA-Z0-9.-]+\.workers\.dev' /tmp/deploy.log | head -1)
           echo "::notice::Notification server URL: $url"
           rm -f /tmp/sa.json /tmp/deploy.json

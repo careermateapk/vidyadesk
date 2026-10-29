@@ -67,6 +67,9 @@ service cloud.firestore {
         || (isStaff(resource.data.instituteId) && live(resource.data.instituteId)
             && changed().hasOnly(['status', 'studentCode', 'monthlyFee', 'batchIds'])
             && (resource.data.role in ['student', 'parent'] || isAdmin(resource.data.instituteId)))
+        // teachers too can say yes / no to a parent's new child
+        || (isStaff(resource.data.instituteId) && live(resource.data.instituteId) && resource.data.role == 'parent'
+            && changed().hasOnly(['childUids', 'childNames', 'newChildUids', 'newChildNames']))
         || (isAdmin(resource.data.instituteId) && live(resource.data.instituteId)
             && changed().hasOnly(['monthlyFee', 'discount', 'feeNote', 'salary', 'payType', 'upiId', 'childUids', 'childNames', 'childFees', 'newChildUids', 'newChildNames']));
 

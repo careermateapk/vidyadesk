@@ -439,7 +439,7 @@ class _JoinWithCodeState extends State<_JoinWithCode> {
         kind: 'join',
         title: '🙋 ${trf('wants_to_join', {'name': app.profile!.name})}',
         body: tr('role_${widget.role.name}'),
-        topics: m.approved ? [Push.admins(m.instituteId)] : [Push.admins(m.instituteId), Push.staff(m.instituteId)],
+        topics: [Push.admins(m.instituteId), Push.staff(m.instituteId)],
       );
       // Approved parent asked for one more child: the admin must say yes first.
       if (m.approved && m.newChildUids.isNotEmpty && mounted) toast(context, tr('child_request_sent'));

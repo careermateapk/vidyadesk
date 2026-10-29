@@ -22,11 +22,15 @@ List<Membership> pendingFor(Membership me, List<Membership> members, List<Batch>
   if (me.role == Role.admin) return [...pend, ...members.where((x) => x.childRequest)];
   final mine = batches.where((b) => b.teacherUid == me.uid).map((b) => b.id).toSet();
   final myStudents = members.where((x) => x.role == Role.student && x.batchIds.any(mine.contains)).map((x) => x.uid).toSet();
-  return pend.where((x) {
-    if (x.role == Role.student) return x.batchIds.any(mine.contains);
-    if (x.role == Role.parent) return x.childUids.any(myStudents.contains);
-    return false;
-  }).toList();
+  return [
+    ...pend.where((x) {
+      if (x.role == Role.student) return x.batchIds.any(mine.contains);
+      if (x.role == Role.parent) return x.childUids.any(myStudents.contains);
+      return false;
+    }),
+    // a parent asking for one more child who studies in my batch
+    ...members.where((x) => x.childRequest && x.newChildUids.any(myStudents.contains)),
+  ];
 }
 
 String monthLabel(String key) {

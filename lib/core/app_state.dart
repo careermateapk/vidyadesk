@@ -24,6 +24,10 @@ class AppState extends ChangeNotifier {
 
   bool ready = false;
   bool splashDone = false;
+
+  /// Has this phone seen the big opening splash? (null until settings load).
+  /// It plays only once — the first time after installing.
+  bool? introSeen;
   String? startError;
 
   // phone settings
@@ -323,6 +327,8 @@ class AppState extends ChangeNotifier {
     try {
       _prefs = await SharedPreferences.getInstance();
     } catch (_) {}
+    introSeen = _prefs?.getBool('introSeen') ?? false;
+    notifyListeners();
     lang = _prefs?.getString('lang') ?? 'en';
     languageChosen = _prefs?.getBool('langChosen') ?? false;
     themeMode = switch (_prefs?.getString('theme')) { 'dark' => ThemeMode.dark, 'system' => ThemeMode.system, _ => ThemeMode.light };
@@ -347,6 +353,8 @@ class AppState extends ChangeNotifier {
 
   void finishSplash() {
     splashDone = true;
+    introSeen = true;
+    _prefs?.setBool('introSeen', true);
     notifyListeners();
   }
 

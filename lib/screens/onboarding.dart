@@ -20,7 +20,7 @@ class SplashScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final app = context.app;
     // No timer: the app moves on only when "Get started" is tapped.
-    return GrandSplash(ready: app.ready && app.signedIn == null, onStart: () => context.appRead.finishSplash());
+    return GrandSplash(ready: app.ready, onStart: () => context.appRead.finishSplash());
   }
 }
 

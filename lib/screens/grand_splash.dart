@@ -26,7 +26,6 @@ class _GrandSplashState extends State<GrandSplash> with SingleTickerProviderStat
   final _t = ValueNotifier<double>(0);
   double _offset = 0;
   AudioPlayer? _player;
-  bool _sound = true;
   bool _boomBuzz = false;
 
   static const _end = 6.9; // everything is on screen by now
@@ -43,48 +42,24 @@ class _GrandSplashState extends State<GrandSplash> with SingleTickerProviderStat
       }
     })
       ..start();
-    _sound = context.appRead.splashSound;
-    _waitThenPlay();
-  }
-
-  /// Sound only for someone who isn't logged in yet (a returning user just
-  /// sees the start for a moment while the app loads).
-  Future<void> _waitThenPlay() async {
-    for (var i = 0; i < 40 && mounted; i++) {
-      final app = context.appRead;
-      if (app.ready) {
-        if (app.signedIn == null && _sound && _player == null) _play();
-        return;
-      }
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-    }
+    _play();
   }
 
   Future<void> _play() async {
     try {
       final p = AudioPlayer();
       _player = p;
-      // "sonification": follows the phone's silent / vibrate mode.
+      // media sound: plays even when the ringer is on silent / vibrate
       await p.setAudioContext(AudioContext(
         android: AudioContextAndroid(
-          usageType: AndroidUsageType.assistanceSonification,
-          contentType: AndroidContentType.sonification,
-          audioFocus: AndroidAudioFocus.none,
+          usageType: AndroidUsageType.media,
+          contentType: AndroidContentType.music,
+          audioFocus: AndroidAudioFocus.gainTransientMayDuck,
         ),
-        iOS: AudioContextIOS(category: AVAudioSessionCategory.ambient),
+        iOS: AudioContextIOS(category: AVAudioSessionCategory.playback),
       ));
       await p.play(AssetSource('sounds/splash.mp3'), position: Duration(milliseconds: (_t.value * 1000).round()));
     } catch (_) {}
-  }
-
-  void _toggleSound() {
-    setState(() => _sound = !_sound);
-    context.appRead.setSplashSound(_sound);
-    if (_sound) {
-      if (_t.value < 8.5 && context.appRead.signedIn == null) _play();
-    } else {
-      _player?.stop();
-    }
   }
 
   void _skip() {
@@ -422,8 +397,6 @@ class _GrandSplashState extends State<GrandSplash> with SingleTickerProviderStat
                 top: mq.padding.top + 8,
                 right: 12,
                 child: Row(children: [
-                  _chip(_sound ? Icons.volume_up_rounded : Icons.volume_off_rounded, null, _toggleSound),
-                  const SizedBox(width: 8),
                   if (t < _end) _chip(null, tr('skip_intro'), _skip),
                 ]),
               ),

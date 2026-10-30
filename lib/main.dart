@@ -60,9 +60,17 @@ class Gate extends StatelessWidget {
     final Widget page;
     final String key;
     // Splash with "Get started" only before login; once logged in the app opens straight away.
-    if (!app.ready || (app.signedIn == null && !app.splashDone)) {
+    if (app.introSeen == null) {
+      // settings still loading (a split second)
+      page = const Scaffold();
+      key = 'boot';
+    } else if (!app.introSeen!) {
+      // first time after installing: the big splash, once
       page = const SplashScreen();
       key = 'splash';
+    } else if (!app.ready) {
+      page = const BootScreen();
+      key = 'boot2';
     } else if (!app.languageChosen) {
       page = const LanguageScreen(firstTime: true);
       key = 'lang';
@@ -131,4 +139,11 @@ class Gate extends StatelessWidget {
       child: KeyedSubtree(key: ValueKey(key), child: Backdrop(child: page)),
     );
   }
+}
+
+/// Short screen while the app starts (the big splash shows only once).
+class BootScreen extends StatelessWidget {
+  const BootScreen({super.key});
+  @override
+  Widget build(BuildContext context) => const Scaffold(body: Center(child: AppLogo(size: 72)));
 }

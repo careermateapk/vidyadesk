@@ -198,7 +198,7 @@ class _GrandSplashState extends State<GrandSplash> with SingleTickerProviderStat
               children.add(Positioned(
                 left: c.dx - 80,
                 top: c.dy - 80,
-                child: Transform.rotate(angle: t * 2.4, child: Transform.scale(scale: s, child: const SizedBox(width: 160, height: 160, child: CustomPaint(painter: _Spark())))),
+                child: Transform.rotate(angle: t * 2.4, child: Transform.scale(scale: s, child: SizedBox(width: 160, height: 160, child: CustomPaint(painter: _Spark())))),
               ));
             }
             // sparks: at the star burst and at the boom

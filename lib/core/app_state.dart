@@ -9,6 +9,7 @@ import '../data/firebase_backend.dart';
 import '../data/models.dart';
 import '../services/push.dart';
 import '../services/upi.dart';
+import '../ui/widgets.dart' show Loader;
 import 'config.dart';
 import 'plan.dart';
 import 'strings.dart';
@@ -498,6 +499,7 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
+    Loader.clearCache();
     await Push.clear();
     await backend.signOut();
     signedIn = null;

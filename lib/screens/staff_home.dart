@@ -44,19 +44,27 @@ class _StaffHomeState extends State<StaffHome> {
     final b = context.appRead.backend;
     final m = widget.m;
     final id = m.instituteId;
-    final members = await b.members(id);
-    final batches = await b.batches(id);
     final now = DateTime.now();
+    final admin = m.role == Role.admin;
+    // Everything at the same time (much faster than one after another).
+    final membersF = b.members(id);
+    final batchesF = b.batches(id);
+    final feesF = admin ? b.feesForMonth(id, monthKey(now)) : Future.value(<FeeRecord>[]);
+    final lastFeesF = admin ? b.feesForMonth(id, monthKey(DateTime(now.year, now.month - 1))) : Future.value(<FeeRecord>[]);
+    final noticesF = b.notices(id);
+    final batches = await batchesF;
     final mine = myBatches(m, batches);
-    final today = <String, AttendanceDay?>{};
-    for (final x in mine.where((x) => x.runsOn(now))) {
-      today[x.id] = await b.attendance(id, x.id, dateKey(now));
-    }
+    final todayL = mine.where((x) => x.runsOn(now)).toList();
+    final todayF = Future.wait([for (final x in todayL) b.attendance(id, x.id, dateKey(now))]);
+    final histF = Future.wait([for (final x in mine) b.attendanceForBatch(id, x.id)]);
+    final members = await membersF;
+    final todays = await todayF;
+    final today = <String, AttendanceDay?>{for (var i = 0; i < todayL.length; i++) todayL[i].id: todays[i]};
     // this week's attendance, from every batch's history
     final monday = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
     final present = List.filled(7, 0), marked = List.filled(7, 0);
-    for (final x in mine) {
-      for (final a in await b.attendanceForBatch(id, x.id)) {
+    for (final hist in await histF) {
+      for (final a in hist) {
         final d = dateFromKey(a.dateKey);
         final diff = DateTime(d.year, d.month, d.day).difference(monday).inDays;
         if (diff < 0 || diff > 6) continue;
@@ -65,16 +73,15 @@ class _StaffHomeState extends State<StaffHome> {
       }
     }
     final week = [for (var i = 0; i < 7; i++) marked[i] == 0 ? null : pct(present[i], marked[i])];
-    final admin = m.role == Role.admin;
-    final fees = admin ? await b.feesForMonth(id, monthKey(now)) : <FeeRecord>[];
-    final lastFees = admin ? await b.feesForMonth(id, monthKey(DateTime(now.year, now.month - 1))) : <FeeRecord>[];
-    final notices = await b.notices(id);
+    final fees = await feesF;
+    final lastFees = await lastFeesF;
+    final notices = await noticesF;
     return _StaffData(members, batches, today, fees, lastFees, notices, week);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Loader<_StaffData>(load: _load, builder: (context, d, reload) => _body(context, d, reload));
+    return Loader<_StaffData>(cacheKey: 'staffHome-${widget.m.id}', load: _load, builder: (context, d, reload) => _body(context, d, reload));
   }
 
   Widget _body(BuildContext context, _StaffData d, Future<void> Function() reload) {

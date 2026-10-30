@@ -648,37 +648,73 @@ class ErrorView extends StatelessWidget {
 }
 
 /// Loads data with [load] and shows loading / error / content.
-/// Pull down to reload.
+/// Pull down to reload. While reloading, the old content stays on screen.
+/// With [cacheKey], the last data is remembered (until the app closes) and shown
+/// at once next time, then quietly refreshed.
 class Loader<T> extends StatefulWidget {
-  const Loader({super.key, required this.load, required this.builder});
+  const Loader({super.key, required this.load, required this.builder, this.cacheKey});
   final Future<T> Function() load;
   final Widget Function(BuildContext context, T data, Future<void> Function() reload) builder;
+  final String? cacheKey;
+
+  /// Forget remembered data (e.g. on logout).
+  static void clearCache() => _loaderCache.clear();
 
   @override
   State<Loader<T>> createState() => _LoaderState<T>();
 }
 
-class _LoaderState<T> extends State<Loader<T>> {
-  late Future<T> _f = widget.load();
+final Map<String, Object?> _loaderCache = {};
 
-  Future<void> _reload() async {
-    final f = widget.load();
-    setState(() => _f = f);
-    try {
-      await f;
-    } catch (_) {}
+class _LoaderState<T> extends State<Loader<T>> {
+  T? _data;
+  bool _has = false;
+  Object? _error;
+  int _gen = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    final k = widget.cacheKey;
+    if (k != null && _loaderCache.containsKey(k) && _loaderCache[k] is T) {
+      _data = _loaderCache[k] as T;
+      _has = true;
+    }
+    _run();
   }
+
+  Future<void> _run() async {
+    final g = ++_gen;
+    try {
+      final d = await widget.load();
+      if (!mounted || g != _gen) return;
+      if (widget.cacheKey != null) _loaderCache[widget.cacheKey!] = d;
+      setState(() {
+        _data = d;
+        _has = true;
+        _error = null;
+      });
+    } catch (e) {
+      if (!mounted || g != _gen) return;
+      setState(() => _error = e);
+    }
+  }
+
+  Future<void> _reload() => _run();
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<T>(
-      future: _f,
-      builder: (context, s) {
-        if (s.hasError) return ErrorView(error: s.error!, onRetry: _reload);
-        if (s.connectionState != ConnectionState.done) return const LoadingView();
-        return RefreshIndicator(color: context.pal.brand, onRefresh: _reload, child: widget.builder(context, s.data as T, _reload));
-      },
-    );
+    if (_has) return RefreshIndicator(color: context.pal.brand, onRefresh: _reload, child: widget.builder(context, _data as T, _reload));
+    if (_error != null) {
+      return ErrorView(
+        error: _error!,
+        onRetry: () {
+          setState(() => _error = null);
+          _run();
+        },
+      );
+    }
+    return const LoadingView();
   }
 }
 

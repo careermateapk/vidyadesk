@@ -33,12 +33,12 @@ class _LearnerData {
 
 Future<_LearnerData> _loadLearner(BuildContext context, String instId, String uid) async {
   final b = context.appRead.backend;
-  return _LearnerData(
-    await b.batches(instId),
-    await b.attendanceForStudent(instId, uid),
-    await b.feesForStudent(instId, uid),
-    await b.notices(instId),
-  );
+  // all four at the same time
+  final batchesF = b.batches(instId);
+  final attF = b.attendanceForStudent(instId, uid);
+  final feesF = b.feesForStudent(instId, uid);
+  final noticesF = b.notices(instId);
+  return _LearnerData(await batchesF, await attF, await feesF, await noticesF);
 }
 
 // ---------------------------------------------------------------------------
@@ -52,6 +52,7 @@ class StudentHome extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Loader<_LearnerData>(
+      cacheKey: 'learnerHome-${m.id}',
       load: () => _loadLearner(context, m.instituteId, m.uid),
       builder: (context, d, reload) {
         final mine = d.batches.where((b) => m.batchIds.contains(b.id)).toList();
@@ -90,6 +91,7 @@ class ParentHome extends StatelessWidget {
     final name = m.childNames.length > i ? m.childNames[i] : '';
     return Loader<_LearnerData>(
       key: ValueKey(uid),
+      cacheKey: 'parentHome-${m.id}-$uid',
       load: () => _loadLearner(context, m.instituteId, uid),
       builder: (context, d, reload) {
         final ids = d.att.map((a) => a.batchId).toSet();

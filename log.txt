@@ -1,0 +1,65 @@
+Analyzing vidyadesk...                                          
+
+   info • Angle brackets will be interpreted as HTML. Try using backticks around the content with angle brackets, or try replacing `<` with `&lt;` and `>` with `&gt;` • lib/data/models.dart:327:21 • unintended_html_in_doc_comment
+   info • Angle brackets will be interpreted as HTML. Try using backticks around the content with angle brackets, or try replacing `<` with `&lt;` and `>` with `&gt;` • lib/data/models.dart:327:27 • unintended_html_in_doc_comment
+   info • Angle brackets will be interpreted as HTML. Try using backticks around the content with angle brackets, or try replacing `<` with `&lt;` and `>` with `&gt;` • lib/data/models.dart:565:54 • unintended_html_in_doc_comment
+   info • Angle brackets will be interpreted as HTML. Try using backticks around the content with angle brackets, or try replacing `<` with `&lt;` and `>` with `&gt;` • lib/data/models.dart:565:64 • unintended_html_in_doc_comment
+   info • Angle brackets will be interpreted as HTML. Try using backticks around the content with angle brackets, or try replacing `<` with `&lt;` and `>` with `&gt;` • lib/data/models.dart:578:51 • unintended_html_in_doc_comment
+   info • Angle brackets will be interpreted as HTML. Try using backticks around the content with angle brackets, or try replacing `<` with `&lt;` and `>` with `&gt;` • lib/data/models.dart:578:64 • unintended_html_in_doc_comment
+   info • Angle brackets will be interpreted as HTML. Try using backticks around the content with angle brackets, or try replacing `<` with `&lt;` and `>` with `&gt;` • lib/data/models.dart:768:38 • unintended_html_in_doc_comment
+   info • Angle brackets will be interpreted as HTML. Try using backticks around the content with angle brackets, or try replacing `<` with `&lt;` and `>` with `&gt;` • lib/data/models.dart:768:51 • unintended_html_in_doc_comment
+   info • Angle brackets will be interpreted as HTML. Try using backticks around the content with angle brackets, or try replacing `<` with `&lt;` and `>` with `&gt;` • lib/data/models.dart:940:64 • unintended_html_in_doc_comment
+   info • Angle brackets will be interpreted as HTML. Try using backticks around the content with angle brackets, or try replacing `<` with `&lt;` and `>` with `&gt;` • lib/data/models.dart:940:70 • unintended_html_in_doc_comment
+   info • Angle brackets will be interpreted as HTML. Try using backticks around the content with angle brackets, or try replacing `<` with `&lt;` and `>` with `&gt;` • lib/data/models.dart:1034:33 • unintended_html_in_doc_comment
+   info • Angle brackets will be interpreted as HTML. Try using backticks around the content with angle brackets, or try replacing `<` with `&lt;` and `>` with `&gt;` • lib/data/models.dart:1034:39 • unintended_html_in_doc_comment
+   info • Statements in an if should be enclosed in a block. Try wrapping the statement in a block • lib/screens/crop.dart:191:34 • curly_braces_in_flow_control_structures
+   info • Statements in an if should be enclosed in a block. Try wrapping the statement in a block • lib/screens/crop.dart:191:52 • curly_braces_in_flow_control_structures
+   info • Statements in an if should be enclosed in a block. Try wrapping the statement in a block • lib/screens/crop.dart:199:34 • curly_braces_in_flow_control_structures
+   info • Statements in an if should be enclosed in a block. Try wrapping the statement in a block • lib/screens/crop.dart:199:52 • curly_braces_in_flow_control_structures
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/screens/fees.dart:290:9 • prefer_interpolation_to_compose_strings
+   info • The import of 'dart:typed_data' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/services.dart'. Try removing the import directive • lib/screens/file_sheet.dart:1:8 • unnecessary_import
+   info • Unnecessary use of multiple underscores. Try using '_' • lib/screens/file_sheet.dart:139:27 • unnecessary_underscores
+   info • Don't use 'BuildContext's across async gaps. Try rewriting the code to not use the 'BuildContext', or guard the use with a 'mounted' check • lib/screens/grand_splash.dart:54:19 • use_build_context_synchronously
+  error • The constructor being called isn't a const constructor. Try removing 'const' from the constructor invocation • lib/screens/grand_splash.dart:201:165 • const_with_non_const
+   info • 'scale' is deprecated and shouldn't be used. Use scaleByVector3, scaleByVector4, or scaleByDouble instead. Try replacing the use of the deprecated member with the replacement • lib/screens/grand_splash.dart:299:23 • deprecated_member_use
+warning • The declaration '_HeroIconButton' isn't referenced. Try removing the declaration of '_HeroIconButton' • lib/screens/join.dart:93:7 • unused_element
+warning • The value of the local variable 'p' isn't used. Try removing the variable or using it • lib/screens/notices.dart:73:11 • unused_local_variable
+warning • Unused import: 'dart:async'. Try removing the import directive • lib/screens/onboarding.dart:1:8 • unused_import
+   info • Don't use 'BuildContext's across async gaps. Try rewriting the code to not use the 'BuildContext', or guard the use with a 'mounted' check • lib/screens/owner.dart:373:33 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps. Try rewriting the code to not use the 'BuildContext', or guard the use with a 'mounted' check • lib/screens/owner.dart:647:33 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps. Try rewriting the code to not use the 'BuildContext', or guard the use with a 'mounted' check • lib/screens/owner2.dart:929:7 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check. Guard a 'State.context' use with a 'mounted' check on the State, and other BuildContext use with a 'mounted' check on the BuildContext • lib/screens/payments.dart:232:44 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps. Try rewriting the code to not use the 'BuildContext', or guard the use with a 'mounted' check • lib/screens/payments.dart:335:28 • use_build_context_synchronously
+   info • Don't use 'BuildContext's across async gaps. Try rewriting the code to not use the 'BuildContext', or guard the use with a 'mounted' check • lib/screens/people.dart:100:23 • use_build_context_synchronously
+warning • A value for optional parameter 'key' isn't ever given. Try removing the unused parameter • lib/screens/subscription.dart:380:37 • unused_element_parameter
+   info • Unnecessary use of multiple underscores. Try using '_' • lib/screens/subscription.dart:390:25 • unnecessary_underscores
+warning • A value for optional parameter 'size' isn't ever given. Try removing the unused parameter • lib/screens/subscription.dart:396:61 • unused_element_parameter
+warning • A value for optional parameter 'key' isn't ever given. Try removing the unused parameter • lib/screens/subscription.dart:443:23 • unused_element_parameter
+   info • Unnecessary use of multiple underscores. Try using '_' • lib/screens/subscription.dart:468:30 • unnecessary_underscores
+   info • Unnecessary use of multiple underscores. Try using '_' • lib/screens/subscription.dart:511:26 • unnecessary_underscores
+   info • Unnecessary use of multiple underscores. Try using '_' • lib/screens/subscription.dart:682:26 • unnecessary_underscores
+   info • Unnecessary use of multiple underscores. Try using '_' • lib/screens/subscription.dart:851:33 • unnecessary_underscores
+   info • Unnecessary use of multiple underscores. Try using '_' • lib/screens/subscription.dart:1202:51 • unnecessary_underscores
+   info • Don't use 'BuildContext's across async gaps. Try rewriting the code to not use the 'BuildContext', or guard the use with a 'mounted' check • lib/screens/subscription.dart:2040:17 • use_build_context_synchronously
+   info • Unnecessary use of multiple underscores. Try using '_' • lib/screens/tests.dart:608:27 • unnecessary_underscores
+warning • Unused import: 'common.dart'. Try removing the import directive • lib/screens/viewers.dart:14:8 • unused_import
+   info • Angle brackets will be interpreted as HTML. Try using backticks around the content with angle brackets, or try replacing `<` with `&lt;` and `>` with `&gt;` • lib/services/push.dart:21:9 • unintended_html_in_doc_comment
+   info • Angle brackets will be interpreted as HTML. Try using backticks around the content with angle brackets, or try replacing `<` with `&lt;` and `>` with `&gt;` • lib/services/push.dart:22:9 • unintended_html_in_doc_comment
+   info • Angle brackets will be interpreted as HTML. Try using backticks around the content with angle brackets, or try replacing `<` with `&lt;` and `>` with `&gt;` • lib/services/push.dart:23:9 • unintended_html_in_doc_comment
+   info • Angle brackets will be interpreted as HTML. Try using backticks around the content with angle brackets, or try replacing `<` with `&lt;` and `>` with `&gt;` • lib/services/push.dart:24:9 • unintended_html_in_doc_comment
+   info • Angle brackets will be interpreted as HTML. Try using backticks around the content with angle brackets, or try replacing `<` with `&lt;` and `>` with `&gt;` • lib/services/push.dart:24:16 • unintended_html_in_doc_comment
+   info • Angle brackets will be interpreted as HTML. Try using backticks around the content with angle brackets, or try replacing `<` with `&lt;` and `>` with `&gt;` • lib/services/push.dart:25:9 • unintended_html_in_doc_comment
+   info • Angle brackets will be interpreted as HTML. Try using backticks around the content with angle brackets, or try replacing `<` with `&lt;` and `>` with `&gt;` • lib/services/push.dart:25:16 • unintended_html_in_doc_comment
+   info • 'deleteToken' is deprecated and shouldn't be used. Use unregister() and onUnregistered instead. Try replacing the use of the deprecated member with the replacement • lib/services/push.dart:131:40 • deprecated_member_use
+   info • The import of 'dart:typed_data' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/services.dart'. Try removing the import directive • lib/services/receipt.dart:3:8 • unnecessary_import
+   info • The import of 'dart:typed_data' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/services.dart'. Try removing the import directive • lib/services/reports.dart:3:8 • unnecessary_import
+   info • The import of 'dart:typed_data' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/services.dart'. Try removing the import directive • lib/services/upi.dart:1:8 • unnecessary_import
+   info • 'translate' is deprecated and shouldn't be used. Use translateByVector3, translateByVector4, or translateByDouble instead. Try replacing the use of the deprecated member with the replacement • lib/ui/mascot.dart:303:17 • deprecated_member_use
+   info • 'scale' is deprecated and shouldn't be used. Use scaleByVector3, scaleByVector4, or scaleByDouble instead. Try replacing the use of the deprecated member with the replacement • lib/ui/mascot.dart:305:17 • deprecated_member_use
+   info • The import of 'dart:typed_data' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/services.dart'. Try removing the import directive • lib/ui/widgets.dart:4:8 • unnecessary_import
+   info • Unnecessary use of multiple underscores. Try using '_' • lib/ui/widgets.dart:645:25 • unnecessary_underscores
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/ui/widgets.dart:654:13 • use_null_aware_elements
+   info • Unnecessary use of multiple underscores. Try using '_' • lib/ui/widgets.dart:677:25 • unnecessary_underscores
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/ui/widgets.dart:1163:53 • use_null_aware_elements
+
+61 issues found. (ran in 17.1s)

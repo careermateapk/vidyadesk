@@ -453,3 +453,17 @@ ${closed ? '<path d="M64 90 Q78 100 92 90" stroke="#1E1A45" stroke-width="5" fil
 ${cap ? '<path d="M60 44 L100 26 L140 44 L100 62Z" fill="url(#oc)"/><path d="M78 50 L78 62 Q100 72 122 62 L122 50 L100 60Z" fill="#2B2560"/><path d="M140 44 L140 66" stroke="#F59F00" stroke-width="3"/><circle cx="140" cy="68" r="4" fill="#F59F00"/>' : ''}
 ${wave ? '<path d="M148 110 Q172 92 166 74" stroke="#8B7CF6" stroke-width="13" fill="none" stroke-linecap="round"/><path d="M54 118 Q40 130 50 146" stroke="#8B7CF6" stroke-width="12" fill="none" stroke-linecap="round"/>' : '<path d="M54 118 Q40 130 50 146" stroke="#8B7CF6" stroke-width="12" fill="none" stroke-linecap="round"/><path d="M146 118 Q160 130 150 146" stroke="#8B7CF6" stroke-width="12" fill="none" stroke-linecap="round"/>'}
 </svg>''';
+
+/// Vidu's graduation cap on its own (for the splash, where it flies off and lands back).
+class ViduCap extends StatelessWidget {
+  const ViduCap({super.key, required this.size});
+  /// Size of the owl this cap belongs to.
+  final double size;
+  @override
+  Widget build(BuildContext context) => SvgPicture.string(
+        '<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">$_defs'
+        '<path d="M60 44 L100 26 L140 44 L100 62Z" fill="url(#oc)"/><path d="M78 50 L78 62 Q100 72 122 62 L122 50 L100 60Z" fill="#2B2560"/>$_tassel</svg>',
+        width: size,
+        height: size,
+      );
+}

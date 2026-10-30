@@ -33,6 +33,8 @@ dependencies:
   webview_flutter: ^4.13.0
   geolocator: ^14.0.0
   firebase_messaging: any
+  # Splash sound
+  audioplayers: ^6.1.0
 
 dev_dependencies:
   flutter_test:
@@ -41,6 +43,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/sounds/
   fonts:
     - family: Hanken
       fonts:

@@ -9,125 +9,20 @@ import '../data/models.dart';
 import '../ui/mascot.dart';
 import '../ui/widgets.dart';
 import 'common.dart';
+import 'grand_splash.dart';
 
 // ---------------------------------------------------------------------------
 // Splash
 // ---------------------------------------------------------------------------
 
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
-}
-
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
-  late final AnimationController _owl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1700))..forward();
-  // No timer: the app moves on only when "Get started" is tapped.
-  void _go() {
-    if (mounted) context.appRead.finishSplash();
-  }
-
-  @override
-  void dispose() {
-    _owl.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final p = context.pal;
-    // Vidu flies in from the top-left along a curve, then lands.
-    Offset flight(double t) {
-      final e = Curves.easeOutCubic.transform(t);
-      const a = Offset(-260, -220), c = Offset(120, -260), b = Offset.zero;
-      final u = 1 - e;
-      return a * (u * u) + c * (2 * u * e) + b * (e * e);
-    }
-    return Scaffold(
-      backgroundColor: p.bg,
-      body: Container(
-        decoration: BoxDecoration(gradient: RadialGradient(center: const Alignment(0, -.55), radius: 1.1, colors: [p.top, p.bg])),
-        child: SafeArea(
-          child: Stack(children: [
-            Positioned(top: 90, left: 30, child: _Dot(16, p.brand2.withValues(alpha: .35))),
-            Positioned(top: 170, right: 40, child: _Dot(26, p.brand2.withValues(alpha: .18))),
-            Positioned(top: 430, left: 54, child: _Dot(10, p.accent.withValues(alpha: .6))),
-            Column(children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
-                child: Row(children: [
-                  const AppLogo(size: 34),
-                  const SizedBox(width: 9),
-                  Text('VidyaDesk', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: p.ink, letterSpacing: -.3)),
-                ]),
-              ),
-              const Spacer(flex: 2),
-              SizedBox(
-                height: 260,
-                child: Stack(clipBehavior: Clip.none, alignment: Alignment.center, children: [
-                  // two soft clouds drifting behind
-                  for (final c in [(-110.0, 70.0, 150.0, 1.0), (100.0, 95.0, 130.0, -1.0)])
-                    AnimatedBuilder(
-                      animation: _owl,
-                      builder: (context, _) => Transform.translate(
-                        offset: Offset(c.$1 + c.$4 * 40 * (1 - _owl.value), c.$2),
-                        child: Opacity(
-                          opacity: (_owl.value * 1.5).clamp(0, 1) * .9,
-                          child: Container(width: c.$3, height: c.$3 * .36, decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(99), boxShadow: [BoxShadow(color: p.brand.withValues(alpha: .12), blurRadius: 20)])),
-                        ),
-                      ),
-                    ),
-                  AnimatedBuilder(
-                    animation: _owl,
-                    builder: (context, child) {
-                      final t = _owl.value;
-                      final tilt = t < .7 ? -.35 + .5 * (t / .7) : .15 * (1 - (t - .7) / .3);
-                      return Transform.translate(offset: flight(t), child: Transform.rotate(angle: tilt, child: Transform.scale(scale: .55 + .45 * Curves.easeOut.transform(t), child: child)));
-                    },
-                    child: const Floaty(amount: 8, child: Mascot(size: 250, book: false, mood: OwlMood.hello)),
-                  ),
-                ]),
-              ),
-              const Spacer(),
-              FadeIn(
-                delay: const Duration(milliseconds: 450),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 36),
-                  child: Column(children: [
-                    Text(tr('splash_title1'), textAlign: TextAlign.center, style: const TextStyle(fontSize: 31, fontWeight: FontWeight.w800, letterSpacing: -1, height: 1.1)),
-                    Text(tr('splash_title2'), textAlign: TextAlign.center, style: TextStyle(fontSize: 31, fontWeight: FontWeight.w800, letterSpacing: -1, height: 1.15, color: p.brand)),
-                    const SizedBox(height: 12),
-                    Text(tr('splash_sub'), textAlign: TextAlign.center, style: TextStyle(fontSize: 14.5, color: p.muted, height: 1.5, fontWeight: FontWeight.w500)),
-                  ]),
-                ),
-              ),
-              const SizedBox(height: 26),
-              FadeIn(
-                delay: const Duration(milliseconds: 700),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: context.app.ready && context.app.signedIn == null
-                      ? PrimaryButton(label: tr('get_started'), onPressed: _go)
-                      : const SizedBox(height: 56, child: Center(child: SizedBox(width: 26, height: 26, child: CircularProgressIndicator(strokeWidth: 3)))),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Text(tr('made_in_india'), style: TextStyle(color: p.muted, fontSize: 12, fontWeight: FontWeight.w600)),
-              const SizedBox(height: 14),
-            ]),
-          ]),
-        ),
-      ),
-    );
+    final app = context.app;
+    // No timer: the app moves on only when "Get started" is tapped.
+    return GrandSplash(ready: app.ready && app.signedIn == null, onStart: () => context.appRead.finishSplash());
   }
-}
-
-class _Dot extends StatelessWidget {
-  const _Dot(this.size, this.color);
-  final double size;
-  final Color color;
-  @override
-  Widget build(BuildContext context) => Floaty(amount: 10, child: Container(width: size, height: size, decoration: BoxDecoration(color: color, shape: BoxShape.circle)));
 }
 
 // ---------------------------------------------------------------------------

@@ -1576,4 +1576,7 @@ const Map<String, List<String>> _t = {
   'att_celebrate': ['{p}/{t} present!', '{p}/{t} हाज़िर!', '{p}/{t} present!'],
   'sky_long_h1': ['Plan active · {n} days left.', 'प्लान चालू · {n} दिन बाकी।', 'Plan chalu · {n} din baaki.'],
   'sky_long_h2': ['Extend or upgrade.', 'आगे बढ़ाएँ या अपग्रेड करें।', 'Aage badhao ya upgrade karo.'],
+  'skip_intro': ['Skip', 'छोड़ें', 'Skip'],
+  'splash_welcome': ['WELCOME', 'स्वागत है', 'SWAGAT HAI'],
+  'splash_line': ['Attendance, fees, tests and doubts —\nyour coaching\'s smart partner.', 'हाज़िरी, फ़ीस, टेस्ट और डाउट —\nआपकी कोचिंग का स्मार्ट साथी।', 'Hazri, fees, tests aur doubts —\naapki coaching ka smart saathi.'],
 };

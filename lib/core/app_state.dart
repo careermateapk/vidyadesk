@@ -203,6 +203,10 @@ class AppState extends ChangeNotifier {
     } catch (_) {}
   }
 
+  /// Splash sound on/off (the speaker button on the splash).
+  bool get splashSound => _prefs?.getBool('splashSound') ?? true;
+  void setSplashSound(bool on) => _prefs?.setBool('splashSound', on);
+
   /// True only the first time [key] is asked for on this phone.
   bool takeOnce(String key) {
     if (_prefs?.getBool('once_$key') ?? false) return false;

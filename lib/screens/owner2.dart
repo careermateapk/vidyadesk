@@ -1083,7 +1083,7 @@ class MaintenanceView extends StatelessWidget {
     return Scaffold(
       body: SafeArea(
         child: ListView(padding: const EdgeInsets.fromLTRB(24, 80, 24, 30), children: [
-          const Center(child: Floaty(child: Mascot(size: 160, book: false))),
+          const Center(child: Mascot(size: 160, book: false, mood: OwlMood.sleep)),
           const SizedBox(height: 8),
           Text(tr('maint_title'), textAlign: TextAlign.center, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
           const SizedBox(height: 8),
@@ -1237,7 +1237,7 @@ class BlockedScreen extends StatelessWidget {
         child: RefreshIndicator(
           onRefresh: app.loadInstitute,
           child: ListView(padding: const EdgeInsets.fromLTRB(24, 70, 24, 30), children: [
-            const Center(child: Floaty(child: Mascot(size: 150, book: false))),
+            const Center(child: Mascot(size: 150, book: false, mood: OwlMood.sad)),
             const SizedBox(height: 8),
             Text(tr('coaching_closed'), textAlign: TextAlign.center, style: const TextStyle(fontSize: 23, fontWeight: FontWeight.w800)),
             const SizedBox(height: 8),

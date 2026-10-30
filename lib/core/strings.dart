@@ -1533,4 +1533,6 @@ const Map<String, List<String>> _t = {
   'child_added_toast': ['{name} added to the parent', '{name} पैरेंट से जुड़ गया', '{name} parent se jud gaya'],
   'child_request_detail': ['Wants to add: {new}\nAlready linked: {old}', 'जोड़ना चाहते हैं: {new}\nपहले से जुड़े: {old}', 'Jodna chahte hain: {new}\nPehle se jude: {old}'],
   'child_request_sent': ['Request sent. You will see this child once the admin approves.', 'रिक्वेस्ट भेज दी। एडमिन की मंज़ूरी के बाद बच्चा दिखेगा।', 'Request bhej di. Admin approve karega tab bachcha dikhega.'],
+  'loading_owl': ['Fetching your data…', 'आपका डेटा ला रहे हैं…', 'Aapka data la rahe hain…'],
+  'thanks': ['Thank you! 🙏', 'धन्यवाद! 🙏', 'Dhanyawad! 🙏'],
 };

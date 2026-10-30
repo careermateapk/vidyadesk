@@ -689,7 +689,7 @@ class _PendingScreenState extends State<PendingScreen> with SingleTickerProvider
                     ),
                   ),
                   Container(width: 222, height: 222, decoration: BoxDecoration(shape: BoxShape.circle, color: p.bg)),
-                  const Floaty(child: Mascot(size: 200, book: false)),
+                  Mascot(size: 200, book: false, mood: rejected ? OwlMood.sad : OwlMood.look),
                   Positioned(
                     right: 18,
                     top: 18,

@@ -99,7 +99,7 @@ class _FaqScreenState extends State<FaqScreen> {
             child: AppCard(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               child: list.isEmpty
-                  ? EmptyState(icon: Icons.search_off_rounded, text: tr('faq_none'))
+                  ? EmptyState(icon: Icons.search_off_rounded, text: tr('faq_none'), search: true)
                   : Column(children: [
                       for (var i = 0; i < list.length; i++) ...[
                         if (i > 0) const Line(),

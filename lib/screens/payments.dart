@@ -148,8 +148,8 @@ class _PaySheetState extends State<_PaySheet> {
     );
     if (!mounted) return;
     HapticFeedback.heavyImpact();
-    toast(context, tr('payment_sent'));
-    Navigator.of(context).pop(true);
+    await showThanks(context, tr('thanks'), sub: tr('payment_sent'));
+    if (mounted) Navigator.of(context).pop(true);
   }
 
   @override

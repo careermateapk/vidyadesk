@@ -22,7 +22,7 @@ class RemovedScreen extends StatelessWidget {
     return Scaffold(
       body: SafeArea(
         child: ListView(padding: const EdgeInsets.fromLTRB(24, 50, 24, 30), children: [
-          const Center(child: Floaty(child: Mascot(size: 160, book: false))),
+          const Center(child: Mascot(size: 160, book: false, mood: OwlMood.sad)),
           const SizedBox(height: 8),
           Text(trf('removed_title', {'inst': institute}), textAlign: TextAlign.center, style: const TextStyle(fontSize: 23, fontWeight: FontWeight.w800)),
           const SizedBox(height: 8),
@@ -84,7 +84,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with SingleTickerProvider
           child: ListView(padding: const EdgeInsets.fromLTRB(24, 60, 24, 30), children: [
             ScaleTransition(
               scale: CurvedAnimation(parent: _a, curve: const Interval(0, .35, curve: Curves.elasticOut)),
-              child: const Center(child: Mascot(size: 180, book: false, wave: true)),
+              child: const Center(child: Mascot(size: 180, book: false, mood: OwlMood.happy)),
             ),
             const SizedBox(height: 8),
             Text(tr('congrats'), textAlign: TextAlign.center, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800)),

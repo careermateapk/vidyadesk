@@ -158,7 +158,7 @@ class _ResourcesPageState extends State<ResourcesPage> {
                   ),
                 )),
               if (q.isNotEmpty) ...[
-                if (found.isEmpty) EmptyState(icon: Icons.search_off_rounded, text: tr('nothing_found')),
+                if (found.isEmpty) EmptyState(icon: Icons.search_off_rounded, text: tr('nothing_found'), search: true),
                 for (final r in found) Padding(padding: const EdgeInsets.only(bottom: 10), child: ResourceTile(m: m, r: r, batch: batches[r.batchId], batches: d.$2, onChanged: reload)),
               ] else ...[
                 item(GridView.count(

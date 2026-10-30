@@ -4,6 +4,7 @@ import '../core/app_state.dart';
 import '../core/strings.dart';
 import '../core/theme.dart';
 import '../data/models.dart';
+import '../ui/mascot.dart';
 import '../ui/widgets.dart';
 import 'auth.dart';
 import 'common.dart';
@@ -585,6 +586,9 @@ class ProfileMeter extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
+          if (pct == 100)
+            const Mascot(size: 64, book: false, mood: OwlMood.wink)
+          else
           Ring(
             value: done / items.length,
             size: 64,

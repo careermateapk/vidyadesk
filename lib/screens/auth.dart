@@ -171,7 +171,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   Text(_tab == 0 ? tr('login_sub') : tr('signup_sub'), style: TextStyle(color: p.muted, fontSize: 14.5, height: 1.35, fontWeight: FontWeight.w500)),
                 ]),
               ),
-              const Floaty(child: BlinkingMascot(size: 92, book: false, wave: true)),
+              const Mascot(size: 92, book: false, mood: OwlMood.hello),
             ]),
             const SizedBox(height: 16),
             const DemoBanner(),

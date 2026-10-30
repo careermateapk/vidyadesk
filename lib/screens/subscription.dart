@@ -1570,7 +1570,7 @@ class _PlanSuccessScreenState extends State<PlanSuccessScreen> with SingleTicker
           child: ListView(padding: const EdgeInsets.fromLTRB(22, 30, 22, 30), children: [
             ScaleTransition(
               scale: CurvedAnimation(parent: _a, curve: const Interval(0, .35, curve: Curves.elasticOut)),
-              child: const Center(child: Mascot(size: 180, book: false, wave: true)),
+              child: const Center(child: Mascot(size: 180, book: false, mood: OwlMood.happy)),
             ),
             const SizedBox(height: 6),
             FadeIn(child: Text(trf('plan_started_title', {'plan': planName(plan)}), textAlign: TextAlign.center, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800))),
@@ -1657,7 +1657,7 @@ class PlanLockedScreen extends StatelessWidget {
         child: RefreshIndicator(
           onRefresh: app.loadInstitute,
           child: ListView(padding: const EdgeInsets.fromLTRB(22, 30, 22, 30), children: [
-            const Center(child: Floaty(child: Mascot(size: 160, book: false))),
+            const Center(child: Mascot(size: 160, book: false, mood: OwlMood.sad)),
             const SizedBox(height: 8),
             Text(admin ? tr('locked_admin_title') : tr('locked_member_title'), textAlign: TextAlign.center, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
             const SizedBox(height: 8),

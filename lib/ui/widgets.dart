@@ -602,16 +602,18 @@ class HeroHeader extends StatelessWidget {
 }
 
 class EmptyState extends StatelessWidget {
-  const EmptyState({super.key, required this.icon, required this.text});
+  const EmptyState({super.key, required this.icon, required this.text, this.search = false});
   final IconData icon;
   final String text;
+  /// A search that found nothing: Vidu thinks (?) instead of looking around.
+  final bool search;
   @override
   Widget build(BuildContext context) {
     final p = context.pal;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 24),
       child: Column(children: [
-        const Floaty(child: Mascot(size: 110, book: false)),
+        Mascot(size: 120, book: false, mood: search ? OwlMood.think : OwlMood.look),
         const SizedBox(height: 14),
         Text(text, textAlign: TextAlign.center, style: TextStyle(color: p.muted, fontSize: 14.5, height: 1.45, fontWeight: FontWeight.w600)),
       ]),
@@ -622,7 +624,40 @@ class EmptyState extends StatelessWidget {
 class LoadingView extends StatelessWidget {
   const LoadingView({super.key});
   @override
-  Widget build(BuildContext context) => const SkeletonList();
+  Widget build(BuildContext context) => Center(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Mascot(size: 120, book: false, mood: OwlMood.read),
+          const SizedBox(height: 10),
+          Text(tr('loading_owl'), style: TextStyle(color: context.pal.muted, fontWeight: FontWeight.w700, fontSize: 13.5)),
+        ]),
+      );
+}
+
+/// "Dhanyawad" — Vidu bows; closes by itself.
+Future<void> showThanks(BuildContext context, String title, {String sub = ''}) {
+  final f = showDialog<void>(
+    context: context,
+    builder: (c) => Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(22, 18, 22, 22),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Mascot(size: 140, book: false, mood: OwlMood.bow),
+          Text(title, textAlign: TextAlign.center, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+          if (sub.isNotEmpty) ...[const SizedBox(height: 4), Text(sub, textAlign: TextAlign.center, style: TextStyle(color: c.pal.muted, fontWeight: FontWeight.w600))],
+        ]),
+      ),
+    ),
+  );
+  Future<void>.delayed(const Duration(milliseconds: 2600), () {
+    if (context.mounted) Navigator.of(context, rootNavigator: true).maybePop();
+  });
+  return f;
+}
+
+bool _offline(Object e) {
+  final s = e.toString().toLowerCase();
+  return s.contains('unavailable') || s.contains('network') || s.contains('socket') || s.contains('offline') || s.contains('timeout');
 }
 
 class ErrorView extends StatelessWidget {
@@ -636,7 +671,7 @@ class ErrorView extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          IconBox(Icons.wifi_off_rounded, fg: p.danger, bg: p.dangerTint, size: 60),
+          Mascot(size: 130, book: false, mood: _offline(error) ? OwlMood.sleep : OwlMood.sad),
           const SizedBox(height: 12),
           Text(tr('err_load'), textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
           const SizedBox(height: 6),

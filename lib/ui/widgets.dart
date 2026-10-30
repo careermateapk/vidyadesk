@@ -4,6 +4,8 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+
+import '../data/cache_mode.dart';
 import 'package:flutter/services.dart';
 
 import '../core/strings.dart';
@@ -652,8 +654,10 @@ class ErrorView extends StatelessWidget {
 /// With [cacheKey], the last data is remembered (until the app closes) and shown
 /// at once next time, then quietly refreshed.
 class Loader<T> extends StatefulWidget {
-  const Loader({super.key, required this.load, required this.builder, this.cacheKey});
+  const Loader({super.key, required this.load, required this.builder, this.cacheKey, this.pullToRefresh = true});
   final Future<T> Function() load;
+  /// false when the page has its own pull-to-refresh (else two spinners show).
+  final bool pullToRefresh;
   final Widget Function(BuildContext context, T data, Future<void> Function() reload) builder;
   final String? cacheKey;
 
@@ -669,6 +673,7 @@ final Map<String, Object?> _loaderCache = {};
 class _LoaderState<T> extends State<Loader<T>> {
   T? _data;
   bool _has = false;
+  bool _fresh = false; // got data from the server at least once
   Object? _error;
   int _gen = 0;
 
@@ -680,7 +685,20 @@ class _LoaderState<T> extends State<Loader<T>> {
       _data = _loaderCache[k] as T;
       _has = true;
     }
+    if (!_has) _fromPhone();
     _run();
+  }
+
+  /// Show what is already saved on the phone straight away (no internet wait).
+  Future<void> _fromPhone() async {
+    try {
+      final d = await runCacheOnly(widget.load).timeout(const Duration(seconds: 2));
+      if (!mounted || _fresh || _has) return;
+      setState(() {
+        _data = d;
+        _has = true;
+      });
+    } catch (_) {}
   }
 
   Future<void> _run() async {
@@ -692,6 +710,7 @@ class _LoaderState<T> extends State<Loader<T>> {
       setState(() {
         _data = d;
         _has = true;
+        _fresh = true;
         _error = null;
       });
     } catch (e) {
@@ -704,7 +723,10 @@ class _LoaderState<T> extends State<Loader<T>> {
 
   @override
   Widget build(BuildContext context) {
-    if (_has) return RefreshIndicator(color: context.pal.brand, onRefresh: _reload, child: widget.builder(context, _data as T, _reload));
+    if (_has) {
+      final child = widget.builder(context, _data as T, _reload);
+      return widget.pullToRefresh ? RefreshIndicator(color: context.pal.brand, onRefresh: _reload, child: child) : child;
+    }
     if (_error != null) {
       return ErrorView(
         error: _error!,

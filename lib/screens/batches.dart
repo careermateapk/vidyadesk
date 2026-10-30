@@ -42,6 +42,7 @@ class _BatchesPageState extends State<BatchesPage> {
     final m = widget.m;
     return Loader<(List<Batch>, List<Membership>)>(
       key: ValueKey(_v),
+      pullToRefresh: false,
       load: _load,
       builder: (context, d, reload) {
         final all = myBatches(m, d.$1);

@@ -55,11 +55,19 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final uid = learnerUid(context, m);
     final now = DateTime.now().millisecondsSinceEpoch;
     const month = 30 * 86400000;
-    final batches = await b.batches(id);
+    // start everything at once (faster than one after another)
+    final batchesF = b.batches(id);
+    final noticesF = b.notices(id);
+    final resF = b.resources(id);
+    final testsF = staff ? null : b.tests(id, publishedOnly: true);
+    final doubtsF = m.role == Role.parent ? null : b.doubts(id, studentUid: staff ? null : m.uid);
+    final claimsF = m.role == Role.admin ? b.feeClaims(id) : null;
+    final membersF = staff ? b.members(id) : null;
+    final batches = await batchesF;
     final out = <_Item>[];
 
     // notices
-    final notices = await b.notices(id);
+    final notices = await noticesF;
     for (final n in notices) {
       if (m.role == Role.student && n.batchId.isNotEmpty && !m.batchIds.contains(n.batchId)) continue;
       final s = noticeStyle(p, n.kind);
@@ -67,7 +75,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
 
     // study material
-    final res = visibleResources(m, await b.resources(id), batches);
+    final res = visibleResources(m, await resF, batches);
     for (final r in res.where((r) => now - r.createdAt < month && r.byUid != m.uid)) {
       final s = kindStyle(r.kind);
       out.add(_Item(
@@ -96,7 +104,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
     // results
     if (!staff) {
-      for (final t in await b.tests(id, publishedOnly: true)) {
+      for (final t in await testsF!) {
         final v = t.marks[uid];
         if (v == null || now - t.date > 2 * month) continue;
         out.add(_Item(
@@ -112,7 +120,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
     // doubts
     if (m.role != Role.parent) {
-      var doubts = await b.doubts(id, studentUid: staff ? null : m.uid);
+      var doubts = await doubtsF!;
       if (m.role == Role.teacher) {
         final mine = myBatches(m, batches).map((x) => x.id).toSet();
         doubts = doubts.where((d) => mine.contains(d.batchId)).toList();
@@ -142,7 +150,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
     // admin: UPI payments to confirm
     if (m.role == Role.admin) {
-      for (final f in await b.feeClaims(id)) {
+      for (final f in await claimsF!) {
         out.add(_Item(
           icon: Icons.currency_rupee_rounded,
           color: p.success,
@@ -156,7 +164,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
     // staff: join requests
     if (staff) {
-      final pend = pendingFor(m, await b.members(id), batches);
+      final pend = pendingFor(m, await membersF!, batches);
       for (final x in pend) {
         out.add(_Item(
           icon: Icons.person_add_alt_1_rounded,

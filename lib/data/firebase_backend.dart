@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import '../core/config.dart';
 import '../core/plan.dart';
 import 'backend.dart';
+import 'cache_mode.dart';
 import 'models.dart';
 
 /// Online store on the Firebase free plan.
@@ -138,7 +139,7 @@ class FirebaseBackend implements Backend {
 
   @override
   Future<AppUser?> profile(String uid) async {
-    final d = await _db.collection('users').doc(uid).get();
+    final d = await _db.collection('users').doc(uid).fetch();
     if (!d.exists || d.data() == null) return null;
     return AppUser.fromMap(d.data()!);
   }
@@ -150,7 +151,7 @@ class FirebaseBackend implements Backend {
   Future<void> setPhoto(String photo) async {
     final me = _auth.currentUser!.uid;
     await _db.collection('users').doc(me).set({'photo': photo}, SetOptions(merge: true));
-    final q = await _mem.where('uid', isEqualTo: me).get();
+    final q = await _mem.where('uid', isEqualTo: me).fetch();
     for (final d in q.docs) {
       await d.reference.update({'photo': photo});
       try {
@@ -161,6 +162,7 @@ class FirebaseBackend implements Backend {
 
   @override
   Future<void> syncParentFees(String instituteId) async {
+    if (cacheOnly) return;
     try {
       final all = await members(instituteId);
       final fee = {for (final x in all) if (x.role == Role.student) x.uid: x.monthlyFee};
@@ -180,7 +182,7 @@ class FirebaseBackend implements Backend {
     if (instituteId.isEmpty) return;
     final me = _auth.currentUser!.uid;
     final ref = _inst(instituteId).collection('photos').doc(me);
-    final cur = await ref.get();
+    final cur = await ref.fetch();
     if (cur.exists && (cur.data()?['photo'] ?? '') == photo) return;
     await ref.set({'photo': photo, 'at': DateTime.now().millisecondsSinceEpoch});
   }
@@ -194,7 +196,7 @@ class FirebaseBackend implements Backend {
   Future<List<Membership>> myMemberships() async {
     final me = _auth.currentUser;
     if (me == null) return [];
-    final q = await _mem.where('uid', isEqualTo: me.uid).get();
+    final q = await _mem.where('uid', isEqualTo: me.uid).fetch();
     final list = q.docs.map((d) => Membership.fromMap(d.data())).toList();
     list.sort((a, b) => a.createdAt.compareTo(b.createdAt));
     return list;
@@ -202,7 +204,7 @@ class FirebaseBackend implements Backend {
 
   @override
   Future<List<Membership>> members(String instituteId) async {
-    final q = await _mem.where('instituteId', isEqualTo: instituteId).get();
+    final q = await _mem.where('instituteId', isEqualTo: instituteId).fetch();
     final list = q.docs.map((d) => Membership.fromMap(d.data())).toList();
     list.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     return list;
@@ -283,13 +285,13 @@ class FirebaseBackend implements Backend {
   Future<void> deleteInstitute(String instituteId) async {
     final me = _auth.currentUser!.uid;
     final inst = _inst(instituteId);
-    final instDoc = await inst.get();
-    final members = await _mem.where('instituteId', isEqualTo: instituteId).get();
-    final batches = await inst.collection('batches').get();
+    final instDoc = await inst.fetch();
+    final members = await _mem.where('instituteId', isEqualTo: instituteId).fetch();
+    final batches = await inst.collection('batches').fetch();
     // 1. everything inside the institute
     final inside = <DocumentReference<Map<String, dynamic>>>[];
     for (final c in ['batches', 'attendance', 'fees', 'notices']) {
-      final q = c == 'batches' ? batches : await inst.collection(c).get();
+      final q = c == 'batches' ? batches : await inst.collection(c).fetch();
       inside.addAll(q.docs.map((d) => d.reference));
     }
     await _deleteAll(inside);
@@ -314,7 +316,7 @@ class FirebaseBackend implements Backend {
     final ref = _db.collection('institutes').doc();
     var code = instituteCodeFor(name);
     for (var i = 0; i < 5; i++) {
-      final taken = await _db.collection('codes').doc(code).get();
+      final taken = await _db.collection('codes').doc(code).fetch();
       if (!taken.exists) break;
       code = instituteCodeFor(name);
     }
@@ -354,7 +356,7 @@ class FirebaseBackend implements Backend {
 
   @override
   Future<Institute?> institute(String id) async {
-    final d = await _inst(id).get();
+    final d = await _inst(id).fetch();
     if (!d.exists || d.data() == null) return null;
     return Institute.fromMap(d.data()!);
   }
@@ -376,7 +378,7 @@ class FirebaseBackend implements Backend {
 
   @override
   Future<JoinCode?> lookupCode(String code) async {
-    final d = await _db.collection('codes').doc(normaliseCode(code)).get();
+    final d = await _db.collection('codes').doc(normaliseCode(code)).fetch();
     if (!d.exists || d.data() == null) return null;
     return JoinCode.fromMap(d.data()!);
   }
@@ -384,7 +386,7 @@ class FirebaseBackend implements Backend {
   @override
   Future<Membership> requestJoin({required AppUser user, required JoinCode code, String relation = '', List<String> subjects = const [], Role? role, String childUid = '', String childName = ''}) async {
     final id = '${user.uid}_${code.instituteId}';
-    final existing = await _mem.doc(id).get();
+    final existing = await _mem.doc(id).fetch();
     if (existing.exists && existing.data() != null) {
       final m = Membership.fromMap(existing.data()!);
       // Same person adds one more batch / child in the same institute.
@@ -436,7 +438,7 @@ class FirebaseBackend implements Backend {
 
   @override
   Future<List<Batch>> batches(String instituteId) async {
-    final q = await _inst(instituteId).collection('batches').get();
+    final q = await _inst(instituteId).collection('batches').fetch();
     final list = q.docs.map((d) => Batch.fromMap(d.data())).toList();
     list.sort((a, b) => a.startMin.compareTo(b.startMin));
     return list;
@@ -457,7 +459,7 @@ class FirebaseBackend implements Backend {
     final ref = _inst(instituteId).collection('batches').doc();
     var code = batchCodeFor(subject, days, startMin);
     for (var i = 0; i < 5; i++) {
-      final taken = await _db.collection('codes').doc(code).get();
+      final taken = await _db.collection('codes').doc(code).fetch();
       if (!taken.exists) break;
       code = batchCodeFor(subject, days, startMin);
     }
@@ -491,7 +493,7 @@ class FirebaseBackend implements Backend {
 
   @override
   Future<AttendanceDay?> attendance(String instituteId, String batchId, String dateKey) async {
-    final d = await _inst(instituteId).collection('attendance').doc('${batchId}_$dateKey').get();
+    final d = await _inst(instituteId).collection('attendance').doc('${batchId}_$dateKey').fetch();
     if (!d.exists || d.data() == null) return null;
     return AttendanceDay.fromMap(d.data()!);
   }
@@ -502,7 +504,7 @@ class FirebaseBackend implements Backend {
 
   @override
   Future<List<AttendanceDay>> attendanceForBatch(String instituteId, String batchId) async {
-    final q = await _inst(instituteId).collection('attendance').where('batchId', isEqualTo: batchId).get();
+    final q = await _inst(instituteId).collection('attendance').where('batchId', isEqualTo: batchId).fetch();
     final list = q.docs.map((d) => AttendanceDay.fromMap(d.data())).toList();
     list.sort((a, b) => b.dateKey.compareTo(a.dateKey));
     return list;
@@ -512,13 +514,13 @@ class FirebaseBackend implements Backend {
 
   @override
   Future<List<FeeRecord>> feesForMonth(String instituteId, String month) async {
-    final q = await _inst(instituteId).collection('fees').where('month', isEqualTo: month).get();
+    final q = await _inst(instituteId).collection('fees').where('month', isEqualTo: month).fetch();
     return q.docs.map((d) => FeeRecord.fromMap(d.data())).toList();
   }
 
   @override
   Future<List<AttendanceDay>> attendanceForStudent(String instituteId, String studentUid) async {
-    final q = await _inst(instituteId).collection('attendance').where('marked', arrayContains: studentUid).get();
+    final q = await _inst(instituteId).collection('attendance').where('marked', arrayContains: studentUid).fetch();
     final list = q.docs.map((d) => AttendanceDay.fromMap(d.data())).toList();
     list.sort((a, b) => b.dateKey.compareTo(a.dateKey));
     return list;
@@ -526,7 +528,7 @@ class FirebaseBackend implements Backend {
 
   @override
   Future<List<FeeRecord>> feesForStudent(String instituteId, String studentUid) async {
-    final q = await _inst(instituteId).collection('fees').where('studentUid', isEqualTo: studentUid).get();
+    final q = await _inst(instituteId).collection('fees').where('studentUid', isEqualTo: studentUid).fetch();
     final list = q.docs.map((d) => FeeRecord.fromMap(d.data())).toList();
     list.sort((a, b) => b.month.compareTo(a.month));
     return list;
@@ -537,7 +539,7 @@ class FirebaseBackend implements Backend {
 
   @override
   Future<List<FeeRecord>> feeClaims(String instituteId) async {
-    final q = await _inst(instituteId).collection('fees').where('claimed', isEqualTo: true).get();
+    final q = await _inst(instituteId).collection('fees').where('claimed', isEqualTo: true).fetch();
     final list = q.docs.map((d) => FeeRecord.fromMap(d.data())).where((f) => f.waiting).toList();
     list.sort((a, b) => b.claimAt.compareTo(a.claimAt));
     return list;
@@ -550,7 +552,7 @@ class FirebaseBackend implements Backend {
 
   @override
   Future<List<Resource>> resources(String instituteId) async {
-    final q = await _inst(instituteId).collection('resources').get();
+    final q = await _inst(instituteId).collection('resources').fetch();
     final list = q.docs.map((d) => Resource.fromMap(d.data())).toList();
     list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return list;
@@ -564,14 +566,14 @@ class FirebaseBackend implements Backend {
 
   @override
   Future<List<Submission>> submissionsFor(String instituteId, String resourceId) async {
-    final q = await _inst(instituteId).collection('submissions').where('resourceId', isEqualTo: resourceId).get();
+    final q = await _inst(instituteId).collection('submissions').where('resourceId', isEqualTo: resourceId).fetch();
     return q.docs.map((d) => Submission.fromMap(d.data())).toList();
   }
 
   @override
   Future<Submission?> mySubmission(String instituteId, String resourceId, String studentUid) async {
     try {
-      final d = await _inst(instituteId).collection('submissions').doc('${resourceId}_$studentUid').get();
+      final d = await _inst(instituteId).collection('submissions').doc('${resourceId}_$studentUid').fetch();
       if (!d.exists || d.data() == null) return null;
       return Submission.fromMap(d.data()!);
     } on FirebaseException catch (e) {
@@ -590,7 +592,7 @@ class FirebaseBackend implements Backend {
   Future<List<TestPaper>> tests(String instituteId, {bool publishedOnly = false}) async {
     Query<Map<String, dynamic>> c = _inst(instituteId).collection('tests');
     if (publishedOnly) c = c.where('published', isEqualTo: true);
-    final q = await c.get();
+    final q = await c.fetch();
     final list = q.docs.map((d) => TestPaper.fromMap(d.data())).toList();
     list.sort((a, b) => b.date.compareTo(a.date));
     return list;
@@ -608,7 +610,7 @@ class FirebaseBackend implements Backend {
   Future<List<Doubt>> doubts(String instituteId, {String? studentUid}) async {
     Query<Map<String, dynamic>> q = _inst(instituteId).collection('doubts');
     if (studentUid != null) q = q.where('studentUid', isEqualTo: studentUid);
-    final r = await q.get();
+    final r = await q.fetch();
     final list = r.docs.map((d) => Doubt.fromMap(d.data())).toList();
     list.sort((a, b) => b.lastAt.compareTo(a.lastAt));
     return list;
@@ -621,7 +623,7 @@ class FirebaseBackend implements Backend {
 
   @override
   Future<List<Notice>> notices(String instituteId) async {
-    final q = await _inst(instituteId).collection('notices').get();
+    final q = await _inst(instituteId).collection('notices').fetch();
     final list = q.docs.map((d) => Notice.fromMap(d.data())).toList();
     list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return list;
@@ -634,7 +636,7 @@ class FirebaseBackend implements Backend {
 
   @override
   Future<List<Txn>> ledger(String instituteId, String month) async {
-    final q = await _inst(instituteId).collection('ledger').where('month', isEqualTo: month).get();
+    final q = await _inst(instituteId).collection('ledger').where('month', isEqualTo: month).fetch();
     return q.docs.map((d) => Txn.fromMap(d.data())).toList()..sort((a, b) => b.date.compareTo(a.date));
   }
 
@@ -646,7 +648,7 @@ class FirebaseBackend implements Backend {
 
   @override
   Future<List<Txn>> payslips(String instituteId, String uid) async {
-    final q = await _inst(instituteId).collection('ledger').where('refUid', isEqualTo: uid).get();
+    final q = await _inst(instituteId).collection('ledger').where('refUid', isEqualTo: uid).fetch();
     return q.docs.map((d) => Txn.fromMap(d.data())).toList()..sort((a, b) => b.date.compareTo(a.date));
   }
 
@@ -654,7 +656,7 @@ class FirebaseBackend implements Backend {
 
   @override
   Future<List<Lead>> leads(String instituteId) async {
-    final q = await _inst(instituteId).collection('leads').get();
+    final q = await _inst(instituteId).collection('leads').fetch();
     return q.docs.map((d) => Lead.fromMap(d.data())).toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
   }
 
@@ -670,7 +672,7 @@ class FirebaseBackend implements Backend {
   Future<List<CheckIn>> checkIns(String instituteId, String month, {String? uid}) async {
     Query<Map<String, dynamic>> q = _inst(instituteId).collection('checkins').where('month', isEqualTo: month);
     if (uid != null) q = q.where('uid', isEqualTo: uid);
-    final r = await q.get();
+    final r = await q.fetch();
     return r.docs.map((d) => CheckIn.fromMap(d.data())).toList()..sort((a, b) => b.inAt.compareTo(a.inAt));
   }
 
@@ -681,7 +683,7 @@ class FirebaseBackend implements Backend {
 
   @override
   Future<Syllabus?> syllabus(String instituteId, String batchId) async {
-    final d = await _inst(instituteId).collection('syllabus').doc(batchId).get();
+    final d = await _inst(instituteId).collection('syllabus').doc(batchId).fetch();
     if (!d.exists || d.data() == null) return null;
     return Syllabus.fromMap(d.data()!);
   }
@@ -694,7 +696,7 @@ class FirebaseBackend implements Backend {
     final out = <String, String>{};
     for (final u in uids) {
       try {
-        final d = await _inst(instituteId).collection('photos').doc(u).get();
+        final d = await _inst(instituteId).collection('photos').doc(u).fetch();
         final ph = (d.data()?['photo'] ?? '').toString();
         if (ph.isNotEmpty) {
           out[u] = ph;
@@ -702,7 +704,7 @@ class FirebaseBackend implements Backend {
         }
       } catch (_) {}
       try {
-        final d = await _mem.doc('${u}_$instituteId').get();
+        final d = await _mem.doc('${u}_$instituteId').fetch();
         final ph = (d.data()?['photo'] ?? '').toString();
         if (ph.isNotEmpty) out[u] = ph;
       } catch (_) {}
@@ -714,6 +716,7 @@ class FirebaseBackend implements Backend {
 
   @override
   Future<void> syncRoster(String instituteId) async {
+    if (cacheOnly) return;
     try {
       final all = await members(instituteId);
       final studs = all.where((x) => x.role == Role.student && x.approved).toList();
@@ -745,7 +748,7 @@ class FirebaseBackend implements Backend {
         } catch (_) {}
       }
       if (deleteFees) {
-        final fees = await _inst(m.instituteId).collection('fees').where('studentUid', isEqualTo: m.uid).get();
+        final fees = await _inst(m.instituteId).collection('fees').where('studentUid', isEqualTo: m.uid).fetch();
         for (final d in fees.docs) {
           await d.reference.delete();
         }
@@ -786,14 +789,14 @@ class FirebaseBackend implements Backend {
         .timeout(const Duration(seconds: 30));
     final j = jsonDecode(r.body) as Map<String, dynamic>;
     if (r.statusCode != 200 || j['ok'] != true) throw BackendError(r.statusCode == 403 ? 'permission' : 'network');
-    final d = await _subs.doc('${j['id']}').get();
+    final d = await _subs.doc('${j['id']}').fetch();
     return SubPayment.fromMap(d.data() ?? {'id': j['id'], 'instituteId': admin.instituteId, 'plan': plan, 'yearly': yearly, 'amount': j['amount'], 'status': j['started'] == true ? 'auto' : 'pending', 'newUntil': j['planUntil'], 'demo': j['demo']});
   }
 
   @override
   Future<List<SubPayment>> mySubPayments(String instituteId) async {
     final uid = _auth.currentUser?.uid ?? '';
-    final q = await _subs.where('adminUid', isEqualTo: uid).get();
+    final q = await _subs.where('adminUid', isEqualTo: uid).fetch();
     final list = q.docs.map((d) => SubPayment.fromMap(d.data())).where((p) => p.instituteId == instituteId).toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return list;
@@ -803,10 +806,10 @@ class FirebaseBackend implements Backend {
   Future<OwnerStats> ownerStats() async {
     final now = DateTime.now();
     final monthStart = DateTime(now.year, now.month).millisecondsSinceEpoch;
-    final insts = (await _db.collection('institutes').get()).docs.map((d) => Institute.fromMap({...d.data(), 'id': d.id})).toList();
-    final pend = (await _subs.where('status', whereIn: ['pending', 'auto']).get()).docs.map((d) => SubPayment.fromMap(d.data())).toList()
+    final insts = (await _db.collection('institutes').fetch()).docs.map((d) => Institute.fromMap({...d.data(), 'id': d.id})).toList();
+    final pend = (await _subs.where('status', whereIn: ['pending', 'auto']).fetch()).docs.map((d) => SubPayment.fromMap(d.data())).toList()
       ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
-    final month = (await _subs.where('createdAt', isGreaterThanOrEqualTo: monthStart).get()).docs.map((d) => SubPayment.fromMap(d.data()));
+    final month = (await _subs.where('createdAt', isGreaterThanOrEqualTo: monthStart).fetch()).docs.map((d) => SubPayment.fromMap(d.data()));
     final income = month.where((p) => p.started && !p.demo).fold<int>(0, (a, p) => a + p.amount);
     var students = 0;
     try {
@@ -842,7 +845,7 @@ class FirebaseBackend implements Backend {
       final back = p.prevUntil > now ? p.prevUntil : now - (graceDays * 86400000 + 60000);
       batch.update(_inst(p.instituteId), {'plan': p.prevPlan.isEmpty ? 'trial' : p.prevPlan, 'planUntil': back});
     } else if (p.status == 'pending' && ok) {
-      final d = await _inst(p.instituteId).get();
+      final d = await _inst(p.instituteId).fetch();
       final inst = Institute.fromMap({...?d.data(), 'id': p.instituteId});
       final until = extendUntil(inst.planUntil, p.yearly);
       batch.update(_inst(p.instituteId), {'plan': p.plan, 'planUntil': until});
@@ -861,13 +864,13 @@ class FirebaseBackend implements Backend {
   Future<Coupon?> coupon(String code) async {
     final c = normaliseCode(code);
     if (c.isEmpty) return null;
-    final d = await _db.collection('coupons').doc(c).get();
+    final d = await _db.collection('coupons').doc(c).fetch();
     return d.exists && d.data() != null ? Coupon.fromMap(d.data()!) : null;
   }
 
   @override
   Future<List<Coupon>> coupons() async =>
-      (await _db.collection('coupons').get()).docs.map((d) => Coupon.fromMap(d.data())).toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      (await _db.collection('coupons').fetch()).docs.map((d) => Coupon.fromMap(d.data())).toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
   @override
   Future<void> saveCoupon(Coupon c) => _db.collection('coupons').doc(c.code).set(c.toMap());
@@ -887,8 +890,8 @@ class FirebaseBackend implements Backend {
 
   @override
   Future<List<PlanAction>> planHistory(String instituteId) async {
-    final a = (await _db.collection('planActions').where('instituteId', isEqualTo: instituteId).get()).docs.map((d) => PlanAction.fromMap(d.data())).toList();
-    final p = (await _subs.where('instituteId', isEqualTo: instituteId).get()).docs.map((d) => SubPayment.fromMap(d.data()));
+    final a = (await _db.collection('planActions').where('instituteId', isEqualTo: instituteId).fetch()).docs.map((d) => PlanAction.fromMap(d.data())).toList();
+    final p = (await _subs.where('instituteId', isEqualTo: instituteId).fetch()).docs.map((d) => SubPayment.fromMap(d.data()));
     return [
       ...a,
       for (final x in p) PlanAction(id: x.id, instituteId: instituteId, action: 'paid_${x.status}', plan: x.plan, until: x.newUntil, note: x.demo ? 'DEMO' : '₹${x.amount}${x.via.isEmpty ? '' : ' · ${x.via}'}', at: x.createdAt),
@@ -897,11 +900,11 @@ class FirebaseBackend implements Backend {
 
   @override
   Future<List<AppBanner>> banners() async =>
-      (await _db.collection('banners').where('active', isEqualTo: true).get()).docs.map((d) => AppBanner.fromMap(d.data())).toList()..sort((a, b) => a.order.compareTo(b.order));
+      (await _db.collection('banners').where('active', isEqualTo: true).fetch()).docs.map((d) => AppBanner.fromMap(d.data())).toList()..sort((a, b) => a.order.compareTo(b.order));
 
   @override
   Future<List<AppBanner>> allBanners() async =>
-      (await _db.collection('banners').get()).docs.map((d) => AppBanner.fromMap(d.data())).toList()..sort((a, b) => a.order.compareTo(b.order));
+      (await _db.collection('banners').fetch()).docs.map((d) => AppBanner.fromMap(d.data())).toList()..sort((a, b) => a.order.compareTo(b.order));
 
   @override
   Future<void> saveBanner(AppBanner b) => _db.collection('banners').doc(b.id).set(b.toMap());
@@ -913,7 +916,7 @@ class FirebaseBackend implements Backend {
 
   @override
   Future<AppConfig> config() async {
-    final d = await _db.collection('config').doc('app').get();
+    final d = await _db.collection('config').doc('app').fetch();
     return AppConfig.fromMap(d.data() ?? {});
   }
 
@@ -931,7 +934,7 @@ class FirebaseBackend implements Backend {
   Future<void> setBlocked(String instituteId, bool blocked, String reason) => _inst(instituteId).update({'blocked': blocked, 'blockReason': reason});
 
   @override
-  Future<List<SubPayment>> allSubPayments() async => (await _subs.get()).docs.map((d) => SubPayment.fromMap(d.data())).toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  Future<List<SubPayment>> allSubPayments() async => (await _subs.fetch()).docs.map((d) => SubPayment.fromMap(d.data())).toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
   CollectionReference<Map<String, dynamic>> get _tickets => _db.collection('tickets');
 
@@ -941,12 +944,12 @@ class FirebaseBackend implements Backend {
   @override
   Future<List<Ticket>> myTickets(String instituteId) async {
     final uid = _auth.currentUser?.uid ?? '';
-    return (await _tickets.where('adminUid', isEqualTo: uid).get()).docs.map((d) => Ticket.fromMap(d.data())).where((t) => t.instituteId == instituteId).toList()
+    return (await _tickets.where('adminUid', isEqualTo: uid).fetch()).docs.map((d) => Ticket.fromMap(d.data())).where((t) => t.instituteId == instituteId).toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
   }
 
   @override
-  Future<List<Ticket>> allTickets() async => (await _tickets.get()).docs.map((d) => Ticket.fromMap(d.data())).toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  Future<List<Ticket>> allTickets() async => (await _tickets.fetch()).docs.map((d) => Ticket.fromMap(d.data())).toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
   @override
   Future<void> replyTicket(Ticket t, String reply) async {
@@ -956,5 +959,32 @@ class FirebaseBackend implements Backend {
       ..reply = reply
       ..status = 'answered'
       ..repliedAt = now;
+  }
+}
+
+
+// Reads: from the phone's saved copy when [cacheOnly], otherwise from the server.
+const _phone = GetOptions(source: Source.cache);
+
+extension _QueryFetch on Query<Map<String, dynamic>> {
+  Future<QuerySnapshot<Map<String, dynamic>>> fetch() async {
+    if (!cacheOnly) return get();
+    final q = await get(_phone);
+    // Nothing saved yet looks the same as "empty" — wait for the server instead.
+    if (q.docs.isEmpty) throw const CacheMiss();
+    return q;
+  }
+}
+
+extension _DocFetch on DocumentReference<Map<String, dynamic>> {
+  Future<DocumentSnapshot<Map<String, dynamic>>> fetch() async {
+    if (!cacheOnly) return get();
+    try {
+      final d = await get(_phone);
+      if (!d.exists) throw const CacheMiss();
+      return d;
+    } on FirebaseException {
+      throw const CacheMiss();
+    }
   }
 }

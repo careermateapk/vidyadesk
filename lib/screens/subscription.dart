@@ -815,6 +815,7 @@ class MyPlanScreen extends StatelessWidget {
     return Scaffold(
       appBar: InnerBar(title: tr('my_plan'), subtitle: m.instituteName),
       body: Loader<(List<SubPayment>, List<Membership>)>(
+        pullToRefresh: false,
         key: ValueKey(st?.until ?? 0),
         load: () async => (
           await app.backend.mySubPayments(m.instituteId),
@@ -1816,6 +1817,7 @@ class _OwnerPanelScreenState extends State<OwnerPanelScreen> {
         trailing: widget.standalone ? IconBtn(icon: Icons.logout_rounded, tooltip: tr('logout'), onTap: () => context.appRead.signOut()) : null,
       ),
       body: Loader<OwnerStats>(
+        pullToRefresh: false,
         key: ValueKey(_v),
         load: () => context.appRead.backend.ownerStats(),
         builder: (context, d, reload) {

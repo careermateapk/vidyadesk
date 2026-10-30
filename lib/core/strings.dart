@@ -1574,4 +1574,6 @@ const Map<String, List<String>> _t = {
   'khan': ['clink!', 'खन!', 'khan!'],
   'updated': ['Updated', 'अपडेट हो गया', 'Updated'],
   'att_celebrate': ['{p}/{t} present!', '{p}/{t} हाज़िर!', '{p}/{t} present!'],
+  'sky_long_h1': ['Plan active · {n} days left.', 'प्लान चालू · {n} दिन बाकी।', 'Plan chalu · {n} din baaki.'],
+  'sky_long_h2': ['Extend or upgrade.', 'आगे बढ़ाएँ या अपग्रेड करें।', 'Aage badhao ya upgrade karo.'],
 };

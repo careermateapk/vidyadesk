@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -7,7 +5,6 @@ import '../core/app_state.dart';
 import '../core/strings.dart';
 import '../core/theme.dart';
 import '../data/models.dart';
-import '../ui/mascot.dart';
 import '../ui/widgets.dart';
 import 'attendance.dart';
 import 'batches.dart';
@@ -204,12 +201,7 @@ class _FloatingNav extends StatelessWidget {
       top: false,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
-        child: LayoutBuilder(builder: (context, box) {
-          // centre of the active tab (the "+" button takes 64 px in the middle)
-          final n = tabs.length;
-          final plusW = onPlus != null ? 64.0 : 0.0;
-          final w = (box.maxWidth - 2 - plusW) / n;
-          final cx = 1 + w * index + w / 2 + (onPlus != null && index >= n ~/ 2 ? plusW : 0);
+        child: Builder(builder: (context) {
           return Stack(clipBehavior: Clip.none, children: [
             Container(
               height: 68,
@@ -221,74 +213,9 @@ class _FloatingNav extends StatelessWidget {
               ),
               child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: items),
             ),
-            _TabOwl(x: cx),
           ]);
         }),
       ),
-    );
-  }
-}
-
-/// Vidu sits on the bar above the open tab and hops to the next one.
-/// Sleeps at night (10 pm – 5 am); says hello on the first morning open.
-class _TabOwl extends StatefulWidget {
-  const _TabOwl({required this.x});
-  final double x;
-  @override
-  State<_TabOwl> createState() => _TabOwlState();
-}
-
-class _TabOwlState extends State<_TabOwl> with SingleTickerProviderStateMixin {
-  static const _s = 38.0;
-  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 520), value: 1);
-  late double _from = widget.x, _to = widget.x;
-  bool _hello = false;
-
-  @override
-  void initState() {
-    super.initState();
-    if (context.appRead.takeMorningHello()) {
-      _hello = true;
-      Future<void>.delayed(const Duration(seconds: 4), () {
-        if (mounted) setState(() => _hello = false);
-      });
-    }
-  }
-
-  @override
-  void didUpdateWidget(_TabOwl old) {
-    super.didUpdateWidget(old);
-    if ((old.x - widget.x).abs() > 1) {
-      _from = _from + (_to - _from) * _c.value;
-      _to = widget.x;
-      _c.forward(from: 0);
-    }
-  }
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final h = DateTime.now().hour;
-    final night = h >= 22 || h < 5;
-    return AnimatedBuilder(
-      animation: _c,
-      builder: (context, child) {
-        final t = Curves.easeInOut.transform(_c.value);
-        final x = _from + (_to - _from) * t;
-        final hop = math.sin(math.pi * _c.value) * 34;
-        final lean = (_to - _from).sign * math.sin(math.pi * _c.value) * .25;
-        return Positioned(
-          left: x - _s / 2,
-          top: -_s + 8 - hop,
-          child: IgnorePointer(child: Transform.rotate(angle: lean, child: child)),
-        );
-      },
-      child: Mascot(size: _s, book: false, mood: night ? OwlMood.sleep : (_hello ? OwlMood.hello : OwlMood.idle)),
     );
   }
 }

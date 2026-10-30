@@ -600,7 +600,9 @@ class _PlansScreenState extends State<PlansScreen> with SingleTickerProviderStat
         ? (tr('sky_trial_h1'), trf('sky_trial_h2', {'n': '$left'}), tr('sky_chip_free'))
         : ended
             ? (tr('sky_end_h1'), tr('sky_end_h2'), tr('sky_chip_safe'))
-            : (trf('sky_paid_h1', {'n': '$left'}), tr('sky_paid_h2'), tr('sky_chip_add'));
+            : left > 30
+                ? (trf('sky_long_h1', {'n': '$left'}), tr('sky_long_h2'), tr('sky_chip_add'))
+                : (trf('sky_paid_h1', {'n': '$left'}), tr('sky_paid_h2'), tr('sky_chip_add'));
     final sub = trial && !ended ? tr('sky_trial_sub') : (ended ? tr('sky_end_sub') : tr('sky_paid_sub'));
     final end = st?.endDate ?? now.add(const Duration(days: trialDays));
     final newEnd = DateTime.fromMillisecondsSinceEpoch(extendUntil(st?.until ?? 0, _yearly));
@@ -638,6 +640,8 @@ class _PlansScreenState extends State<PlansScreen> with SingleTickerProviderStat
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 300),
                       height: 62,
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(20),
                         gradient: pro
@@ -646,11 +650,15 @@ class _PlansScreenState extends State<PlansScreen> with SingleTickerProviderStat
                         border: pro ? Border.all(color: const Color(0xFFFFD27A), width: 1.5) : null,
                       ),
                       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                        Text(
-                          '${pro ? '★ ' : ''}${trf('take_plan_short', {'plan': planName(_plan)})} · ${rupees(amt)}${_yearly ? tr('per_year') : tr('per_month')}',
-                          style: TextStyle(color: pro ? const Color(0xFFFFD27A) : Colors.white, fontWeight: FontWeight.w900, fontSize: 17),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            '${pro ? '★ ' : ''}${trf('take_plan_short', {'plan': planName(_plan)})} · ${rupees(amt)}${_yearly ? tr('per_year') : tr('per_month')}',
+                            maxLines: 1,
+                            style: TextStyle(color: pro ? const Color(0xFFFFD27A) : Colors.white, fontWeight: FontWeight.w900, fontSize: 17),
+                          ),
                         ),
-                        Text(tr('sky_cta_sub'), style: const TextStyle(color: Color(0xDDFFFFFF), fontWeight: FontWeight.w700, fontSize: 11.5)),
+                        FittedBox(fit: BoxFit.scaleDown, child: Text(tr('sky_cta_sub'), maxLines: 1, style: const TextStyle(color: Color(0xDDFFFFFF), fontWeight: FontWeight.w700, fontSize: 11.5))),
                       ]),
                     ),
                   ),
@@ -1064,7 +1072,7 @@ class MyPlanScreen extends StatelessWidget {
           final pct = total == 0 ? 0.0 : (left / total).clamp(0.0, 1.0);
           final ended = st != null && !st.active;
           final nextUp = st == null || st.trial ? Plan.standard : (st.plan == Plan.pro ? null : paidPlans[(paidPlans.indexOf(st.plan) + 1).clamp(0, 2)]);
-          return RefreshIndicator(
+          return OwlRefresh(
             onRefresh: () async {
               await app.loadInstitute();
               await reload();
@@ -1886,7 +1894,7 @@ class PlanLockedScreen extends StatelessWidget {
     final renew = st.renewPlan;
     return Scaffold(
       body: SafeArea(
-        child: RefreshIndicator(
+        child: OwlRefresh(
           onRefresh: app.loadInstitute,
           child: ListView(padding: const EdgeInsets.fromLTRB(22, 30, 22, 30), children: [
             const Center(child: Mascot(size: 160, book: false, mood: OwlMood.sad)),
@@ -2092,7 +2100,7 @@ class _OwnerPanelScreenState extends State<OwnerPanelScreen> {
                   ]),
                 ),
               );
-          return RefreshIndicator(
+          return OwlRefresh(
             onRefresh: reload,
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(),

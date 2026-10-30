@@ -1234,7 +1234,7 @@ class BlockedScreen extends StatelessWidget {
     final app = context.app;
     return Scaffold(
       body: SafeArea(
-        child: RefreshIndicator(
+        child: OwlRefresh(
           onRefresh: app.loadInstitute,
           child: ListView(padding: const EdgeInsets.fromLTRB(24, 70, 24, 30), children: [
             const Center(child: Mascot(size: 150, book: false, mood: OwlMood.sad)),

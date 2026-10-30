@@ -72,7 +72,7 @@ class _BatchesPageState extends State<BatchesPage> {
           const SizedBox(height: 6),
           PillBar(items: filters, index: f, onChanged: (v) => setState(() => _filter = v)),
           Expanded(
-            child: RefreshIndicator(
+            child: OwlRefresh(
               onRefresh: reload,
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),

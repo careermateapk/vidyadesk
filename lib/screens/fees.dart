@@ -459,14 +459,17 @@ class _FeeSheetState extends State<_FeeSheet> {
     super.dispose();
   }
 
-  Future<void> _run(Future<void> Function() job, String done) async {
+  Future<void> _run(Future<void> Function() job, String done, {int coin = 0, String who = ''}) async {
     setState(() => _busy = true);
     try {
       await job();
       if (!mounted) return;
       HapticFeedback.heavyImpact();
-      toast(context, done);
-      Navigator.of(context).pop(true);
+      final nav = Navigator.of(context);
+      if (coin <= 0) toast(context, done);
+      nav.pop(true);
+      // money came in: the ₹ coin drops into Vidu's bag
+      if (coin > 0) showCoinDrop(nav.context, coin, title: who);
     } catch (e) {
       if (mounted) toast(context, errorMessage(e));
     } finally {
@@ -508,7 +511,7 @@ class _FeeSheetState extends State<_FeeSheet> {
         'claimed': false,
       });
     }
-    await _run(() => context.appRead.backend.saveFee(widget.m.instituteId, rec), rec.paid ? tr('marked_paid') : trf('part_saved', {'amt': rupees(amt), 'left': rupees(rec.balance)}));
+    await _run(() => context.appRead.backend.saveFee(widget.m.instituteId, rec), rec.paid ? tr('marked_paid') : trf('part_saved', {'amt': rupees(amt), 'left': rupees(rec.balance)}), coin: amt, who: f.studentName);
   }
 
   Future<void> _unpay() {

@@ -1571,4 +1571,7 @@ const Map<String, List<String>> _t = {
   'sky_p3s': ['{plan} for {per}', '{plan} · {per}', '{plan} ke saath {per}'],
   'sky_upi': ['UPI fees', 'UPI फ़ीस', 'UPI fees'],
   'sky_support': ['Support', 'सहायता', 'Support'],
+  'khan': ['clink!', 'खन!', 'khan!'],
+  'updated': ['Updated', 'अपडेट हो गया', 'Updated'],
+  'att_celebrate': ['{p}/{t} present!', '{p}/{t} हाज़िर!', '{p}/{t} present!'],
 };

@@ -332,6 +332,7 @@ class _ConfirmPaymentsScreenState extends State<ConfirmPaymentsScreen> {
       );
       HapticFeedback.mediumImpact();
       setState(() => _done[f.id] = ok);
+      if (ok) showCoinDrop(context, f.amount, title: f.studentName);
     } catch (e) {
       if (mounted) toast(context, errorMessage(e));
     } finally {

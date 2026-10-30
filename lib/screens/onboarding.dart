@@ -21,7 +21,7 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
-  late final AnimationController _owl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100))..forward();
+  late final AnimationController _owl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1700))..forward();
   // No timer: the app moves on only when "Get started" is tapped.
   void _go() {
     if (mounted) context.appRead.finishSplash();
@@ -36,7 +36,13 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   @override
   Widget build(BuildContext context) {
     final p = context.pal;
-    final owl = CurvedAnimation(parent: _owl, curve: Curves.elasticOut);
+    // Vidu flies in from the top-left along a curve, then lands.
+    Offset flight(double t) {
+      final e = Curves.easeOutCubic.transform(t);
+      const a = Offset(-260, -220), c = Offset(120, -260), b = Offset.zero;
+      final u = 1 - e;
+      return a * (u * u) + c * (2 * u * e) + b * (e * e);
+    }
     return Scaffold(
       backgroundColor: p.bg,
       body: Container(
@@ -56,10 +62,31 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                 ]),
               ),
               const Spacer(flex: 2),
-              AnimatedBuilder(
-                animation: owl,
-                builder: (context, child) => Transform.scale(scale: .4 + .6 * owl.value, child: Opacity(opacity: _owl.value.clamp(0, 1), child: child)),
-                child: const Floaty(amount: 8, child: BlinkingMascot(size: 250)),
+              SizedBox(
+                height: 260,
+                child: Stack(clipBehavior: Clip.none, alignment: Alignment.center, children: [
+                  // two soft clouds drifting behind
+                  for (final c in [(-110.0, 70.0, 150.0, 1.0), (100.0, 95.0, 130.0, -1.0)])
+                    AnimatedBuilder(
+                      animation: _owl,
+                      builder: (context, _) => Transform.translate(
+                        offset: Offset(c.$1 + c.$4 * 40 * (1 - _owl.value), c.$2),
+                        child: Opacity(
+                          opacity: (_owl.value * 1.5).clamp(0, 1) * .9,
+                          child: Container(width: c.$3, height: c.$3 * .36, decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(99), boxShadow: [BoxShadow(color: p.brand.withValues(alpha: .12), blurRadius: 20)])),
+                        ),
+                      ),
+                    ),
+                  AnimatedBuilder(
+                    animation: _owl,
+                    builder: (context, child) {
+                      final t = _owl.value;
+                      final tilt = t < .7 ? -.35 + .5 * (t / .7) : .15 * (1 - (t - .7) / .3);
+                      return Transform.translate(offset: flight(t), child: Transform.rotate(angle: tilt, child: Transform.scale(scale: .55 + .45 * Curves.easeOut.transform(t), child: child)));
+                    },
+                    child: const Floaty(amount: 8, child: Mascot(size: 250, book: false, mood: OwlMood.hello)),
+                  ),
+                ]),
               ),
               const Spacer(),
               FadeIn(

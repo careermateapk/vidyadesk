@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -6,6 +8,7 @@ import '../core/strings.dart';
 import '../core/theme.dart';
 import '../data/models.dart';
 import '../services/push.dart';
+import '../ui/mascot.dart';
 import '../ui/widgets.dart';
 import 'common.dart';
 
@@ -19,7 +22,35 @@ class MarkAttendanceScreen extends StatefulWidget {
   State<MarkAttendanceScreen> createState() => _MarkAttendanceScreenState();
 }
 
-class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
+class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> with SingleTickerProviderStateMixin {
+  /// Vidu flying down the list while "all present" ticks everyone.
+  late final AnimationController _sweep = AnimationController(vsync: this);
+  bool _sweeping = false;
+
+  @override
+  void dispose() {
+    _sweep.dispose();
+    super.dispose();
+  }
+
+  Future<void> _allPresent(List<Membership> studs) async {
+    if (_sweeping) return;
+    final todo = studs.where((s) => !_present.contains(s.uid)).toList();
+    if (todo.isEmpty) return;
+    final step = (1600 / todo.length).clamp(40, 110).round();
+    setState(() => _sweeping = true);
+    _sweep.duration = Duration(milliseconds: step * todo.length + 350);
+    _sweep.forward(from: 0);
+    for (final s in todo) {
+      await Future<void>.delayed(Duration(milliseconds: step));
+      if (!mounted) return;
+      HapticFeedback.selectionClick();
+      setState(() => _present.add(s.uid));
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 380));
+    if (mounted) setState(() => _sweeping = false);
+  }
+
   late DateTime _date = widget.date ?? DateTime.now();
   List<Membership>? _students;
   List<Membership> _all = [];
@@ -99,8 +130,9 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
       if (!mounted) return;
       _tellParents(studs);
       HapticFeedback.heavyImpact();
-      toast(context, trf('att_saved', {'p': '${_present.length}', 't': '${studs.length}'}));
-      Navigator.of(context).pop(true);
+      final pc = studs.where((s) => _present.contains(s.uid)).length;
+      await showCelebration(context, trf('att_celebrate', {'p': '$pc', 't': '${studs.length}'}), sub: prettyDay(_date), happy: pc == studs.length);
+      if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
       if (mounted) toast(context, errorMessage(e));
     } finally {
@@ -122,7 +154,8 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
               ? const LoadingView()
               : Column(children: [
                   Expanded(
-                    child: ListView(
+                    child: Stack(children: [
+                    ListView(
                       padding: const EdgeInsets.fromLTRB(16, 6, 16, 20),
                       children: [
                         AppCard(
@@ -170,7 +203,7 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
                         ),
                         const SizedBox(height: 12),
                         Row(children: [
-                          Expanded(child: SoftButton(label: tr('all_present'), icon: Icons.done_all_rounded, color: p.successTint, textColor: p.success, onPressed: () => setState(() => _present.addAll(studs.map((s) => s.uid))))),
+                          Expanded(child: SoftButton(label: tr('all_present'), icon: Icons.done_all_rounded, color: p.successTint, textColor: p.success, onPressed: () => _allPresent(studs))),
                           const SizedBox(width: 8),
                           Expanded(child: SoftButton(label: tr('all_absent'), icon: Icons.remove_done_rounded, color: p.dangerTint, textColor: p.danger, onPressed: () => setState(_present.clear))),
                         ]),
@@ -195,6 +228,28 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
                           ),
                       ],
                     ),
+                    if (_sweeping)
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: LayoutBuilder(
+                            builder: (context, box) => AnimatedBuilder(
+                              animation: _sweep,
+                              builder: (context, child) {
+                                final t = _sweep.value;
+                                return Stack(children: [
+                                  Positioned(
+                                    right: 18 + 26 * math.sin(t * math.pi * 3),
+                                    top: -40 + (box.maxHeight + 20) * Curves.easeInOut.transform(t),
+                                    child: Transform.rotate(angle: .18 * math.sin(t * math.pi * 3), child: child),
+                                  ),
+                                ]);
+                              },
+                              child: const Mascot(size: 64, book: false, mood: OwlMood.hello),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ]),
                   ),
                   SafeArea(
                     top: false,

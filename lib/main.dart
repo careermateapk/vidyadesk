@@ -42,6 +42,7 @@ class VidyaDeskApp extends StatelessWidget {
           themeAnimationDuration: const Duration(milliseconds: 500),
           themeAnimationCurve: Curves.easeInOut,
           scaffoldMessengerKey: messengerKey,
+          navigatorKey: navKey,
           home: const Gate(),
         );
       }),

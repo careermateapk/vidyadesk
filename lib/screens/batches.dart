@@ -92,16 +92,18 @@ class _BatchesPageState extends State<BatchesPage> {
                       delay: stagger(i),
                       child: Padding(
                         padding: const EdgeInsets.only(bottom: 12),
-                        child: BatchCard(
-                          b: list[i],
-                          colorIndex: all.indexOf(list[i]),
-                          instituteName: m.instituteName,
-                          count: approvedStudents(d.$2, batchId: list[i].id).length,
-                          mine: list[i].teacherUid == m.uid,
-                          onTap: () async {
-                            await push(context, BatchDetailScreen(m: m, batch: list[i]));
-                            reload();
-                          },
+                        child: Builder(
+                          builder: (cardContext) => BatchCard(
+                            b: list[i],
+                            colorIndex: all.indexOf(list[i]),
+                            instituteName: m.instituteName,
+                            count: approvedStudents(d.$2, batchId: list[i].id).length,
+                            mine: list[i].teacherUid == m.uid,
+                            onTap: () async {
+                              await pushExpand(cardContext, BatchDetailScreen(m: m, batch: list[i]));
+                              reload();
+                            },
+                          ),
                         ),
                       ),
                     ),

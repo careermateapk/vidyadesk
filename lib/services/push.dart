@@ -8,10 +8,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/config.dart';
 import '../data/backend.dart';
+import '../ui/widgets.dart' show showOwlMail;
 import '../data/models.dart';
 
 /// Shows messages that arrive while the app is open.
 final messengerKey = GlobalKey<ScaffoldMessengerState>();
+
+/// The app's navigator (for pop-ups shown from outside a screen).
+final navKey = GlobalKey<NavigatorState>();
 
 /// Phone notifications through Firebase Cloud Messaging topics.
 ///   l_<inst>         every student and parent of an institute
@@ -54,10 +58,16 @@ class Push {
           if (m.data['from'] != null && m.data['from'] == FirebaseAuth.instance.currentUser?.uid) return;
           final n = m.notification;
           if (n == null) return;
-          messengerKey.currentState?.showSnackBar(SnackBar(
-            duration: const Duration(seconds: 5),
-            content: Text([n.title, n.body].whereType<String>().where((x) => x.isNotEmpty).join('\n')),
-          ));
+          // Vidu flies in carrying the message (falls back to a plain bar).
+          final ov = navKey.currentState?.overlay;
+          if (ov != null) {
+            showOwlMail(ov, n.title ?? '', n.body ?? '');
+          } else {
+            messengerKey.currentState?.showSnackBar(SnackBar(
+              duration: const Duration(seconds: 5),
+              content: Text([n.title, n.body].whereType<String>().where((x) => x.isNotEmpty).join('\n')),
+            ));
+          }
         });
       }
       final want = <String>{'all', if (owner) 'owner'};

@@ -203,6 +203,23 @@ class AppState extends ChangeNotifier {
     } catch (_) {}
   }
 
+  /// True only the first time [key] is asked for on this phone.
+  bool takeOnce(String key) {
+    if (_prefs?.getBool('once_$key') ?? false) return false;
+    _prefs?.setBool('once_$key', true);
+    return true;
+  }
+
+  /// True once a day, on the first app open between 5 and 11 am (Vidu says good morning).
+  bool takeMorningHello() {
+    final n = DateTime.now();
+    if (n.hour < 5 || n.hour >= 11) return false;
+    final k = '${n.year}-${n.month}-${n.day}';
+    if (_prefs?.getString('morningOwl') == k) return false;
+    _prefs?.setString('morningOwl', k);
+    return true;
+  }
+
   /// "What's new" already shown up to this id.
   int get newsSeen => _prefs?.getInt('newsSeen') ?? 0;
   void markNewsSeen(int id) => _prefs?.setInt('newsSeen', id);

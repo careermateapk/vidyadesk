@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import '../data/cache_mode.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter/services.dart';
 
 import '../core/strings.dart';
@@ -633,6 +634,252 @@ class LoadingView extends StatelessWidget {
       );
 }
 
+/// A big moment: Vidu jumps with confetti (or stands happy). Closes by itself.
+Future<void> showCelebration(BuildContext context, String title, {String sub = '', bool happy = true, Widget? extra}) {
+  final f = showGeneralDialog<void>(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: 'celebrate',
+    barrierColor: Colors.black.withValues(alpha: .35),
+    transitionDuration: const Duration(milliseconds: 260),
+    pageBuilder: (c, _, __) => Center(
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          width: 290,
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 22),
+          decoration: BoxDecoration(color: c.pal.card, borderRadius: BorderRadius.circular(30)),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Mascot(size: 150, book: false, mood: happy ? OwlMood.happy : OwlMood.hello),
+            if (extra != null) extra,
+            Text(title, textAlign: TextAlign.center, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: -.4)),
+            if (sub.isNotEmpty) ...[const SizedBox(height: 4), Text(sub, textAlign: TextAlign.center, style: TextStyle(color: c.pal.muted, fontWeight: FontWeight.w700))],
+          ]),
+        ),
+      ),
+    ),
+    transitionBuilder: (c, a, _, child) => FadeTransition(opacity: a, child: ScaleTransition(scale: Tween(begin: .9, end: 1.0).animate(CurvedAnimation(parent: a, curve: Curves.easeOutBack)), child: child)),
+  );
+  Future<void>.delayed(const Duration(milliseconds: 1900), () {
+    if (context.mounted) Navigator.of(context, rootNavigator: true).maybePop();
+  });
+  return f;
+}
+
+/// A ₹ coin drops into Vidu's bag ("khan!") and the amount counts up.
+Future<void> showCoinDrop(BuildContext context, int amount, {String title = ''}) {
+  final f = showGeneralDialog<void>(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: 'coin',
+    barrierColor: Colors.black.withValues(alpha: .35),
+    transitionDuration: const Duration(milliseconds: 220),
+    pageBuilder: (c, _, __) => Center(child: Material(color: Colors.transparent, child: _CoinDrop(amount: amount, title: title))),
+    transitionBuilder: (c, a, _, child) => FadeTransition(opacity: a, child: child),
+  );
+  Future<void>.delayed(const Duration(milliseconds: 2300), () {
+    if (context.mounted) Navigator.of(context, rootNavigator: true).maybePop();
+  });
+  return f;
+}
+
+class _CoinDrop extends StatefulWidget {
+  const _CoinDrop({required this.amount, required this.title});
+  final int amount;
+  final String title;
+  @override
+  State<_CoinDrop> createState() => _CoinDropState();
+}
+
+class _CoinDropState extends State<_CoinDrop> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1600))..forward();
+  bool _buzzed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _c.addListener(() {
+      if (!_buzzed && _c.value > .45) {
+        _buzzed = true;
+        HapticFeedback.heavyImpact();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pal;
+    return Container(
+      width: 290,
+      height: 330,
+      decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(30)),
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (context, _) {
+          final t = _c.value;
+          final fall = (t / .45).clamp(0.0, 1.0);
+          final land = t > .45;
+          final squash = land ? 1 - .08 * math.sin(((t - .45) / .15).clamp(0.0, 1.0) * math.pi) : 1.0;
+          final count = ((t - .45) / .5).clamp(0.0, 1.0);
+          return Stack(clipBehavior: Clip.none, alignment: Alignment.topCenter, children: [
+            Positioned(
+              top: 22,
+              child: Opacity(
+                opacity: count,
+                child: Column(children: [
+                  Text(rupees((widget.amount * Curves.easeOut.transform(count)).round()), style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: p.success, letterSpacing: -1)),
+                  if (widget.title.isNotEmpty) Text(widget.title, style: TextStyle(color: p.muted, fontWeight: FontWeight.w700, fontSize: 13)),
+                ]),
+              ),
+            ),
+            Positioned(
+              bottom: 26,
+              child: Transform(alignment: Alignment.bottomCenter, transform: Matrix4.diagonal3Values(1 / squash, squash, 1), child: const Mascot(size: 150, book: false, mood: OwlMood.idle)),
+            ),
+            if (!land)
+              Positioned(
+                top: -40 + 230 * Curves.easeIn.transform(fall),
+                child: Transform(
+                  alignment: Alignment.center,
+                  transform: Matrix4.rotationY(fall * math.pi * 4),
+                  child: Container(
+                    width: 46,
+                    height: 46,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(color: const Color(0xFFFFB547), shape: BoxShape.circle, border: Border.all(color: const Color(0xFFF59F00), width: 3)),
+                    child: const Text('₹', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: Color(0xFF7A4A00))),
+                  ),
+                ),
+              ),
+            if (land && t < .8)
+              Positioned(
+                top: 150,
+                right: 50,
+                child: Opacity(opacity: (1 - (t - .45) / .35).clamp(0.0, 1.0), child: Text(tr('khan'), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Color(0xFFE8930C)))),
+              ),
+          ]);
+        },
+      ),
+    );
+  }
+}
+
+/// A new notification: Vidu flies in with a letter, drops it, the card slides down
+/// with a ringing bell. Tap to close; goes away by itself.
+OverlayEntry? _mailEntry;
+void showOwlMail(OverlayState overlay, String title, String body) {
+  _mailEntry?.remove();
+  late OverlayEntry e;
+  e = OverlayEntry(builder: (_) => _OwlMail(title: title, body: body, onDone: () {
+        if (_mailEntry == e) _mailEntry = null;
+        e.remove();
+      }));
+  _mailEntry = e;
+  overlay.insert(e);
+}
+
+class _OwlMail extends StatefulWidget {
+  const _OwlMail({required this.title, required this.body, required this.onDone});
+  final String title, body;
+  final VoidCallback onDone;
+  @override
+  State<_OwlMail> createState() => _OwlMailState();
+}
+
+class _OwlMailState extends State<_OwlMail> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 5600))..forward().whenComplete(_close);
+  bool _closed = false;
+
+  void _close() {
+    if (_closed) return;
+    _closed = true;
+    widget.onDone();
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pal;
+    final w = MediaQuery.of(context).size.width;
+    final top = MediaQuery.of(context).padding.top + 8;
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (context, _) {
+        final t = _c.value * 5.6; // seconds
+        // owl: flies in 0–0.9s, drops letter, flies away 1.1–1.8s
+        final fly = (t / .9).clamp(0.0, 1.0), away = ((t - 1.1) / .7).clamp(0.0, 1.0);
+        final ox = -90 + (w * .62 + 90) * Curves.easeOutCubic.transform(fly) + (w * .5) * Curves.easeIn.transform(away);
+        final oy = top + 30 - 40 * math.sin(math.pi * fly) - 80 * away;
+        // card: slides down at 0.9s, back up at 5.0s
+        final cin = Curves.easeOutBack.transform(((t - .9) / .35).clamp(0.0, 1.0));
+        final cout = Curves.easeIn.transform(((t - 5.0) / .45).clamp(0.0, 1.0));
+        final cy = top - 120 + 120 * cin - 140 * cout;
+        final ring = t > .95 && t < 1.8 ? math.sin((t - .95) * 28) * .35 * (1 - (t - .95) / .85) : 0.0;
+        return Stack(children: [
+          Positioned(
+            left: 12,
+            right: 12,
+            top: cy,
+            child: GestureDetector(
+              onTap: _close,
+              onVerticalDragEnd: (_) => _close(),
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
+                  decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(20), border: Border.all(color: p.border), boxShadow: [BoxShadow(color: p.brand.withValues(alpha: .25), blurRadius: 30, offset: const Offset(0, 12), spreadRadius: -10)]),
+                  child: Row(children: [
+                    Transform.rotate(alignment: Alignment.topCenter, angle: ring, child: IconBox(Icons.notifications_active_rounded, fg: p.brand, bg: p.brandTint)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                        if (widget.title.isNotEmpty) Text(widget.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5, color: p.ink)),
+                        if (widget.body.isNotEmpty) Text(widget.body, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: p.muted, fontSize: 12.5, fontWeight: FontWeight.w600)),
+                      ]),
+                    ),
+                  ]),
+                ),
+              ),
+            ),
+          ),
+          if (t < 1.8)
+            Positioned(
+              left: ox,
+              top: oy,
+              child: IgnorePointer(
+                child: Stack(clipBehavior: Clip.none, children: [
+                  const Mascot(size: 64, book: false, mood: OwlMood.hello),
+                  if (t < 1.0)
+                    Positioned(
+                      left: 18,
+                      top: 44,
+                      child: Container(
+                        width: 28,
+                        height: 20,
+                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4), border: Border.all(color: p.brand, width: 2)),
+                        child: Icon(Icons.mail_rounded, size: 12, color: p.brand),
+                      ),
+                    ),
+                ]),
+              ),
+            ),
+        ]);
+      },
+    );
+  }
+}
+
 /// "Dhanyawad" — Vidu bows; closes by itself.
 Future<void> showThanks(BuildContext context, String title, {String sub = ''}) {
   final f = showDialog<void>(
@@ -760,7 +1007,7 @@ class _LoaderState<T> extends State<Loader<T>> {
   Widget build(BuildContext context) {
     if (_has) {
       final child = widget.builder(context, _data as T, _reload);
-      return widget.pullToRefresh ? RefreshIndicator(color: context.pal.brand, onRefresh: _reload, child: child) : child;
+      return widget.pullToRefresh ? OwlRefresh(onRefresh: _reload, child: child) : child;
     }
     if (_error != null) {
       return ErrorView(
@@ -772,6 +1019,134 @@ class _LoaderState<T> extends State<Loader<T>> {
       );
     }
     return const LoadingView();
+  }
+}
+
+/// Pull down to refresh — Vidu comes down on a rope instead of a spinner,
+/// flaps while loading, then flies back up ("✓ Updated").
+class OwlRefresh extends StatefulWidget {
+  const OwlRefresh({super.key, required this.onRefresh, required this.child});
+  final Future<void> Function() onRefresh;
+  final Widget child;
+  @override
+  State<OwlRefresh> createState() => _OwlRefreshState();
+}
+
+class _OwlRefreshState extends State<OwlRefresh> with SingleTickerProviderStateMixin {
+  static const _trigger = 86.0, _hold = 76.0, _max = 150.0;
+  late final AnimationController _ac = AnimationController(vsync: this, lowerBound: 0, upperBound: _max, value: 0);
+  bool _busy = false, _done = false;
+
+  @override
+  void dispose() {
+    _ac.dispose();
+    super.dispose();
+  }
+
+  void _pullBy(double d) {
+    if (_busy) return;
+    _ac.value = (_ac.value + d).clamp(0.0, _max);
+  }
+
+  Future<void> _release() async {
+    if (_busy) return;
+    if (_ac.value >= _trigger) {
+      HapticFeedback.mediumImpact();
+      setState(() => _busy = true);
+      await _ac.animateTo(_hold, duration: const Duration(milliseconds: 180), curve: Curves.easeOut);
+      try {
+        await widget.onRefresh();
+      } catch (_) {}
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _done = true;
+      });
+      await _ac.animateTo(0, duration: const Duration(milliseconds: 420), curve: Curves.easeInBack);
+      await Future<void>.delayed(const Duration(milliseconds: 900));
+      if (mounted) setState(() => _done = false);
+    } else {
+      _ac.animateTo(0, duration: const Duration(milliseconds: 220), curve: Curves.easeOut);
+    }
+  }
+
+  bool _onScroll(ScrollNotification n) {
+    if (n.depth != 0) return false;
+    if (n is OverscrollNotification && n.overscroll < 0 && n.dragDetails != null) {
+      _pullBy(-n.overscroll * .55);
+    } else if (n is ScrollUpdateNotification && n.dragDetails != null) {
+      if (n.metrics.pixels < 0) {
+        _pullBy(-(n.scrollDelta ?? 0) * .55);
+      } else if (_ac.value > 0 && (n.scrollDelta ?? 0) > 0) {
+        _pullBy(-(n.scrollDelta ?? 0));
+      }
+    } else if (n is ScrollEndNotification || (n is UserScrollNotification && n.direction == ScrollDirection.idle)) {
+      if (_ac.value > 0) _release();
+    }
+    return false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pal;
+    return NotificationListener<ScrollNotification>(
+      onNotification: _onScroll,
+      child: Stack(children: [
+        AnimatedBuilder(
+          animation: _ac,
+          builder: (context, child) => Transform.translate(offset: Offset(0, _ac.value * .85), child: child),
+          child: widget.child,
+        ),
+        AnimatedBuilder(
+          animation: _ac,
+          builder: (context, _) {
+            final v = _ac.value;
+            if (v <= 1) return const SizedBox.shrink();
+            const owl = 52.0;
+            final rope = (v - owl * .55).clamp(0.0, _max);
+            final ready = v >= _trigger || _busy;
+            return Positioned(
+              left: 0,
+              right: 0,
+              top: 0,
+              child: IgnorePointer(
+                child: Column(children: [
+                  Container(width: 2, height: rope, color: p.brand2.withValues(alpha: .6)),
+                  Transform.translate(
+                    offset: const Offset(0, -6),
+                    child: Transform.rotate(
+                      angle: _busy ? 0 : math.sin(v / 14) * .12,
+                      child: Mascot(size: owl, book: false, mood: ready ? OwlMood.happy : OwlMood.hello),
+                    ),
+                  ),
+                ]),
+              ),
+            );
+          },
+        ),
+        if (_done)
+          Positioned(
+            top: 8,
+            left: 0,
+            right: 0,
+            child: IgnorePointer(
+              child: Center(
+                child: FadeIn(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(color: p.successTint, borderRadius: BorderRadius.circular(99)),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.check_rounded, size: 15, color: p.success),
+                      const SizedBox(width: 4),
+                      Text(tr('updated'), style: TextStyle(color: p.success, fontWeight: FontWeight.w800, fontSize: 12.5)),
+                    ]),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ]),
+    );
   }
 }
 

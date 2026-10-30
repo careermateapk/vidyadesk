@@ -8,6 +8,7 @@ import '../core/theme.dart';
 import '../data/backend.dart';
 import '../data/models.dart';
 import '../services/push.dart';
+import '../ui/mascot.dart';
 import '../ui/widgets.dart';
 import 'common.dart';
 import 'insights.dart' show shareReportCard;
@@ -469,6 +470,13 @@ class _Results extends StatelessWidget {
           if (mine.isEmpty) {
             return ListView(physics: const AlwaysScrollableScrollPhysics(), children: [EmptyState(icon: Icons.emoji_events_outlined, text: tr('no_results'))]);
           }
+          // a new result (last 7 days): the podium shows by itself, once
+          final newest = mine.first;
+          if (DateTime.now().millisecondsSinceEpoch - (newest.publishedAt > 0 ? newest.publishedAt : newest.date) < 7 * 86400000 && context.appRead.takeOnce('podium_${newest.id}_$uid')) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (context.mounted) showResultPodium(context, newest, uid);
+            });
+          }
           final pcts = [for (final t in mine) (t.marks[uid]! * 100 / t.maxMarks).round()];
           final avg = (pcts.reduce((a, b) => a + b) / pcts.length).round();
           final best = pcts.reduce((a, b) => a > b ? a : b);
@@ -535,6 +543,7 @@ class _Results extends StatelessWidget {
                       final rank = t.rankOf(uid);
                       final avgT = t.average;
                       return AppCard(
+                        onTap: () => showResultPodium(context, t, uid),
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                           Row(children: [
                             Ring(
@@ -582,6 +591,125 @@ class _Results extends StatelessWidget {
               ),
             ],
           );
+        },
+      ),
+    );
+  }
+}
+
+
+/// Result reveal: the podium rises, Vidu jumps on with a trophy, marks count up.
+Future<void> showResultPodium(BuildContext context, TestPaper t, String uid) => showGeneralDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'result',
+      barrierColor: Colors.black.withValues(alpha: .4),
+      transitionDuration: const Duration(milliseconds: 260),
+      pageBuilder: (c, _, __) => Center(child: Material(color: Colors.transparent, child: _Podium(t: t, uid: uid))),
+      transitionBuilder: (c, a, _, child) => FadeTransition(opacity: a, child: ScaleTransition(scale: Tween(begin: .92, end: 1.0).animate(CurvedAnimation(parent: a, curve: Curves.easeOutBack)), child: child)),
+    );
+
+class _Podium extends StatefulWidget {
+  const _Podium({required this.t, required this.uid});
+  final TestPaper t;
+  final String uid;
+  @override
+  State<_Podium> createState() => _PodiumState();
+}
+
+class _PodiumState extends State<_Podium> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 2200))..forward();
+
+  @override
+  void initState() {
+    super.initState();
+    Future<void>.delayed(const Duration(milliseconds: 900), () => HapticFeedback.heavyImpact());
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pal;
+    final t = widget.t;
+    final my = t.marks[widget.uid] ?? 0;
+    final rank = t.rankOf(widget.uid);
+    final order = t.marks.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    String nameAt(int i) => i < order.length ? firstName(t.names[order[i].key] ?? '') : '';
+    // podium: 2nd · 1st · 3rd
+    final slots = [(1, 92.0, p.brand2), (0, 132.0, p.brand), (2, 70.0, p.brandTint)];
+    return Container(
+      width: 310,
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+      decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(30)),
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (context, _) {
+          final v = _c.value;
+          final score = Curves.easeOut.transform(((v - .45) / .45).clamp(0.0, 1.0));
+          final owlIn = Curves.easeOutBack.transform(((v - .3) / .3).clamp(0.0, 1.0));
+          return Column(mainAxisSize: MainAxisSize.min, children: [
+            Text(t.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: p.muted, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 4),
+            Row(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
+              Text(fmtMarks(my * score), style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w900, letterSpacing: -1.5, height: 1)),
+              Text('/${t.maxMarks}', style: TextStyle(color: p.muted, fontWeight: FontWeight.w800, fontSize: 16)),
+            ]),
+            if (rank > 0) Text(trf('rank_of', {'r': '$rank', 'n': '${t.marks.length}'}), style: TextStyle(color: p.warn, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 230,
+              child: Stack(clipBehavior: Clip.none, alignment: Alignment.bottomCenter, children: [
+                Row(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
+                  for (var k = 0; k < 3; k++) ...[
+                    if (k > 0) const SizedBox(width: 8),
+                    Builder(builder: (_) {
+                      final s = slots[k];
+                      final rise = Curves.elasticOut.transform(((v - k * .06) / .45).clamp(0.0, 1.0));
+                      final me = rank == s.$1 + 1;
+                      return Column(mainAxisSize: MainAxisSize.min, children: [
+                        if (s.$1 < order.length) Text(me ? tr('you') : nameAt(s.$1), maxLines: 1, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: me ? p.brand : p.muted)),
+                        const SizedBox(height: 4),
+                        Container(
+                          width: 76,
+                          height: s.$2 * rise,
+                          alignment: Alignment.topCenter,
+                          padding: const EdgeInsets.only(top: 6),
+                          decoration: BoxDecoration(color: s.$3, borderRadius: const BorderRadius.vertical(top: Radius.circular(14))),
+                          child: rise > .5 ? Text('${s.$1 + 1}', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 24, color: s.$1 == 2 ? p.brand : Colors.white)) : null,
+                        ),
+                      ]);
+                    }),
+                  ],
+                ]),
+                // Vidu with a trophy lands on my step (or beside the podium)
+                Builder(builder: (_) {
+                  final idx = rank >= 1 && rank <= 3 ? [1, 0, 2].indexOf(rank - 1) : -1;
+                  final x = idx < 0 ? 110.0 : (idx - 1) * 84.0;
+                  final base = idx < 0 ? 0.0 : slots[idx].$2 + 18;
+                  return Positioned(
+                    bottom: base + 120 * (1 - owlIn),
+                    child: Transform.translate(
+                      offset: Offset(x, 0),
+                      child: Opacity(
+                        opacity: owlIn.clamp(0.0, 1.0),
+                        child: Stack(clipBehavior: Clip.none, children: [
+                          Mascot(size: 86, book: false, mood: rank > 0 && rank <= 3 ? OwlMood.happy : OwlMood.hello),
+                          if (rank > 0 && rank <= 3) const Positioned(right: -6, top: 6, child: Text('🏆', style: TextStyle(fontSize: 26))),
+                        ]),
+                      ),
+                    ),
+                  );
+                }),
+              ]),
+            ),
+            const SizedBox(height: 12),
+            SoftButton(label: tr('great'), height: 46, onPressed: () => Navigator.pop(context)),
+          ]);
         },
       ),
     );

@@ -118,6 +118,47 @@ Future<T?> push<T>(BuildContext context, Widget page) => Navigator.of(context).p
     ));
 
 
+/// Open [page] by growing it out of the tapped card ([cardContext] is the card's
+/// own context); going back shrinks it into the card again.
+Future<T?> pushExpand<T>(BuildContext cardContext, Widget page) {
+  final box = cardContext.findRenderObject() as RenderBox?;
+  final nav = Navigator.of(cardContext);
+  if (box == null || !box.hasSize) return push<T>(cardContext, page);
+  final navBox = nav.context.findRenderObject() as RenderBox?;
+  final origin = box.localToGlobal(Offset.zero, ancestor: navBox);
+  final from = origin & box.size;
+  return nav.push<T>(PageRouteBuilder<T>(
+    transitionDuration: const Duration(milliseconds: 420),
+    reverseTransitionDuration: const Duration(milliseconds: 340),
+    pageBuilder: (_, _, _) => Backdrop(child: page),
+    transitionsBuilder: (context, a, _, child) {
+      final c = CurvedAnimation(parent: a, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
+      return AnimatedBuilder(
+        animation: c,
+        builder: (context, child) {
+          final full = Offset.zero & MediaQuery.of(context).size;
+          final r = Rect.lerp(from, full, c.value)!;
+          return ClipRRect(
+            clipper: _RectClip(r, 22 * (1 - c.value)),
+            child: Opacity(opacity: (c.value * 2.2).clamp(0.0, 1.0), child: child),
+          );
+        },
+        child: child,
+      );
+    },
+  ));
+}
+
+class _RectClip extends CustomClipper<RRect> {
+  _RectClip(this.r, this.radius);
+  final Rect r;
+  final double radius;
+  @override
+  RRect getClip(Size size) => RRect.fromRectAndRadius(r, Radius.circular(radius));
+  @override
+  bool shouldReclip(_RectClip o) => o.r != r || o.radius != radius;
+}
+
 /// A UPI app's own icon from the phone (or its first letter when the phone gives none).
 class UpiIcon extends StatelessWidget {
   const UpiIcon(this.app, {super.key, this.size = 38});

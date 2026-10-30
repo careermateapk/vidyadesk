@@ -130,7 +130,12 @@ class _StaffHomeState extends State<StaffHome> {
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
         item(Row(children: [
-          GestureDetector(onTap: () => shell?.goToNamed('profile'), child: Avatar(app.profile?.name ?? m.name, size: 46, photo: app.profile?.photo ?? '')),
+          GestureDetector(
+            onTap: () => shell?.goToNamed('profile'),
+            child: m.role == Role.admin && app.plan != null
+                ? PlanRing(st: app.plan, size: 42, child: Avatar(app.profile?.name ?? m.name, size: 42, photo: app.profile?.photo ?? ''))
+                : Avatar(app.profile?.name ?? m.name, size: 46, photo: app.profile?.photo ?? ''),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

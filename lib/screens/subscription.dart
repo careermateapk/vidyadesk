@@ -68,6 +68,118 @@ class PlanBadge extends StatelessWidget {
   }
 }
 
+/// A glowing ring around the admin's photo, coloured by the plan:
+/// trial grey · Basic teal · Standard purple-blue · Pro gold with stars ·
+/// red and pulsing when 7 days or less are left.
+class PlanRing extends StatefulWidget {
+  const PlanRing({super.key, required this.st, required this.child, required this.size, this.stroke});
+  final PlanStatus? st;
+  final Widget child;
+  /// Size of [child] (the photo).
+  final double size;
+  final double? stroke;
+  @override
+  State<PlanRing> createState() => _PlanRingState();
+}
+
+class _PlanRingState extends State<PlanRing> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(seconds: 12))..repeat();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final st = widget.st;
+    if (st == null) return widget.child;
+    final w = widget.stroke ?? (widget.size * .075).clamp(3.0, 7.0);
+    final total = widget.size + w * 2 + 4;
+    final red = !st.active || st.daysLeft <= 7;
+    final (List<Color> cols, Color glow, double turns) = red
+        ? (const [Color(0xFFF0466E), Color(0xFFFF8FA8), Color(0xFFF0466E)], const Color(0xFFF0466E), 0)
+        : switch (st.plan) {
+            Plan.basic => (const [Color(0xFF0EA5B7), Color(0xFF5EEAD4), Color(0xFF0EA5B7)], const Color(0xFF0EA5B7), 2),
+            Plan.standard => (const [Color(0xFF6C5CE7), Color(0xFFA79BFF), Color(0xFF3B9EF5), Color(0xFF6C5CE7)], const Color(0xFF6C5CE7), 3),
+            Plan.pro => (const [Color(0xFFFFD27A), Color(0xFFFF9F43), Color(0xFFF0466E), Color(0xFFFFD27A), Color(0xFFFFF3C4), Color(0xFFFFD27A)], const Color(0xFFFF9F43), 4),
+            Plan.trial => (const [Color(0xFFC9C6DC), Color(0xFFEFEDFA), Color(0xFFC9C6DC)], const Color(0x00000000), 0),
+          };
+    final pro = !red && st.plan == Plan.pro;
+    final std = !red && st.plan == Plan.standard;
+    return RepaintBoundary(
+      child: SizedBox(
+        width: total,
+        height: total,
+        child: AnimatedBuilder(
+          animation: _c,
+          builder: (context, child) {
+            final t = _c.value;
+            final pulse = 0.5 + 0.5 * math.sin(t * math.pi * 2 * (red ? 7.5 : 6));
+            final glowA = red ? .25 + .6 * pulse : (st.plan == Plan.trial ? 0.0 : (pro ? .45 + .45 * pulse : .25 + .35 * pulse));
+            return Stack(clipBehavior: Clip.none, children: [
+              Positioned.fill(
+                child: Opacity(
+                  opacity: red ? .45 + .55 * pulse : 1,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(shape: BoxShape.circle, boxShadow: [if (glowA > 0) BoxShadow(color: glow.withValues(alpha: glowA), blurRadius: pro ? 18 : 12, spreadRadius: pro ? 1 : 0)]),
+                    child: CustomPaint(painter: _RingArc(cols, w, t * math.pi * 2 * turns)),
+                  ),
+                ),
+              ),
+              Positioned.fill(child: Padding(padding: EdgeInsets.all(w + 2), child: ClipOval(child: child))),
+              if (pro) ...[
+                _star(total * .78, -total * .06, total * .26, (0.5 + 0.5 * math.sin(t * math.pi * 2 * 5))),
+                _star(-total * .02, total * .72, total * .16, (0.5 + 0.5 * math.sin(t * math.pi * 2 * 5 + 2))),
+              ],
+              if (std)
+                Builder(builder: (_) {
+                  final a = t * math.pi * 2 * 3 - math.pi / 2;
+                  final r = total / 2 - w / 2;
+                  return Positioned(
+                    left: total / 2 + r * math.cos(a) - 4,
+                    top: total / 2 + r * math.sin(a) - 4,
+                    child: Container(width: 8, height: 8, decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(color: const Color(0xFFA79BFF).withValues(alpha: .9), blurRadius: 8)])),
+                  );
+                }),
+            ]);
+          },
+          child: SizedBox(width: widget.size, height: widget.size, child: widget.child),
+        ),
+      ),
+    );
+  }
+
+  Widget _star(double x, double y, double s, double v) => Positioned(
+        left: x,
+        top: y,
+        child: IgnorePointer(
+          child: Opacity(
+            opacity: .35 + .65 * v,
+            child: Transform.scale(scale: .7 + .4 * v, child: Icon(Icons.auto_awesome, size: s, color: const Color(0xFFFFD27A))),
+          ),
+        ),
+      );
+}
+
+class _RingArc extends CustomPainter {
+  _RingArc(this.cols, this.w, this.angle);
+  final List<Color> cols;
+  final double w, angle;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final r = Rect.fromLTWH(w / 2, w / 2, size.width - w, size.height - w);
+    canvas.drawArc(r, 0, math.pi * 2, false, Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = w
+      ..shader = SweepGradient(colors: cols, transform: GradientRotation(angle)).createShader(r));
+  }
+
+  @override
+  bool shouldRepaint(_RingArc o) => o.angle != angle || o.cols != cols;
+}
+
 /// Does the coaching's plan include [f]? (true while the plan is unknown).
 /// Is a feature switched on by the VidyaDesk owner for this coaching?
 bool featureOn(BuildContext context, String key) {
@@ -451,349 +563,469 @@ class PlansScreen extends StatefulWidget {
   State<PlansScreen> createState() => _PlansScreenState();
 }
 
-class _PlansScreenState extends State<PlansScreen> {
+class _PlansScreenState extends State<PlansScreen> with SingleTickerProviderStateMixin {
   bool _yearly = true;
   late Plan _plan = widget.pick ?? context.appRead.plan?.renewPlan ?? Plan.standard;
   int _v = 0;
+  // clouds drift slowly
+  late final AnimationController _sky = AnimationController(vsync: this, duration: const Duration(seconds: 18))..repeat();
+
+  @override
+  void dispose() {
+    _sky.dispose();
+    super.dispose();
+  }
 
   Future<void> _pay() async {
     final ok = await payForPlan(context, widget.m, _plan, _yearly);
     if (ok && mounted) setState(() => _v++);
   }
 
+  String _short(DateTime d) => '${d.day} ${tr('m${d.month}')}';
+
   @override
   Widget build(BuildContext context) {
     final p = context.pal;
     final app = context.app;
     final st = app.plan;
-    final sub = st == null
-        ? widget.m.instituteName
-        : st.trial
-            ? '${tr('plan_trial')} · ${trf('n_days_left', {'n': '${st.daysLeft.clamp(0, 999)}'})}'
-            : '${tr('now')}: ${planName(st.plan)} · ${st.active ? trf('till_date', {'date': _date(st.endDate)}) : tr('plan_ended')}';
     final amt = planAmount(_plan, _yearly);
+    final pro = _plan == Plan.pro;
+    final now = DateTime.now();
+
+    // Heading and the three steps depend on where the coaching stands.
+    final trial = st == null || st.trial;
+    final ended = st != null && !st.active;
+    final left = st == null ? 0 : st.daysLeft.clamp(0, 9999);
+    final (String h1, String h2, String chip) = trial && !ended
+        ? (tr('sky_trial_h1'), trf('sky_trial_h2', {'n': '$left'}), tr('sky_chip_free'))
+        : ended
+            ? (tr('sky_end_h1'), tr('sky_end_h2'), tr('sky_chip_safe'))
+            : (trf('sky_paid_h1', {'n': '$left'}), tr('sky_paid_h2'), tr('sky_chip_add'));
+    final sub = trial && !ended ? tr('sky_trial_sub') : (ended ? tr('sky_end_sub') : tr('sky_paid_sub'));
+    final end = st?.endDate ?? now.add(const Duration(days: trialDays));
+    final newEnd = DateTime.fromMillisecondsSinceEpoch(extendUntil(st?.until ?? 0, _yearly));
+    final steps = trial && !ended
+        ? [
+            (Icons.check_rounded, tr('sky_t1'), tr('sky_t1s')),
+            (Icons.notifications_rounded, trf('sky_t2', {'date': _short(end.subtract(const Duration(days: 7)))}), tr('sky_t2s')),
+            (Icons.lock_rounded, trf('sky_t3', {'date': _short(end)}), tr('sky_t3s')),
+          ]
+        : [
+            (Icons.check_rounded, tr('sky_p1'), tr('sky_p1s')),
+            (Icons.schedule_rounded, ended ? tr('sky_p2_end') : trf('sky_p2', {'date': _short(end)}), ended ? tr('sky_p2s_end') : trf('sky_p2s', {'n': '$left'})),
+            (Icons.star_rounded, trf('sky_p3', {'date': prettyDate(newEnd)}), trf('sky_p3s', {'plan': planName(_plan), 'per': _yearly ? tr('one_year') : tr('one_month')})),
+          ];
+    final fill = trial && !ended ? (1 - left / trialDays).clamp(.12, 1.0) : .34;
+
     return Scaffold(
-      appBar: InnerBar(
-        title: tr('choose_plan'),
-        subtitle: sub,
-        trailing: IconBtn(icon: Icons.table_chart_outlined, tooltip: tr('compare_plans'), onTap: () => push(context, ComparePlansScreen(m: widget.m))),
-      ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            PrimaryButton(
-              icon: Icons.verified_user_rounded,
-              label: trf('take_plan', {'plan': planName(_plan), 'amt': rupees(amt), 'per': _yearly ? tr('per_year') : tr('per_month')}),
-              onPressed: _pay,
-            ),
-            const SizedBox(height: 6),
-            Text(tr('plans_footer'), textAlign: TextAlign.center, style: TextStyle(color: p.muted, fontSize: 11.5)),
-          ]),
-        ),
-      ),
-      body: Loader<List<SubPayment>>(
-        key: ValueKey(_v),
-        load: () => app.backend.mySubPayments(widget.m.instituteId),
-        builder: (context, pays, reload) {
-          final waiting = pays.where((x) => x.status == 'pending').toList();
-          final lastNoAny = pays.where((x) => (x.status == 'rejected' || x.status == 'reversed') && DateTime.now().millisecondsSinceEpoch - x.decidedAt < 15 * 86400000).firstOrNull;
-          // Hide the red note once a newer plan payment went through.
-          final lastNo = lastNoAny == null || pays.any((x) => x.started && x.createdAt > lastNoAny.createdAt) ? null : lastNoAny;
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 6, 16, 20),
-            children: [
-              if (waiting.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: AppCard(
-                    color: p.successTint,
-                    padding: const EdgeInsets.all(14),
-                    child: Row(children: [
-                      Icon(Icons.hourglass_top_rounded, color: p.success),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          trf('sub_waiting', {'plan': planName(planFrom(waiting.first.plan)), 'amt': rupees(waiting.first.amount), 'utr': waiting.first.utr}),
-                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: p.ink2, height: 1.4),
-                        ),
+      backgroundColor: const Color(0xFFF3F1FF),
+      bottomNavigationBar: Container(
+        color: const Color(0xFFF3F1FF),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              _Shine(
+                radius: 20,
+                seconds: 3,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () {
+                      HapticFeedback.mediumImpact();
+                      _pay();
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      height: 62,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        gradient: pro
+                            ? const LinearGradient(colors: [Color(0xFF1E1A45), Color(0xFF3D2E8C)])
+                            : const LinearGradient(colors: [Color(0xFF5B6CF0), Color(0xFF4B3FC4)], begin: Alignment.topCenter, end: Alignment.bottomCenter),
+                        border: pro ? Border.all(color: const Color(0xFFFFD27A), width: 1.5) : null,
                       ),
-                    ]),
-                  ),
-                ),
-              if (lastNo != null && waiting.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _ShakeOnce(
-                    child: AppCard(
-                      color: p.dangerTint,
-                      padding: const EdgeInsets.all(14),
-                      child: Text(trf('sub_not_found', {'plan': planName(planFrom(lastNo.plan)), 'amt': rupees(lastNo.amount)}), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: p.danger, height: 1.4)),
-                    ),
-                  ),
-                ),
-              _Segment(yearly: _yearly, onChanged: (v) => setState(() => _yearly = v)),
-              const SizedBox(height: 14),
-              for (var i = 0; i < paidPlans.length; i++)
-                TweenAnimationBuilder<double>(
-                  tween: Tween(begin: 0, end: 1),
-                  duration: Duration(milliseconds: 450 + i * 140),
-                  curve: Curves.easeOutCubic,
-                  builder: (_, v, c) => Opacity(opacity: v, child: Transform.translate(offset: Offset(0, 24 * (1 - v)), child: c)),
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: 14),
-                    child: _PlanCard(
-                      plan: paidPlans[i],
-                      yearly: _yearly,
-                      selected: _plan == paidPlans[i],
-                      current: st != null && !st.trial && st.plan == paidPlans[i],
-                      onTap: () => setState(() => _plan = paidPlans[i]),
-                    ),
-                  ),
-                ),
-              AppCard(
-                color: p.cardAlt,
-                padding: const EdgeInsets.all(14),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(tr('how_plan_ends'), style: const TextStyle(fontWeight: FontWeight.w800)),
-                  const SizedBox(height: 8),
-                  for (final r in [('end_7', p.indigo), ('end_3', p.warn), ('end_0', p.danger), ('end_lock', p.muted)])
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Padding(padding: const EdgeInsets.only(top: 5), child: CircleAvatar(radius: 4, backgroundColor: r.$2)),
-                        const SizedBox(width: 10),
-                        Expanded(child: Text(tr(r.$1), style: TextStyle(color: p.ink2, fontSize: 12.5, height: 1.35, fontWeight: FontWeight.w600))),
+                      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                        Text(
+                          '${pro ? '★ ' : ''}${trf('take_plan_short', {'plan': planName(_plan)})} · ${rupees(amt)}${_yearly ? tr('per_year') : tr('per_month')}',
+                          style: TextStyle(color: pro ? const Color(0xFFFFD27A) : Colors.white, fontWeight: FontWeight.w900, fontSize: 17),
+                        ),
+                        Text(tr('sky_cta_sub'), style: const TextStyle(color: Color(0xDDFFFFFF), fontWeight: FontWeight.w700, fontSize: 11.5)),
                       ]),
                     ),
-                ]),
+                  ),
+                ),
               ),
-            ],
-          );
-        },
+              const SizedBox(height: 6),
+              Text(tr('sky_footer'), textAlign: TextAlign.center, style: TextStyle(color: p.muted, fontSize: 11.5, fontWeight: FontWeight.w600)),
+            ]),
+          ),
+        ),
       ),
+      body: Stack(children: [
+        // sky
+        Positioned(
+          left: 0,
+          right: 0,
+          top: 0,
+          height: 360,
+          child: AnimatedBuilder(
+            animation: _sky,
+            builder: (_, __) {
+              final t = _sky.value * math.pi * 2;
+              Widget cloud(double x, double y, double w, double h, double speed) => Positioned(
+                    left: x + math.sin(t * speed) * 18,
+                    top: y,
+                    child: Container(
+                      width: w,
+                      height: h,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(99),
+                        gradient: RadialGradient(colors: [Colors.white, Colors.white.withValues(alpha: .9), Colors.white.withValues(alpha: .35)], stops: const [0, .6, 1]),
+                        boxShadow: [BoxShadow(color: const Color(0xFF4B3FC4).withValues(alpha: .15), blurRadius: 18, offset: const Offset(0, 8))],
+                      ),
+                    ),
+                  );
+              return Stack(clipBehavior: Clip.hardEdge, children: [
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF5B6CF0), Color(0xFF7E8BF7), Color(0xFFBFC6FF), Color(0xFFF3F1FF)], stops: [0, .38, .72, 1]),
+                    ),
+                  ),
+                ),
+                Positioned(left: 0, right: 0, top: -60, child: Center(child: Container(width: 260, height: 260, decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [Colors.white.withValues(alpha: .5), Colors.white.withValues(alpha: 0)]))))),
+                cloud(-50, 130, 180, 62, 1),
+                cloud(260, 115, 200, 68, -1),
+                cloud(-30, 185, 210, 72, -1),
+                cloud(120, 175, 220, 78, 1),
+                cloud(250, 195, 190, 70, 1),
+                cloud(30, 235, 330, 82, -1),
+                const Positioned(left: 0, right: 0, bottom: 0, height: 90, child: DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0x00F3F1FF), Color(0xFFF3F1FF)])))),
+              ]);
+            },
+          ),
+        ),
+        SafeArea(
+          child: Loader<List<SubPayment>>(
+            key: ValueKey(_v),
+            pullToRefresh: false,
+            load: () => app.backend.mySubPayments(widget.m.instituteId),
+            builder: (context, pays, reload) {
+              final waiting = pays.where((x) => x.status == 'pending').toList();
+              final lastNoAny = pays.where((x) => (x.status == 'rejected' || x.status == 'reversed') && DateTime.now().millisecondsSinceEpoch - x.decidedAt < 15 * 86400000).firstOrNull;
+              final lastNo = lastNoAny == null || pays.any((x) => x.started && x.createdAt > lastNoAny.createdAt) ? null : lastNoAny;
+              return ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 20), children: [
+                Row(children: [
+                  Material(
+                    color: Colors.white.withValues(alpha: .75),
+                    borderRadius: BorderRadius.circular(14),
+                    child: InkWell(borderRadius: BorderRadius.circular(14), onTap: () => Navigator.maybePop(context), child: const SizedBox(width: 44, height: 44, child: Icon(Icons.chevron_left_rounded, size: 28))),
+                  ),
+                  const Spacer(),
+                  Material(
+                    color: Colors.white.withValues(alpha: .8),
+                    borderRadius: BorderRadius.circular(99),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(99),
+                      onTap: () => push(context, ComparePlansScreen(m: widget.m)),
+                      child: Padding(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9), child: Text(tr('compare_short'), style: TextStyle(color: p.brandDeep, fontWeight: FontWeight.w800, fontSize: 13))),
+                    ),
+                  ),
+                ]),
+                // Vidu flies in
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0, end: 1),
+                  duration: const Duration(milliseconds: 900),
+                  curve: Curves.easeOutBack,
+                  builder: (_, v, c) => Opacity(opacity: v.clamp(0.0, 1.0), child: Transform.translate(offset: Offset(0, -40 * (1 - v)), child: c)),
+                  child: const Center(child: Mascot(size: 150, book: false, mood: OwlMood.hello)),
+                ),
+                Text(h1, textAlign: TextAlign.center, style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w900, height: 1.15, letterSpacing: -.5)),
+                ShaderMask(
+                  shaderCallback: (r) => (trial && !ended ? const LinearGradient(colors: [Color(0xFF5545D6), Color(0xFF8B7CF6)]) : const LinearGradient(colors: [Color(0xFFE8930C), Color(0xFFF0466E)])).createShader(r),
+                  child: Text(h2, textAlign: TextAlign.center, style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w900, height: 1.2, letterSpacing: -.5, color: Colors.white)),
+                ),
+                const SizedBox(height: 8),
+                Wrap(alignment: WrapAlignment.center, crossAxisAlignment: WrapCrossAlignment.center, spacing: 6, runSpacing: 4, children: [
+                  Text(sub, style: TextStyle(color: p.ink2, fontWeight: FontWeight.w700, fontSize: 13)),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(color: p.success, borderRadius: BorderRadius.circular(7)),
+                    child: Text(chip, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11.5)),
+                  ),
+                ]),
+                const SizedBox(height: 14),
+                if (waiting.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: AppCard(
+                      color: p.successTint,
+                      padding: const EdgeInsets.all(14),
+                      child: Text(trf('sub_waiting', {'plan': planName(planFrom(waiting.first.plan)), 'amt': rupees(waiting.first.amount), 'utr': waiting.first.utr}),
+                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: p.ink2, height: 1.4)),
+                    ),
+                  ),
+                if (lastNo != null && waiting.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _ShakeOnce(
+                      child: AppCard(
+                        color: p.dangerTint,
+                        padding: const EdgeInsets.all(14),
+                        child: Text(trf('sub_not_found', {'plan': planName(planFrom(lastNo.plan)), 'amt': rupees(lastNo.amount)}), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: p.danger, height: 1.4)),
+                      ),
+                    ),
+                  ),
+                _Timeline(steps: steps, fill: fill),
+                const SizedBox(height: 12),
+                _PlanTabs(plan: _plan, onChanged: (x) => setState(() => _plan = x)),
+                const SizedBox(height: 16),
+                Row(children: [
+                  Expanded(child: _PeriodCard(plan: _plan, yearly: false, selected: !_yearly, onTap: () => setState(() => _yearly = false))),
+                  const SizedBox(width: 10),
+                  Expanded(child: _PeriodCard(plan: _plan, yearly: true, selected: _yearly, onTap: () => setState(() => _yearly = true))),
+                ]),
+                const SizedBox(height: 12),
+                _PlanIncludes(plan: _plan),
+              ]);
+            },
+          ),
+        ),
+      ]),
     );
   }
 }
 
-/// Monthly / yearly switch with a sliding coloured pill.
-class _Segment extends StatelessWidget {
-  const _Segment({required this.yearly, required this.onChanged});
-  final bool yearly;
-  final ValueChanged<bool> onChanged;
+/// "How the plan works": three steps with a bar that fills down.
+class _Timeline extends StatelessWidget {
+  const _Timeline({required this.steps, required this.fill});
+  final List<(IconData, String, String)> steps;
+  final double fill;
   @override
   Widget build(BuildContext context) {
     final p = context.pal;
-    final months = yearlySaving(Plan.standard).$2;
-    Widget seg(bool y, String t, String? sub) => Expanded(
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () {
-              HapticFeedback.selectionClick();
-              onChanged(y);
-            },
-            child: SizedBox(
-              height: 50,
-              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                AnimatedDefaultTextStyle(
-                  duration: const Duration(milliseconds: 250),
-                  style: TextStyle(fontFamily: Theme.of(context).textTheme.bodyMedium?.fontFamily, fontWeight: FontWeight.w900, fontSize: 15, color: yearly == y ? Colors.white : p.muted),
-                  child: Text(t),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .85),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: Colors.white),
+        boxShadow: [BoxShadow(color: const Color(0xFF4B3FC4).withValues(alpha: .14), blurRadius: 30, offset: const Offset(0, 14), spreadRadius: -12)],
+      ),
+      child: Column(children: [
+        Text(tr('sky_how'), style: TextStyle(color: p.muted, fontWeight: FontWeight.w900, fontSize: 11.5, letterSpacing: 1)),
+        const SizedBox(height: 10),
+        Stack(children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 34),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              for (var i = 0; i < steps.length; i++)
+                Padding(
+                  padding: EdgeInsets.only(bottom: i < steps.length - 1 ? 10 : 0),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(steps[i].$2, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
+                    Text(steps[i].$3, style: TextStyle(color: p.muted, fontWeight: FontWeight.w600, fontSize: 11.5, height: 1.35)),
+                  ]),
                 ),
-                if (sub != null)
-                  AnimatedDefaultTextStyle(
-                    duration: const Duration(milliseconds: 250),
-                    style: TextStyle(fontFamily: Theme.of(context).textTheme.bodyMedium?.fontFamily, fontWeight: FontWeight.w800, fontSize: 11, color: yearly == y ? const Color(0xFFFFE08A) : p.success),
-                    child: Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis),
-                  ),
-              ]),
+            ]),
+          ),
+          Positioned(
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: 22,
+            child: LayoutBuilder(
+              builder: (_, box) => TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0, end: fill),
+                duration: const Duration(milliseconds: 1500),
+                curve: Curves.easeOutCubic,
+                builder: (_, v, __) => Stack(children: [
+                  Positioned.fill(child: Container(decoration: BoxDecoration(color: const Color(0xFFE6E3FA), borderRadius: BorderRadius.circular(12)))),
+                  Positioned(left: 0, right: 0, top: 0, height: box.maxHeight * v, child: Container(decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF6C5CE7), Color(0xFF8B7CF6)], begin: Alignment.topCenter, end: Alignment.bottomCenter), borderRadius: BorderRadius.circular(12)))),
+                  for (var i = 0; i < steps.length; i++)
+                    Positioned(
+                      left: 3,
+                      top: box.maxHeight * (i / steps.length) + 4,
+                      child: Container(
+                        width: 16,
+                        height: 16,
+                        decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                        child: Icon(steps[i].$1, size: 11, color: const Color(0xFF6C5CE7)),
+                      ),
+                    ),
+                ]),
+              ),
             ),
           ),
-        );
+        ]),
+        const SizedBox(height: 10),
+        Divider(height: 1, color: p.border),
+        const SizedBox(height: 8),
+        Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
+          for (final x in [(Icons.groups_rounded, tr('students')), (Icons.currency_rupee_rounded, tr('sky_upi')), (Icons.support_agent_rounded, tr('sky_support'))])
+            Row(children: [Icon(x.$1, size: 14, color: p.ink2), const SizedBox(width: 4), Text(x.$2, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: p.ink2))]),
+        ]),
+      ]),
+    );
+  }
+}
+
+class _PlanTabs extends StatelessWidget {
+  const _PlanTabs({required this.plan, required this.onChanged});
+  final Plan plan;
+  final ValueChanged<Plan> onChanged;
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pal;
+    final i = paidPlans.indexOf(plan);
     return Container(
-      padding: const EdgeInsets.all(5),
-      decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(18), boxShadow: [BoxShadow(color: p.brand.withValues(alpha: .10), blurRadius: 20, offset: const Offset(0, 8))]),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(color: Colors.white.withValues(alpha: .75), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white)),
       child: Stack(children: [
         Positioned.fill(
           child: AnimatedAlign(
             duration: const Duration(milliseconds: 320),
             curve: Curves.easeOutBack,
-            alignment: yearly ? Alignment.centerRight : Alignment.centerLeft,
+            alignment: Alignment(-1 + i * 1.0, 0),
             child: FractionallySizedBox(
-              widthFactor: .5,
-              child: Container(
+              widthFactor: 1 / 3,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: [p.brand, p.brand2]),
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [BoxShadow(color: p.brand.withValues(alpha: .4), blurRadius: 14, offset: const Offset(0, 6))],
+                  color: plan == Plan.pro ? null : Colors.white,
+                  gradient: plan == Plan.pro ? const LinearGradient(colors: [Color(0xFF1E1A45), Color(0xFF3D2E8C)]) : null,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [BoxShadow(color: p.brand.withValues(alpha: .25), blurRadius: 12, offset: const Offset(0, 5))],
                 ),
               ),
             ),
           ),
         ),
         Row(children: [
-          seg(false, tr('monthly'), null),
-          seg(true, tr('yearly'), months > 0 ? trf('n_months_free', {'n': '$months'}) : null),
+          for (final x in paidPlans)
+            Expanded(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  onChanged(x);
+                },
+                child: SizedBox(
+                  height: 40,
+                  child: Center(
+                    child: Text(
+                      '${planName(x)}${x == Plan.standard ? ' 🔥' : ''}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 13.5,
+                        color: x == plan ? (x == Plan.pro ? const Color(0xFFFFD27A) : p.brand) : p.muted,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ]),
       ]),
     );
   }
 }
 
-class _PlanCard extends StatelessWidget {
-  const _PlanCard({required this.plan, required this.yearly, required this.selected, required this.current, required this.onTap});
+class _PeriodCard extends StatelessWidget {
+  const _PeriodCard({required this.plan, required this.yearly, required this.selected, required this.onTap});
   final Plan plan;
-  final bool yearly, selected, current;
+  final bool yearly, selected;
   final VoidCallback onTap;
-
   @override
   Widget build(BuildContext context) {
     final p = context.pal;
-    final dark = plan == Plan.pro;
-    final col = dark ? const Color(0xFFFFD27A) : planColor(p, plan);
-    final i = paidPlans.indexOf(plan);
-    final lim = planLimit[plan]!;
-    final price = planPrice[plan]!;
-    final (save, _) = yearlySaving(plan);
-    final own = [
-      for (final f in planFeatureRows)
-        if ((i == 0 && f.$2) || (i == 1 && f.$3 && !f.$2) || (i == 2 && f.$4 && !f.$3)) f.$1,
-    ].take(4).toList();
-    final ribbon = current ? tr('current_plan') : plan == Plan.standard ? tr('most_popular') : plan == Plan.pro ? tr('best_value') : '';
-    final fg = dark ? Colors.white : p.ink;
-    final soft = dark ? Colors.white.withValues(alpha: .65) : p.muted;
-
-    Widget card = Container(
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
-      decoration: BoxDecoration(
-        color: dark ? null : p.card,
-        gradient: dark ? const LinearGradient(colors: [Color(0xFF1E1A45), Color(0xFF2B2370), Color(0xFF3D2E8C)], begin: Alignment.topLeft, end: Alignment.bottomRight) : null,
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Stack(clipBehavior: Clip.none, children: [
-        if (dark)
-          Positioned(
-            right: -60,
-            top: -60,
-            child: Container(width: 180, height: 180, decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [const Color(0xFFFFD27A).withValues(alpha: .35), const Color(0xFFFFD27A).withValues(alpha: 0)]))),
-          ),
-        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(color: col.withValues(alpha: dark ? .16 : .13), borderRadius: BorderRadius.circular(16)),
-              child: Icon(planIcon(plan), color: col, size: 26),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(planName(plan), style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900, color: fg, letterSpacing: -.3)),
-                Text(
-                  '${lim.$1 < 0 ? tr('unlimited_students') : trf('n_students', {'n': '${lim.$1}'})} · ${lim.$2 < 0 ? tr('unlimited_teachers') : trf('n_teachers', {'n': '${lim.$2}'})}',
-                  style: TextStyle(color: soft, fontSize: 12.5, fontWeight: FontWeight.w700),
-                ),
-              ]),
-            ),
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              width: 26,
-              height: 26,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: selected ? p.brand : Colors.transparent,
-                border: Border.all(color: selected ? p.brand : (dark ? Colors.white38 : p.border), width: 2),
-              ),
-              child: selected ? const Icon(Icons.check_rounded, color: Colors.white, size: 16) : null,
-            ),
-          ]),
-          const SizedBox(height: 14),
-          Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            _CountTo(yearly ? price.$2 : price.$1, money: true, ms: 600, style: TextStyle(fontSize: 34, fontWeight: FontWeight.w900, color: fg, letterSpacing: -1.2, height: 1)),
-            Padding(padding: const EdgeInsets.only(left: 6, bottom: 3), child: Text(yearly ? tr('per_year') : tr('per_month'), style: TextStyle(color: soft, fontWeight: FontWeight.w700, fontSize: 13))),
-            const Spacer(),
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 250),
-              child: yearly && save > 0
-                  ? Column(key: const ValueKey('y'), crossAxisAlignment: CrossAxisAlignment.end, children: [
-                      Text(rupees(price.$1 * 12), style: TextStyle(color: soft, fontSize: 12, fontWeight: FontWeight.w700, decoration: TextDecoration.lineThrough, decorationColor: soft)),
-                      const SizedBox(height: 3),
-                      Tag(trf('rs_saved', {'amt': rupees(save)}), fg: dark ? const Color(0xFF4ADE80) : p.success, bg: dark ? const Color(0xFF4ADE80).withValues(alpha: .16) : p.successTint),
-                    ])
-                  : Text(yearly ? '' : '≈${rupees((price.$1 / 30).round())}${tr('per_day')}', key: const ValueKey('m'), style: TextStyle(color: soft, fontSize: 12, fontWeight: FontWeight.w700)),
-            ),
-          ]),
-          const SizedBox(height: 12),
-          Wrap(runSpacing: 6, children: [
-            for (final k in own)
-              FractionallySizedBox(
-                widthFactor: .5,
-                child: Row(children: [
-                  Icon(Icons.check_rounded, size: 16, color: col),
-                  const SizedBox(width: 5),
-                  Expanded(child: Text(tr('${k}_short'), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: dark ? Colors.white.withValues(alpha: .9) : p.ink2))),
-                ]),
-              ),
-            if (i > 0)
-              FractionallySizedBox(
-                widthFactor: .5,
-                child: Row(children: [
-                  Icon(Icons.add_rounded, size: 16, color: soft),
-                  const SizedBox(width: 5),
-                  Expanded(child: Text(trf('all_of_plan_short', {'plan': planName(paidPlans[i - 1])}), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: soft))),
-                ]),
-              ),
-          ]),
-        ]),
-        if (dark) const Positioned.fill(child: _Twinkle(spots: [(.86, .02, 13), (.74, .2, 8), (.6, .05, 7)])),
-      ]),
-    );
-    if (dark) card = _Shine(radius: 24, child: card);
-
+    final pr = planPrice[plan]!;
+    final (save, months) = yearlySaving(plan);
+    final amount = yearly ? pr.$2 : pr.$1;
     return GestureDetector(
       onTap: () {
         HapticFeedback.selectionClick();
         onTap();
       },
-      child: AnimatedScale(
-        duration: const Duration(milliseconds: 250),
-        scale: selected ? 1 : .98,
-        child: Stack(clipBehavior: Clip.none, children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 250),
-            padding: const EdgeInsets.all(2.5),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(26.5),
-              gradient: dark
-                  ? const LinearGradient(colors: [Color(0xFFFFD27A), Color(0xFFFF9F43), Color(0xFF8B7CF6)])
-                  : LinearGradient(colors: selected ? [p.brand, p.brand2] : [p.border, p.border]),
-              boxShadow: [
-                BoxShadow(
-                  color: (dark ? const Color(0xFFFF9F43) : (selected ? p.brand : Colors.black)).withValues(alpha: dark || selected ? .28 : .04),
-                  blurRadius: selected || dark ? 26 : 12,
-                  offset: const Offset(0, 12),
-                  spreadRadius: -8,
-                ),
-              ],
-            ),
-            child: card,
+      child: Stack(clipBehavior: Clip.none, children: [
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
+          decoration: BoxDecoration(
+            color: selected ? Colors.white : Colors.white.withValues(alpha: .65),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: selected ? p.brand : Colors.white, width: selected ? 2.5 : 1.5),
+            boxShadow: selected ? [BoxShadow(color: p.brand.withValues(alpha: .3), blurRadius: 24, offset: const Offset(0, 12), spreadRadius: -10)] : null,
           ),
-          if (ribbon.isNotEmpty)
-            Positioned(
-              right: 18,
-              top: 2.5,
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(10, 4, 10, 5),
-                decoration: BoxDecoration(
-                  color: current ? p.success : null,
-                  gradient: current ? null : (dark ? const LinearGradient(colors: [Color(0xFFFF9F43), Color(0xFFF0466E)]) : LinearGradient(colors: [planColor(p, plan), planColor(p, plan)])),
-                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(10)),
-                ),
-                child: Text(ribbon.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w900, letterSpacing: .5)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 16,
+                height: 16,
+                decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: selected ? p.brand : p.border, width: 2)),
+                alignment: Alignment.center,
+                child: selected ? Container(width: 8, height: 8, decoration: BoxDecoration(color: p.brand, shape: BoxShape.circle)) : null,
               ),
+              const SizedBox(width: 7),
+              Text((yearly ? tr('yearly') : tr('monthly')).toUpperCase(), style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: .6, color: p.ink2)),
+            ]),
+            const SizedBox(height: 8),
+            Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              Flexible(child: FittedBox(fit: BoxFit.scaleDown, child: _CountTo(amount, money: true, ms: 500, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900, letterSpacing: -.6, height: 1)))),
+              Text(yearly ? tr('per_year_short') : tr('per_month_short'), style: TextStyle(color: p.muted, fontSize: 12, fontWeight: FontWeight.w700)),
+            ]),
+            const SizedBox(height: 2),
+            Text(
+              yearly && months > 0 ? '≈ ${rupees((pr.$2 / 12).round())}${tr('per_month_short')} · ${trf('n_months_free_plain', {'n': '$months'})}' : tr('stop_any_time'),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: p.muted, fontSize: 11, fontWeight: FontWeight.w700),
             ),
-        ]),
-      ),
+          ]),
+        ),
+        if (yearly && save > 0)
+          Positioned(
+            right: 10,
+            top: -11,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+              decoration: BoxDecoration(gradient: LinearGradient(colors: [p.brand, p.brand2]), borderRadius: BorderRadius.circular(8)),
+              child: Text(trf('rs_save', {'amt': rupees(save)}), style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w900)),
+            ),
+          ),
+      ]),
+    );
+  }
+}
+
+/// What the chosen plan adds (small chips).
+class _PlanIncludes extends StatelessWidget {
+  const _PlanIncludes({required this.plan});
+  final Plan plan;
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pal;
+    final i = paidPlans.indexOf(plan);
+    final lim = planLimit[plan]!;
+    final own = [
+      for (final f in planFeatureRows)
+        if ((i == 0 && f.$2) || (i == 1 && f.$3 && !f.$2) || (i == 2 && f.$4 && !f.$3)) f.$1,
+    ].take(5);
+    final dark = plan == Plan.pro;
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 250),
+      child: Wrap(key: ValueKey(plan), spacing: 6, runSpacing: 6, alignment: WrapAlignment.center, children: [
+        _Chip(
+          text: '${lim.$1 < 0 ? '∞' : lim.$1} ${tr('students')} · ${lim.$2 < 0 ? '∞' : lim.$2} ${tr('teachers')}',
+          icon: Icons.groups_rounded,
+          fg: dark ? const Color(0xFF8A5200) : p.brand,
+          bg: dark ? const Color(0xFFFFF3C4) : p.brandTint,
+        ),
+        for (final k in own) _Chip(text: tr('${k}_short'), icon: Icons.check_rounded, fg: dark ? const Color(0xFF8A5200) : p.brand, bg: dark ? const Color(0xFFFFF3C4) : p.brandTint),
+        if (i > 0) _Chip(text: trf('all_of_plan_short', {'plan': planName(paidPlans[i - 1])}), icon: Icons.add_rounded, fg: p.muted, bg: Colors.white),
+      ]),
     );
   }
 }

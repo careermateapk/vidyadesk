@@ -51,12 +51,14 @@ class SettingsPage extends StatelessWidget {
               GestureDetector(
                 onTap: () => changeProfilePhoto(context),
                 child: Stack(clipBehavior: Clip.none, children: [
-                  Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color(0x66FFFFFF), width: 2)),
-                    child: ClipOval(child: Avatar(name, size: 60, photo: u?.photo ?? '')),
-                  ),
-                  if (m.role == Role.admin && app.plan != null) Positioned(left: -2, bottom: -2, child: PlanBadge(st: app.plan!, small: true)),
+                  if (m.role == Role.admin && app.plan != null)
+                    PlanRing(st: app.plan, size: 60, child: Avatar(name, size: 60, photo: u?.photo ?? ''))
+                  else
+                    Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color(0x66FFFFFF), width: 2)),
+                      child: ClipOval(child: Avatar(name, size: 60, photo: u?.photo ?? '')),
+                    ),
                   Positioned(
                     right: -2,
                     bottom: -2,
@@ -77,7 +79,8 @@ class SettingsPage extends StatelessWidget {
                   const SizedBox(height: 8),
                   Wrap(spacing: 6, runSpacing: 6, children: [
                     Tag(roleName(m.role), fg: const Color(0xFF4B3FC4), bg: Colors.white),
-                    if (m.role == Role.admin && app.plan != null) PlanBadge(st: app.plan!),
+                    if (m.role == Role.admin && app.plan != null)
+                      GestureDetector(onTap: () => push(context, MyPlanScreen(m: m)), child: PlanBadge(st: app.plan!)),
                     ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 220),
                       child: Container(

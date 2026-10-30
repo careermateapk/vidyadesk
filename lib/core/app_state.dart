@@ -327,7 +327,8 @@ class AppState extends ChangeNotifier {
     try {
       _prefs = await SharedPreferences.getInstance();
     } catch (_) {}
-    introSeen = _prefs?.getBool('introSeen') ?? false;
+    // Phones that already used the app (language picked) count as "seen".
+    introSeen = _prefs?.getBool('introSeen') ?? (_prefs?.getBool('langChosen') ?? false);
     notifyListeners();
     lang = _prefs?.getString('lang') ?? 'en';
     languageChosen = _prefs?.getBool('langChosen') ?? false;
